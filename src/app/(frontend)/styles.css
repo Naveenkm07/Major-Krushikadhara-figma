@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+
+.figma-custom-code-fragment {
+  display: contents;
+}
+
+.figma-bypass-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 2147483647;
+  transform: translateY(-150%);
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  padding: 8px 12px;
+  font: 600 14px/1.2 system-ui, sans-serif;
+  text-decoration: none;
+}
+
+.figma-bypass-link:focus {
+  transform: translateY(0);
+}
+
+
+:root {
+  --font-sans: "Poppins", system-ui, sans-serif;
+  --font-kannada: "Noto Sans Kannada", "Poppins", sans-serif;
+}
+
+.font-kannada {
+  font-family: var(--font-kannada);
+}
+
+html.lang-kn body,
+html.lang-kn button,
+html.lang-kn input,
+html.lang-kn textarea,
+html.lang-kn select {
+  font-family: var(--font-kannada);
+  line-height: 1.55;
+}
+
+@keyframes splash-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes splash-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  60% {
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scan-sweep {
+  0% {
+    top: 2rem;
+  }
+  50% {
+    top: calc(100% - 2rem);
+  }
+  100% {
+    top: 2rem;
+  }
+}
+
+@keyframes splash-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+}
