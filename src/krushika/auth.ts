@@ -1,12 +1,9 @@
-// Development-only test authentication. Test credentials live only in this
-// module and are active only in dev builds (NODE_ENV !== production) unless
-// explicitly disabled with NEXT_PUBLIC_ENABLE_TEST_AUTH=false. Production builds
-// never grant access with them, and no SMS provider is configured here.
-const TEST_PHONE = "1234567890"
+// Demo authentication for previews and published prototype builds. Disable it
+// explicitly with NEXT_PUBLIC_ENABLE_TEST_AUTH=false when real SMS auth is added.
+const TEST_PHONE = "9591502209"
 const TEST_OTP = "1234"
 
-export const TEST_AUTH_ENABLED: boolean =
-  process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ENABLE_TEST_AUTH !== "false"
+export const TEST_AUTH_ENABLED: boolean = process.env.NEXT_PUBLIC_ENABLE_TEST_AUTH !== "false"
 
 export const DEV_TEST_PHONE: string | null = TEST_AUTH_ENABLED ? TEST_PHONE : null
 export const DEV_TEST_OTP: string | null = TEST_AUTH_ENABLED ? TEST_OTP : null
