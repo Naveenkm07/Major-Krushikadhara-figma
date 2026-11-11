@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+npm-debug.*
+
+# Environment variables & secrets
+.env
+*.env
+
+# Build outputs
+dist/
+build/
+
+# Uploads & temporary scan images
+uploads/
+uploads/scans/
+*.log
+
+# Cache & Prisma generated
+.cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+

@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Krushikadhara",
+    "slug": "krushikadhara",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#15803d"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#15803d",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "package": "com.krushikadhara.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
