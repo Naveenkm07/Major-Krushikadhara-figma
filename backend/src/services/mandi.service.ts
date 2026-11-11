@@ -13,7 +13,7 @@ dotenv.config()
 
 const prisma = new PrismaClient()
 
-const DEFAULT_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
+const DEFAULT_RESOURCE_ID = ""
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes price cache to prevent 429 rate limits
 
 export const DEFAULT_FARMER_COORDS = {
