@@ -30,7 +30,8 @@ COPY scripts ./scripts
 COPY models ./models
 
 RUN npm run build \
-  && mkdir -p /app/uploads/scans /app/.local-cache
+  && mkdir -p /app/uploads/scans /app/.local-cache \
+  && chmod -R a+rwX /app/uploads /app/.local-cache
 
 ENV NODE_ENV=production
 ENV PORT=5000
