@@ -24,7 +24,16 @@ app.use(cors())
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true, limit: "10mb" }))
 
-// Health Check Endpoint
+// Health Check Endpoints (GET / ensures cloud health probes like HF Spaces get 200 OK)
+app.get("/", (_req: Request, res: Response) => {
+  res.json({
+    status: "online",
+    service: "KrushikaDhara Core API",
+    health: "/api/health",
+    timestamp: new Date().toISOString(),
+  })
+})
+
 app.get("/api/health", (_req: Request, res: Response) => {
   res.json({
     status: "online",
