@@ -250,7 +250,7 @@ export function AiPredictionsScreen() {
           <Text style={styles.bodyText}>
             {isKn
               ? diagnosis?.about_kn || diagnosis?.about || "ಯಾವುದೇ ಕೀಟ ಬಾಧೆ ಕಂಡುಬಂದಿಲ್ಲ."
-              : diagnosis?.about || "No insect detections exceeded the 22% threshold."}
+              : diagnosis?.about || "No bounding box detections exceeded the threshold."}
           </Text>
         </View>
       ) : (

@@ -363,7 +363,7 @@ TASK:
 2. Check photo quality: if extremely blurry, too dark, or leaf is tiny/distant, set "imageQualityIssue" to "blurry" | "dark" | "too_far", else null.
 3. Identify the likely crop ("detectedCrop", e.g., "Tomato", "Rice", "Ragi", "Chilli", "Maize", "Potato", or "Crop Leaf").
 4. Diagnose accurately:
-   - If YOLO detected a real visible insect that matches the photo, confirm or refine it with full crop-specific bilingual EN+KN remedies.
+   - Treat local YOLO11s detections as a strong localization clue, NOT absolute truth: confirm if visually accurate, or refine to the exact visible species (for example, Colorado Potato Beetle vs Flea Beetle, Fall Armyworm vs Cutworm) with crop-specific bilingual EN+KN remedies.
    - If there is a fungal/bacterial/viral disease (e.g., Early Blight, Late Blight, Bacterial Leaf Spot, Powdery Mildew, Blast, Yellow Mosaic) or nutrient deficiency (Nitrogen/Potassium/Magnesium deficiency), diagnose it accurately with exact Indian agricultural dosages (ml/L or g/L).
    - If the foliage is visibly green, clean, and thriving with no pest/disease/deficiency, set "healthy": true, "issueType": "healthy", "severity": "None", "affectedAreaPct": 0, "spreadRisk": "None".
 

@@ -211,7 +211,7 @@ def run_inference(image_path: str) -> dict:
         interp.invoke()
 
         output = interp.get_tensor(output_details[0]['index'])
-        detections = postprocess(output, pad=pad, scaled_size=scaled_size, conf_threshold=0.22)
+        detections = postprocess(output, pad=pad, scaled_size=scaled_size, conf_threshold=0.18)
 
         if not detections:
             return {
