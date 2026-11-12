@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.krushikadhara.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "predictiveBackGestureEnabled": false,
       "adaptiveIcon": {
         "backgroundColor": "#165922",
