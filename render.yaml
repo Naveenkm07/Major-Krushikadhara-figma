@@ -8,6 +8,7 @@ services:
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
+      - fromGroup: backend
       - key: NODE_ENV
         value: production
       - key: PORT
@@ -16,5 +17,3 @@ services:
         value: "--max-old-space-size=256"
       - key: PYTHON_EXECUTABLE
         value: /opt/venv/bin/python
-      - key: JWT_SECRET
-        generateValue: true
