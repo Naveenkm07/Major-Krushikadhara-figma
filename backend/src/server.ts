@@ -15,6 +15,11 @@ import authRoutes from "./routes/auth.routes.js"
 import insightsRoutes from "./routes/insights.routes.js"
 import equipmentRoutes from "./routes/equipment.routes.js"
 import insuranceRoutes from "./routes/insurance.routes.js"
+import {
+  DELETE_ACCOUNT_HTML,
+  PRIVACY_POLICY_HTML,
+  TERMS_OF_SERVICE_HTML,
+} from "./utils/legalPages.js"
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -24,14 +29,51 @@ app.use(cors())
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true, limit: "10mb" }))
 
-// Health Check Endpoints (GET / ensures cloud health probes like HF Spaces get 200 OK)
+// Health Check & Public Legal Pages (for Google Play Console Compliance)
 app.get("/", (_req: Request, res: Response) => {
   res.json({
     status: "online",
     service: "KrushikaDhara Core API",
     health: "/api/health",
+    privacy: "/privacy",
+    terms: "/terms",
+    deleteAccount: "/delete-account",
     timestamp: new Date().toISOString(),
   })
+})
+
+app.get("/api", (_req: Request, res: Response) => {
+  res.json({
+    status: "online",
+    service: "KrushikaDhara Core API",
+    health: "/api/health",
+    endpoints: [
+      "/api/auth",
+      "/api/profile",
+      "/api/mandi",
+      "/api/weather",
+      "/api/scan",
+      "/api/ai",
+      "/api/crop-stage",
+      "/api/schemes",
+      "/api/insights",
+      "/api/equipment",
+      "/api/insurance",
+    ],
+    timestamp: new Date().toISOString(),
+  })
+})
+
+app.get("/privacy", (_req: Request, res: Response) => {
+  res.type("html").send(PRIVACY_POLICY_HTML)
+})
+
+app.get("/terms", (_req: Request, res: Response) => {
+  res.type("html").send(TERMS_OF_SERVICE_HTML)
+})
+
+app.get("/delete-account", (_req: Request, res: Response) => {
+  res.type("html").send(DELETE_ACCOUNT_HTML)
 })
 
 app.get("/api/health", (_req: Request, res: Response) => {
