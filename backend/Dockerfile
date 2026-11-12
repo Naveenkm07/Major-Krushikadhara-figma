@@ -28,6 +28,7 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY scripts ./scripts
 COPY models ./models
+COPY public-web ./public-web
 
 RUN npm run build \
   && mkdir -p /app/uploads/scans /app/.local-cache \

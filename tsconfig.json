@@ -5,6 +5,9 @@
   },
   "exclude": [
     "node_modules",
+    "backend",
+    "web-dist",
+    "play-store-assets",
     "_reference_figma"
   ]
 }

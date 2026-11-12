@@ -1,4 +1,6 @@
 import "./config/env.js"
+import path from "node:path"
+import fs from "node:fs"
 import express, { type NextFunction, type Request, type Response } from "express"
 import cors from "cors"
 import { connectDB } from "./config/db.js"
@@ -29,11 +31,22 @@ app.use(cors())
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true, limit: "10mb" }))
 
-// Health Check & Public Legal Pages (for Google Play Console Compliance)
-app.get("/", (_req: Request, res: Response) => {
+const publicWebDir = path.resolve(__dirname, "../public-web")
+const publicWebIndex = path.join(publicWebDir, "index.html")
+if (fs.existsSync(publicWebDir)) {
+  app.use(express.static(publicWebDir, { index: false, maxAge: "1h" }))
+}
+
+// Web App Root (browsers receive Expo Web SPA; API/health probes receive JSON status)
+app.get("/", (req: Request, res: Response) => {
+  if (req.accepts(["html", "json"]) === "html" && fs.existsSync(publicWebIndex)) {
+    res.sendFile(publicWebIndex)
+    return
+  }
   res.json({
     status: "online",
     service: "KrushikaDhara Core API",
+    webApp: "/",
     health: "/api/health",
     privacy: "/privacy",
     terms: "/terms",
