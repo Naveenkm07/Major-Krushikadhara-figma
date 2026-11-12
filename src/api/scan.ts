@@ -152,9 +152,11 @@ export interface BackendCropScanRecord {
 }
 
 /**
- * Fetch persisted crop scan history for a farmer from Neon PostgreSQL.
+ * Fetch persisted crop scan history with request status so empty lists reset stale cache cleanly.
  */
-export async function fetchScanHistoryFromBackend(mobile: string): Promise<BackendCropScanRecord[]> {
+export async function fetchScanHistoryWithStatus(
+  mobile: string
+): Promise<{ ok: boolean; scans: BackendCropScanRecord[] }> {
   try {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 8000)
@@ -162,12 +164,23 @@ export async function fetchScanHistoryFromBackend(mobile: string): Promise<Backe
       signal: controller.signal,
     })
     clearTimeout(timer)
-    if (!res.ok) return []
+    if (!res.ok) return { ok: false, scans: [] }
     const json = await res.json()
-    return json?.success && Array.isArray(json.scans) ? json.scans : []
+    if (!json?.success || !Array.isArray(json.scans)) {
+      return { ok: false, scans: [] }
+    }
+    return { ok: true, scans: json.scans }
   } catch {
-    return []
+    return { ok: false, scans: [] }
   }
+}
+
+/**
+ * Fetch persisted crop scan history for a farmer from Neon PostgreSQL / resilient store.
+ */
+export async function fetchScanHistoryFromBackend(mobile: string): Promise<BackendCropScanRecord[]> {
+  const res = await fetchScanHistoryWithStatus(mobile)
+  return res.scans
 }
 
 /**

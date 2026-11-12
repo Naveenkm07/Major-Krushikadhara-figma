@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import {
+  Animated,
   View,
   Text,
   TextInput,
@@ -8,12 +9,15 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  ScrollView,
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
-import { Sprout, Phone, Check, ArrowLeft, ShieldCheck } from "lucide-react-native"
+import { Sprout, Phone, Check, ArrowLeft, ShieldCheck, X } from "lucide-react-native"
 import { useLang, fmt } from "../i18n"
 import { useProfile } from "../profile"
 import { syncScanHistoryFromBackend } from "../storage/scanHistory"
+import { FadeSlideIn, ScalePressable } from "./Motion"
 import {
   DEV_TEST_PHONE,
   DEV_TEST_OTP,
@@ -40,7 +44,20 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
   const [digits, setDigits] = useState(["", "", "", ""])
   const [otpError, setOtpError] = useState("")
   const [cooldown, setCooldown] = useState(30)
+  const [policyModal, setPolicyModal] = useState<"privacy" | "terms" | null>(null)
   const otpInputRefs = useRef<any[]>([])
+  const otpShake = useRef(new Animated.Value(0)).current
+
+  function triggerOtpShake() {
+    otpShake.setValue(0)
+    Animated.sequence([
+      Animated.timing(otpShake, { toValue: -10, duration: 55, useNativeDriver: true }),
+      Animated.timing(otpShake, { toValue: 10, duration: 55, useNativeDriver: true }),
+      Animated.timing(otpShake, { toValue: -7, duration: 55, useNativeDriver: true }),
+      Animated.timing(otpShake, { toValue: 7, duration: 55, useNativeDriver: true }),
+      Animated.timing(otpShake, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start()
+  }
 
   useEffect(() => {
     if (step !== "otp" || cooldown <= 0) return
@@ -92,11 +109,13 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
         onDone()
       } else {
         setOtpError(L.invalidCode)
+        triggerOtpShake()
         setDigits(["", "", "", ""])
         otpInputRefs.current[0]?.focus()
       }
     } catch {
       setOtpError(L.error)
+      triggerOtpShake()
     } finally {
       setBusy(false)
     }
@@ -106,11 +125,33 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
     const clean = text.replace(/\D/g, "")
     setOtpError("")
     const newDigits = [...digits]
-    newDigits[index] = clean.slice(-1)
+
+    // Support pasting full 4-digit OTP into any box
+    if (clean.length > 1) {
+      const chars = clean.slice(0, 4).split("")
+      chars.forEach((ch, idx) => {
+        if (index + idx < 4) newDigits[index + idx] = ch
+      })
+      setDigits(newDigits)
+      const nextFocus = Math.min(3, index + chars.length)
+      otpInputRefs.current[nextFocus]?.focus()
+      return
+    }
+
+    newDigits[index] = clean
     setDigits(newDigits)
 
     if (clean && index < 3) {
       otpInputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  function handleDigitKeyPress(key: string, index: number) {
+    if (key === "Backspace" && !digits[index] && index > 0) {
+      const newDigits = [...digits]
+      newDigits[index - 1] = ""
+      setDigits(newDigits)
+      otpInputRefs.current[index - 1]?.focus()
     }
   }
 
@@ -136,7 +177,7 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
         ]}
       >
         {step === "phone" ? (
-          <View style={styles.content}>
+          <FadeSlideIn key="phone-step" delay={40} style={styles.content}>
             {/* Header / Logo */}
             <View style={styles.logoWrap}>
               <View style={styles.sproutBox}>
@@ -208,11 +249,20 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
                 </Text>
               </TouchableOpacity>
 
+              <View style={styles.legalLinksRow}>
+                <TouchableOpacity onPress={() => setPolicyModal("terms")} hitSlop={6}>
+                  <Text style={styles.legalLinkText}>{L.termsLink}</Text>
+                </TouchableOpacity>
+                <Text style={styles.legalDot}>·</Text>
+                <TouchableOpacity onPress={() => setPolicyModal("privacy")} hitSlop={6}>
+                  <Text style={styles.legalLinkText}>{L.privacyLink}</Text>
+                </TouchableOpacity>
+              </View>
+
               {/* Submit Button */}
-              <TouchableOpacity
+              <ScalePressable
                 onPress={handleSendOtp}
                 disabled={!canContinue}
-                activeOpacity={0.85}
                 style={[
                   styles.submitBtn,
                   !canContinue && styles.submitBtnDisabled,
@@ -228,11 +278,11 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
                     </Text>
                   </>
                 )}
-              </TouchableOpacity>
+              </ScalePressable>
             </View>
-          </View>
+          </FadeSlideIn>
         ) : (
-          <View style={styles.content}>
+          <FadeSlideIn key="otp-step" delay={30} style={styles.content}>
             {/* Back Button */}
             <TouchableOpacity
               onPress={() => {
@@ -256,7 +306,12 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
             </View>
 
             {/* OTP Digits Card */}
-            <View style={styles.card}>
+            <Animated.View
+              style={[
+                styles.card,
+                { transform: [{ translateX: otpShake }] },
+              ]}
+            >
               <View style={styles.digitsRow}>
                 {[0, 1, 2, 3].map((i) => (
                   <TextInput
@@ -266,8 +321,9 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
                     }}
                     value={digits[i]}
                     onChangeText={(t) => handleDigitChange(t, i)}
+                    onKeyPress={({ nativeEvent }) => handleDigitKeyPress(nativeEvent.key, i)}
                     keyboardType="number-pad"
-                    maxLength={1}
+                    maxLength={i === 0 ? 4 : 1}
                     style={[
                       styles.digitInput,
                       digits[i] ? styles.digitInputFilled : null,
@@ -289,10 +345,9 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
 
               {otpError ? <Text style={styles.noticeText}>{otpError}</Text> : null}
 
-              <TouchableOpacity
+              <ScalePressable
                 onPress={handleVerifyOtp}
                 disabled={digits.join("").length !== 4 || busy}
-                activeOpacity={0.85}
                 style={[
                   styles.submitBtn,
                   digits.join("").length !== 4 && styles.submitBtnDisabled,
@@ -303,7 +358,7 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
                 ) : (
                   <Text style={styles.submitBtnText}>{L.verify}</Text>
                 )}
-              </TouchableOpacity>
+              </ScalePressable>
 
               {/* Resend */}
               <TouchableOpacity
@@ -317,10 +372,47 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
                     : L.resend}
                 </Text>
               </TouchableOpacity>
-            </View>
-          </View>
+            </Animated.View>
+          </FadeSlideIn>
         )}
       </View>
+
+      <Modal
+        visible={policyModal !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPolicyModal(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {policyModal === "privacy" ? L.privacyLink : L.termsLink}
+              </Text>
+              <TouchableOpacity onPress={() => setPolicyModal(null)} hitSlop={8}>
+                <X size={20} color="#4b5563" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalBody}>
+                {policyModal === "privacy"
+                  ? isKn
+                    ? "ಕೃಷಿಕಧಾರಾ ನಿಮ್ಮ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನು OTP ಲಾಗಿನ್ ಮತ್ತು ರೈತ ಸೇವೆಗಳ ಸಿಂಕ್‌ಗಾಗಿ ಮಾತ್ರ ಬಳಸುತ್ತದೆ. ಕ್ಯಾಮೆರಾ, ಮೈಕ್ ಮತ್ತು ಸ್ಥಳ ಅನುಮತಿಗಳನ್ನು ನೀವು ಸ್ಕ್ಯಾನ್, ಧ್ವನಿ ಸಹಾಯಕ ಅಥವಾ ಹತ್ತಿರದ ಮಂಡಿ/ಹವಾಮಾನ ವೀಕ್ಷಿಸುವಾಗ ಮಾತ್ರ ಬಳಸಲಾಗುತ್ತದೆ. ಜಾಹೀರಾತಿಗಾಗಿ ಡೇಟಾವನ್ನು ಮಾರಾಟ ಮಾಡುವುದಿಲ್ಲ. ಆ್ಯಪ್‌ನ ಸೆಟ್ಟಿಂಗ್ಸ್ -> ಗೌಪ್ಯತಾ ನೀತಿಯಿಂದ ನೀವು ಯಾವುದೇ ಸಮಯದಲ್ಲಿ ನಿಮ್ಮ ಖಾತೆ ಮತ್ತು ಎಲ್ಲಾ ಡೇಟಾವನ್ನು ಶಾಶ್ವತವಾಗಿ ಅಳಿಸಬಹುದು."
+                    : "KrushikaDhara uses your mobile number only for OTP authentication and syncing your farm profile, crop scans, equipment rentals, and PMFBY insurance records. Camera, microphone, and GPS are requested strictly when you scan leaves, speak to Voice AI, or query local weather and mandis. We never sell personal data or display third-party ads. You can delete your account and all data anytime from Settings -> Privacy Policy."
+                  : isKn
+                  ? "ಕೃಷಿಕಧಾರಾ AI ಬೆಳೆ ತಪಾಸಣೆ, ಮಂಡಿ ದರಗಳು, ಹವಾಮಾನ ಮತ್ತು ವಿಮಾ ದಾಖಲೆಗಳು ರೈತರ ಮಾರ್ಗದರ್ಶನಕ್ಕಾಗಿ ಮಾತ್ರ. ರಾಸಾಯನಿಕ ಸಿಂಪಡಣೆಗೆ ಮುನ್ನ ಲೇಬಲ್ ಸೂಚನೆ ಮತ್ತು ಕೃಷಿ ಅಧಿಕಾರಿಗಳ ಸಲಹೆ ಪಾಲಿಸಿ. ಅಧಿಕೃತ ಸರ್ಕಾರಿ ಯೋಜನೆ ಮತ್ತು ವಿಮಾ ಪರಿಹಾರಗಳು ಆಯಾ ಸರ್ಕಾರಿ ಪೋರ್ಟಲ್ ನಿಯಮಗಳಿಗೆ ಒಳಪಟ್ಟಿರುತ್ತವೆ."
+                  : "KrushikaDhara provides AI pest diagnostics, APMC Mandi rates, weather guidance, equipment rental matching, and PMFBY workflows as farmer decision-support tools. Always verify chemical dosages against registered product labels and local agricultural officers. Official schemes and insurance payouts remain governed by pmfby.gov.in and respective government portals."}
+              </Text>
+            </ScrollView>
+            <ScalePressable
+              onPress={() => setPolicyModal(null)}
+              style={[styles.submitBtn, { marginTop: 14 }]}
+            >
+              <Text style={styles.submitBtnText}>{isKn ? "ಸರಿ" : "Close"}</Text>
+            </ScalePressable>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   )
 }
@@ -532,5 +624,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: "#4b5563",
+  },
+  legalLinksRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+    paddingLeft: 30,
+  },
+  legalLinkText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#256428",
+    textDecorationLine: "underline",
+  },
+  legalDot: {
+    fontSize: 12,
+    color: "#9ca3af",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 22,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#111827",
+  },
+  modalBody: {
+    fontSize: 13.5,
+    color: "#4b5563",
+    lineHeight: 21,
   },
 })

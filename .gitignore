@@ -16,11 +16,16 @@ yarn-error.*
 dist/
 web-build/
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
 *.orig.*
+google-services-account.json
+*play-service-account*.json
+*.apk
+*.aab
 
 # Android / iOS native outputs (if prebuilt)
 android/
@@ -29,6 +34,8 @@ ios/
 # Uploads & temporary media
 uploads/
 backend/uploads/
+.local-cache/
+backend/.local-cache/
 *.log
 __pycache__/
 *.pyc

@@ -3,7 +3,7 @@
 
 import {
   deleteScanHistoryFromBackend,
-  fetchScanHistoryFromBackend,
+  fetchScanHistoryWithStatus,
   type PestDetectionResult,
 } from "../api/scan"
 
@@ -22,6 +22,7 @@ export interface ScanHistoryItem {
 }
 
 let scanHistoryStore: ScanHistoryItem[] = []
+let syncedMobile: string | null = null
 const listeners: Array<(items: ScanHistoryItem[]) => void> = []
 
 function notifyListeners() {
@@ -85,8 +86,18 @@ export async function removeScanFromHistory(scanId: string, mobile?: string): Pr
 
 export async function syncScanHistoryFromBackend(mobile: string): Promise<ScanHistoryItem[]> {
   if (!mobile) return getScanHistory()
-  const records = await fetchScanHistoryFromBackend(mobile)
-  if (!records.length) return getScanHistory()
+  const mobileChanged = syncedMobile !== null && syncedMobile !== mobile
+  const { ok, scans: records } = await fetchScanHistoryWithStatus(mobile)
+  if (!ok) {
+    if (mobileChanged) {
+      syncedMobile = mobile
+      scanHistoryStore = []
+      notifyListeners()
+    }
+    return getScanHistory()
+  }
+
+  syncedMobile = mobile
 
   const mapped: ScanHistoryItem[] = records.map((rec) => {
     const isHealthy = rec.diseaseName.toLowerCase().includes("healthy") || rec.severity === "None"
@@ -149,12 +160,17 @@ export async function syncScanHistoryFromBackend(mobile: string): Promise<ScanHi
     }
   })
 
-  // Keep any very recent local-only scans not yet returned from backend
+  // Keep only unsynced local-only scans created under the same mobile session
   const backendIds = new Set(mapped.map((m) => m.id))
   const backendUrls = new Set(mapped.map((m) => m.imageUrl))
-  const localOnly = scanHistoryStore.filter(
-    (local) => !backendIds.has(local.id) && !backendUrls.has(local.imageUrl)
-  )
+  const localOnly = mobileChanged
+    ? []
+    : scanHistoryStore.filter(
+        (local) =>
+          local.id.startsWith("scan_") &&
+          !backendIds.has(local.id) &&
+          !backendUrls.has(local.imageUrl)
+      )
 
   scanHistoryStore = [...localOnly, ...mapped].slice(0, 30)
   notifyListeners()
@@ -167,4 +183,10 @@ export function subscribeScanHistory(cb: (items: ScanHistoryItem[]) => void) {
     const idx = listeners.indexOf(cb)
     if (idx !== -1) listeners.splice(idx, 1)
   }
+}
+
+export function clearLocalScanHistory() {
+  scanHistoryStore = []
+  syncedMobile = null
+  notifyListeners()
 }

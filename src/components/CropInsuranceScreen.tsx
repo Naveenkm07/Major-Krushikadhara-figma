@@ -3,6 +3,7 @@ import { useLang } from "../i18n"
 import { useInsurance } from "../insurance"
 import { useNav } from "../nav"
 import DetailShell from "./DetailShell"
+import { FadeSlideIn, ScalePressable } from "./Motion"
 import {
   ShieldCheck,
   CheckCircle2,
@@ -12,17 +13,28 @@ import {
   LayoutDashboard,
   ChevronRight,
   AlertTriangle,
+  ClipboardCheck,
+  FileCheck2,
 } from "lucide-react-native"
 
 export default function CropInsuranceScreen() {
   const { t, lang } = useLang()
   const isKn = lang === "kn"
   const ins = t.ins
-  const { policies, applications } = useInsurance()
+  const cropMap = (t.x.coreA.crops as Record<string, string>) || {}
+  const seasonMap = (t.x.insurance.seasons as Record<string, string>) || {}
+  const { policies, applications, claims, unreadCount } = useInsurance()
   const { open } = useNav()
 
   const activePolicy = policies[0] ?? null
   const latestApp = applications[0] ?? null
+
+  const seasonDisplay = (s: string) => {
+    if (!isKn) return s
+    if (s.toLowerCase().includes("rabi")) return seasonMap["Rabi 2026-27"]?.split(" ")[0] || "ಹಿಂಗಾರು"
+    if (s.toLowerCase().includes("comm")) return t.x.insurance.plan.commercial
+    return seasonMap["Kharif"] || "ಮುಂಗಾರು"
+  }
 
   const quickActions = [
     {
@@ -31,6 +43,20 @@ export default function CropInsuranceScreen() {
       route: "eligibilityCheck" as const,
       bg: "#dcfce7",
       color: "#16a34a",
+    },
+    {
+      icon: ClipboardCheck,
+      label: isKn ? "ವಿಮಾ ಯೋಜನೆಗಳು" : "Plans & Premium",
+      route: "insurancePlan" as const,
+      bg: "#ecfeff",
+      color: "#0891b2",
+    },
+    {
+      icon: FileCheck2,
+      label: ins.makeClaim,
+      route: "claimHome" as const,
+      bg: "#fef2f2",
+      color: "#dc2626",
     },
     {
       icon: FileText,
@@ -59,6 +85,7 @@ export default function CropInsuranceScreen() {
       route: "insuranceDashboard" as const,
       bg: "#e0e7ff",
       color: "#4f46e5",
+      badge: unreadCount,
     },
   ]
 
@@ -82,10 +109,13 @@ export default function CropInsuranceScreen() {
           </View>
 
           <Text style={styles.policyScheme}>
-            {isKn ? "PMFBY ಮುಂಗಾರು ಬೆಳೆ ವಿಮೆ" : "PMFBY Kharif Crop Insurance"}
+            {isKn
+              ? `PMFBY ${seasonDisplay(activePolicy.season)} ಬೆಳೆ ವಿಮೆ`
+              : `PMFBY ${activePolicy.season} Crop Insurance`}
           </Text>
           <Text style={styles.policyCrop}>
-            {activePolicy.crop} · {activePolicy.season}
+            {cropMap[activePolicy.crop] || activePolicy.crop} ·{" "}
+            {seasonDisplay(activePolicy.season)}
           </Text>
 
           <View style={styles.policyMetrics}>
@@ -115,14 +145,18 @@ export default function CropInsuranceScreen() {
         </TouchableOpacity>
       ) : latestApp ? (
         <TouchableOpacity
-          onPress={() => open("applicationStatus")}
+          onPress={() => open("applicationStatus", { applicationId: latestApp.id })}
           activeOpacity={0.88}
           style={styles.emptyPolicyCard}
         >
           <Text style={styles.emptyTitle}>
             {isKn
-              ? `ಅರ್ಜಿ ಸಲ್ಲಿಸಲಾಗಿದೆ (${latestApp.crop})`
+              ? `ಅರ್ಜಿ ಸಲ್ಲಿಸಲಾಗಿದೆ (${cropMap[latestApp.crop] || latestApp.crop})`
               : `Application Submitted (${latestApp.crop})`}
+          </Text>
+          <Text style={styles.emptySub}>
+            {(t.x.insurance.appStatus as Record<string, string>)[latestApp.status] ||
+              latestApp.status.replace(/_/g, " ")}
           </Text>
           <View style={styles.applyNowBtn}>
             <Text style={styles.applyNowText}>{ins.trackApp}</Text>
@@ -141,44 +175,56 @@ export default function CropInsuranceScreen() {
       )}
 
       {/* Report Loss Alert Banner */}
-      <TouchableOpacity
-        onPress={() => open("reportCropLoss")}
-        activeOpacity={0.85}
-        style={styles.lossBanner}
-      >
-        <View style={styles.lossIconWrap}>
-          <AlertTriangle size={22} color="#dc2626" />
-        </View>
-        <View style={styles.lossTextWrap}>
-          <Text style={styles.lossTitle}>{ins.reportLoss}</Text>
-          <Text style={styles.lossSubtitle}>
-            {isKn
-              ? "ತಕ್ಷಣದ ಸಮೀಕ್ಷೆಗಾಗಿ ನೈಸರ್ಗಿಕ ವಿಕೋಪದ 72 ಗಂಟೆಗಳೊಳಗೆ ವರದಿ ಮಾಡಿ"
-              : "Report within 72 hrs of natural calamity for immediate claim survey"}
-          </Text>
-        </View>
-        <ChevronRight size={18} color="#dc2626" />
-      </TouchableOpacity>
+      <FadeSlideIn delay={60}>
+        <ScalePressable
+          onPress={() => open(claims.length > 0 ? "claimHome" : "reportCropLoss")}
+          style={styles.lossBanner}
+        >
+          <View style={styles.lossIconWrap}>
+            <AlertTriangle size={22} color="#dc2626" />
+          </View>
+          <View style={styles.lossTextWrap}>
+            <Text style={styles.lossTitle}>{ins.reportLoss}</Text>
+            <Text style={styles.lossSubtitle}>
+              {claims.length > 0
+                ? isKn
+                  ? `${claims.length} ಸಕ್ರಿಯ ಕ್ಲೇಮ್ · ಹೊಸ ಹಾನಿ ವರದಿ ಮಾಡಿ ಅಥವಾ ಪ್ರಗತಿ ನೋಡಿ`
+                  : `${claims.length} submitted claim(s) · Track progress or file new crop loss`
+                : isKn
+                ? "ತಕ್ಷಣದ ಸಮೀಕ್ಷೆಗಾಗಿ ನೈಸರ್ಗಿಕ ವಿಕೋಪದ 72 ಗಂಟೆಗಳೊಳಗೆ ವರದಿ ಮಾಡಿ"
+                : "Report within 72 hrs of natural calamity for immediate claim survey"}
+            </Text>
+          </View>
+          <ChevronRight size={18} color="#dc2626" />
+        </ScalePressable>
+      </FadeSlideIn>
 
       {/* Quick Action Cards */}
       <Text style={styles.sectionHeader}>
         {isKn ? "ವಿಮಾ ಸೇವೆಗಳು" : "Insurance Services"}
       </Text>
-      <View style={styles.servicesGrid}>
-        {quickActions.map((act) => (
-          <TouchableOpacity
-            key={act.route}
-            onPress={() => open(act.route)}
-            activeOpacity={0.8}
-            style={styles.serviceCard}
-          >
-            <View style={[styles.serviceIconCircle, { backgroundColor: act.bg }]}>
-              <act.icon size={22} color={act.color} />
-            </View>
-            <Text style={styles.serviceLabel}>{act.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <FadeSlideIn delay={120}>
+        <View style={styles.servicesGrid}>
+          {quickActions.map((act) => (
+            <ScalePressable
+              key={act.route}
+              onPress={() => open(act.route)}
+              scaleTo={0.95}
+              style={styles.serviceCard}
+            >
+              {act.badge && act.badge > 0 ? (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{act.badge}</Text>
+                </View>
+              ) : null}
+              <View style={[styles.serviceIconCircle, { backgroundColor: act.bg }]}>
+                <act.icon size={22} color={act.color} />
+              </View>
+              <Text style={styles.serviceLabel}>{act.label}</Text>
+            </ScalePressable>
+          ))}
+        </View>
+      </FadeSlideIn>
     </DetailShell>
   )
 }
@@ -278,8 +324,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#374151",
-    marginBottom: 14,
+    marginBottom: 6,
     textAlign: "center",
+  },
+  emptySub: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#256428",
+    marginBottom: 14,
   },
   applyNowBtn: {
     backgroundColor: "#256428",
@@ -343,11 +395,29 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     alignItems: "center",
+    position: "relative",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 2,
+  },
+  notifBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "#dc2626",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifBadgeText: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#ffffff",
   },
   serviceIconCircle: {
     width: 48,

@@ -17,6 +17,7 @@ import { fetchActiveCropStage, type ActiveCropStageResponse } from "../api/cropS
 import { fetchLiveWeather, type LiveWeatherData } from "../api/weather"
 import { getCurrentLocation } from "../utils/location"
 import { useNotifications } from "../storage/notifications"
+import { AnimatedProgressFill, FadeSlideIn, ScalePressable } from "./Motion"
 import {
   getScanHistory,
   subscribeScanHistory,
@@ -27,6 +28,7 @@ import {
   Languages,
   Bell,
   Sun,
+  CloudRain,
   Droplets,
   RefreshCw,
   Tractor,
@@ -35,7 +37,6 @@ import {
   Bug,
   ChevronRight,
   TrendingUp,
-  TrendingDown,
   Mic,
   Settings,
   Cloud,
@@ -44,6 +45,25 @@ import {
   Scan,
   Sprout,
 } from "lucide-react-native"
+
+const DISTRICT_FALLBACK_COORDS: Record<string, { lat: number; lng: number }> = {
+  mandya: { lat: 12.5244, lng: 76.8958 },
+  mysuru: { lat: 12.277, lng: 76.669 },
+  mysore: { lat: 12.277, lng: 76.669 },
+  bengaluru: { lat: 12.9716, lng: 77.5946 },
+  bangalore: { lat: 12.9716, lng: 77.5946 },
+  ramanagara: { lat: 12.721, lng: 77.281 },
+  kolar: { lat: 13.1367, lng: 78.1292 },
+  tumakuru: { lat: 13.3409, lng: 77.101 },
+  tumkur: { lat: 13.3409, lng: 77.101 },
+  hassan: { lat: 13.0033, lng: 76.1004 },
+  shivamogga: { lat: 13.9299, lng: 75.5681 },
+  shimoga: { lat: 13.9299, lng: 75.5681 },
+  davanagere: { lat: 14.4644, lng: 75.9218 },
+  dharwad: { lat: 15.3647, lng: 75.124 },
+  hubballi: { lat: 15.3647, lng: 75.124 },
+  belagavi: { lat: 15.8497, lng: 74.4977 },
+}
 
 const QUICK_ACTIONS = [
   { label: "scanCrop", icon: Scan, bg: "#16a34a", target: "scan" as Tab },
@@ -59,12 +79,6 @@ const SECONDARY_ACTIONS = [
   { label: "voiceAi", icon: Mic, bg: "#fce7f3", iconColor: "#db2777", route: "voiceAssistant" as Route },
 ] as const
 
-const RECENT_SCANS = [
-  { crop: "Wheat", disease: "leafBlight", confidence: 78, status: "disease" as const, day: 25, month: "Sep" },
-  { crop: "Rice", disease: "healthy", confidence: 91, status: "healthy" as const, day: 24, month: "Sep" },
-  { crop: "Tomato", disease: "earlyBlight", confidence: 85, status: "disease" as const, day: 23, month: "Sep" },
-] as const
-
 export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const { t, lang, toggle } = useLang()
   const { profile } = useProfile()
@@ -75,13 +89,13 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
   const cropMap = (t.x.coreA.crops as Record<string, string>) || {}
   const { unreadCount } = useNotifications(profile.district, profile.crops)
 
-  const [livePrices, setLivePrices] = useState<Array<{ key: string; name: string; price: number | null; change: number }>>(() => {
+  const [livePrices, setLivePrices] = useState<Array<{ key: string; name: string; price: number | null; market: string }>>(() => {
     const crops = Array.from(new Set(profile.crops || ["Rice", "Ragi"]))
     return crops.slice(0, 3).map((c) => ({
       key: c.toLowerCase(),
       name: c,
       price: null,
-      change: 0,
+      market: profile.district || "APMC",
     }))
   })
 
@@ -96,10 +110,13 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
 
   useEffect(() => {
     let active = true
+    const distKey = (profile.district || "mandya").trim().toLowerCase()
+    const distFallback = DISTRICT_FALLBACK_COORDS[distKey] || DISTRICT_FALLBACK_COORDS.mandya
+
     getCurrentLocation(8000).then((loc) => {
       if (!active) return
-      const lat = loc.ok ? loc.lat : 12.5244
-      const lng = loc.ok ? loc.lng : 76.8958
+      const lat = loc.ok ? loc.lat : distFallback.lat
+      const lng = loc.ok ? loc.lng : distFallback.lng
 
       fetchLiveWeather(lat, lng, 1)
         .then((w) => {
@@ -120,7 +137,7 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
       )
         .then((responses) => {
           if (!active) return
-          const mapped: Array<{ key: string; name: string; price: number; change: number }> = []
+          const mapped: Array<{ key: string; name: string; price: number; market: string }> = []
           const seen = new Set<string>()
 
           responses.forEach((resp, idx) => {
@@ -135,11 +152,14 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
               const k = displayCrop.toLowerCase()
               if (!seen.has(k)) {
                 seen.add(k)
+                const shortMandi = (priced.mandi || profile.district || "APMC")
+                  .replace(/\s*APMC$/i, "")
+                  .slice(0, 14)
                 mapped.push({
                   key: k,
                   name: displayCrop,
                   price: priced.modalPriceKg || 0,
-                  change: 2,
+                  market: shortMandi,
                 })
               }
             }
@@ -147,6 +167,16 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
 
           if (mapped.length > 0) {
             setLivePrices(mapped.slice(0, 3))
+          } else {
+            const fallbackCrops = Array.from(new Set(profile.crops || ["Rice", "Ragi"]))
+            setLivePrices(
+              fallbackCrops.slice(0, 3).map((c) => ({
+                key: c.toLowerCase(),
+                name: c,
+                price: null,
+                market: profile.district || "APMC",
+              }))
+            )
           }
         })
         .catch(() => {})
@@ -154,13 +184,26 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
     return () => {
       active = false
     }
-  }, [profile.crops])
+  }, [profile.crops, profile.district])
+
+  const cropsStageSyncKey = [
+    profile.crops.join(","),
+    profile.cropFields
+      .map((f) => `${f.id}:${f.cropName}:${f.healthStatus}:${f.daysSinceSowing}`)
+      .join("|"),
+  ].join("::")
 
   useEffect(() => {
+    let active = true
     fetchActiveCropStage(profile.mobile)
-      .then((res) => setStageData(res))
+      .then((res) => {
+        if (active) setStageData(res)
+      })
       .catch(() => {})
-  }, [profile.mobile])
+    return () => {
+      active = false
+    }
+  }, [profile.mobile, cropsStageSyncKey])
 
   return (
     <View style={styles.container}>
@@ -233,22 +276,31 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
           </View>
 
           {/* Live Weather Card */}
-          <TouchableOpacity
+          <ScalePressable
             onPress={() => open("weather")}
-            activeOpacity={0.9}
+            scaleTo={0.975}
             style={styles.weatherCard}
           >
             <View style={styles.weatherLeft}>
               <View style={styles.sunIconCircle}>
-                <Sun size={24} color="#f59e0b" />
+                {(() => {
+                  const cond = (liveWeather?.current.conditionTextEn || "").toLowerCase()
+                  if (cond.includes("rain") || cond.includes("drizzle") || cond.includes("thunder")) {
+                    return <CloudRain size={24} color="#7dd3fc" />
+                  }
+                  if (cond.includes("cloud") || cond.includes("overcast") || cond.includes("mist") || cond.includes("fog")) {
+                    return <Cloud size={24} color="#e2e8f0" />
+                  }
+                  return <Sun size={24} color="#f59e0b" />
+                })()}
               </View>
-              <View>
-                <Text style={styles.weatherPlace}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.weatherPlace} numberOfLines={1}>
                   {liveWeather?.location
                     ? `${liveWeather.location.name}, ${liveWeather.location.region}`
                     : t.weather.place}
                 </Text>
-                <Text style={styles.weatherCondition}>
+                <Text style={styles.weatherCondition} numberOfLines={1}>
                   {liveWeather
                     ? `${isKn && liveWeather.current.conditionTextKn ? liveWeather.current.conditionTextKn : liveWeather.current.conditionTextEn} · ${liveWeather.current.tempC}°C`
                     : `${t.weather.condition} · --°C`}
@@ -261,20 +313,26 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                 <Droplets size={14} color="rgba(255,255,255,0.8)" />
                 <Text style={styles.humidityText}>
                   {liveWeather
-                    ? `${liveWeather.current.humidity}%`
+                    ? `${liveWeather.current.humidity}% · ${liveWeather.current.chanceOfRain}%🌧`
                     : t.weather.humidity}
                 </Text>
               </View>
               <Text style={styles.weatherTapHint}>
-                {isKn ? "ಮುನ್ಸೂಚನೆ ನೋಡಿ →" : "View Forecast →"}
+                {liveWeather?.advisory && !liveWeather.advisory.sprayRecommended
+                  ? isKn
+                    ? "⚠️ ಸಿಂಪಡಣೆ ಬೇಡ →"
+                    : "⚠️ Hold Spray →"
+                  : isKn
+                  ? "ಮುನ್ಸೂಚನೆ ನೋಡಿ →"
+                  : "View Forecast →"}
               </Text>
             </View>
-          </TouchableOpacity>
+          </ScalePressable>
         </View>
 
         {/* Core App Feature: Active Crop Present Growth Stage Card */}
         {stageData?.cropField && (
-          <View style={styles.stageSection}>
+          <FadeSlideIn delay={50} style={styles.stageSection}>
             <View style={styles.stageCard}>
               <TouchableOpacity
                 onPress={() => open("calendar")}
@@ -322,16 +380,12 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                   </View>
 
                   <View style={styles.stageProgressBarTrack}>
-                    <View
-                      style={[
-                        styles.stageProgressBarFill,
-                        {
-                          width: `${Math.min(
-                            100,
-                            Math.max(10, Math.round((stageData.cropField.daysSinceSowing / 120) * 100))
-                          )}%`,
-                        },
-                      ]}
+                    <AnimatedProgressFill
+                      pct={Math.min(
+                        100,
+                        Math.max(10, Math.round((stageData.cropField.daysSinceSowing / 120) * 100))
+                      )}
+                      color="#16a34a"
                     />
                   </View>
                 </View>
@@ -370,21 +424,21 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </FadeSlideIn>
         )}
 
         {/* Quick Actions Grid */}
-        <View style={styles.section}>
+        <FadeSlideIn delay={90} style={styles.section}>
           <Text style={styles.sectionTitle}>{t.quickActions.title}</Text>
           <View style={styles.quickGrid}>
             {QUICK_ACTIONS.map((item) => (
-              <TouchableOpacity
+              <ScalePressable
                 key={item.label}
                 onPress={() => {
                   if ("target" in item) onNavigate(item.target)
                   else open(item.route)
                 }}
-                activeOpacity={0.85}
+                scaleTo={0.95}
                 style={styles.quickCard}
               >
                 <View style={[styles.quickIconCircle, { backgroundColor: item.bg }]}>
@@ -393,19 +447,19 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                 <Text style={styles.quickLabel} numberOfLines={2}>
                   {String((h as any)[item.label] || item.label)}
                 </Text>
-              </TouchableOpacity>
+              </ScalePressable>
             ))}
           </View>
-        </View>
+        </FadeSlideIn>
 
         {/* Secondary Actions (Insurance, Equipment, Weather, Voice AI) */}
-        <View style={styles.section}>
+        <FadeSlideIn delay={140} style={styles.section}>
           <View style={styles.secondaryRow}>
             {SECONDARY_ACTIONS.map((item) => (
-              <TouchableOpacity
+              <ScalePressable
                 key={item.label}
                 onPress={() => open(item.route)}
-                activeOpacity={0.8}
+                scaleTo={0.94}
                 style={styles.secondaryCard}
               >
                 <View style={[styles.secondaryIconCircle, { backgroundColor: item.bg }]}>
@@ -414,13 +468,13 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                 <Text style={styles.secondaryLabel} numberOfLines={1}>
                   {String((h as any)[item.label] || item.label)}
                 </Text>
-              </TouchableOpacity>
+              </ScalePressable>
             ))}
           </View>
-        </View>
+        </FadeSlideIn>
 
         {/* Today's Advisory Tips */}
-        <View style={styles.section}>
+        <FadeSlideIn delay={180} style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>{t.tips.title}</Text>
             <TouchableOpacity onPress={() => open("saved")}>
@@ -429,19 +483,24 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
           </View>
           <View style={styles.tipsList}>
             {t.tips.items.map((tip, idx) => (
-              <View key={idx} style={styles.tipCard}>
+              <ScalePressable
+                key={idx}
+                onPress={() => open("saved")}
+                scaleTo={0.98}
+                style={styles.tipCard}
+              >
                 <View style={styles.tipStripe} />
                 <View style={styles.tipBodyWrap}>
                   <Text style={styles.tipTitle}>{tip.title}</Text>
                   <Text style={styles.tipBody}>{tip.body}</Text>
                 </View>
-              </View>
+              </ScalePressable>
             ))}
           </View>
-        </View>
+        </FadeSlideIn>
 
         {/* Recent Scans */}
-        <View style={styles.section}>
+        <FadeSlideIn delay={220} style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>{t.scan.recent}</Text>
             <TouchableOpacity onPress={() => open("scanHistory")}>
@@ -453,7 +512,7 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
               ? recentScans.slice(0, 3).map((scan) => {
                   const isHealthy = scan.status === "healthy"
                   return (
-                    <TouchableOpacity
+                    <ScalePressable
                       key={scan.id}
                       onPress={() =>
                         open("scanResult", {
@@ -462,7 +521,7 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                           cropName: scan.crop,
                         })
                       }
-                      activeOpacity={0.8}
+                      scaleTo={0.97}
                       style={styles.scanItemCard}
                     >
                       <View style={styles.scanDateBox}>
@@ -470,7 +529,9 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                         <Text style={styles.scanMonth}>{scan.month}</Text>
                       </View>
                       <View style={styles.scanInfo}>
-                        <Text style={styles.scanCrop}>{scan.crop}</Text>
+                        <Text style={styles.scanCrop}>
+                          {cropMap[scan.crop] || scan.crop}
+                        </Text>
                         <Text
                           style={[
                             styles.scanDisease,
@@ -483,47 +544,36 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                       <View style={styles.confidenceBadge}>
                         <Text style={styles.confidenceText}>{scan.confidence}%</Text>
                       </View>
-                    </TouchableOpacity>
+                    </ScalePressable>
                   )
                 })
-              : RECENT_SCANS.map((scan, i) => (
-                  <TouchableOpacity
-                    key={i}
+              : (
+                  <ScalePressable
                     onPress={() => onNavigate("scan")}
-                    activeOpacity={0.8}
+                    scaleTo={0.97}
                     style={styles.scanItemCard}
                   >
-                    <View style={styles.scanDateBox}>
-                      <Text style={styles.scanDay}>{scan.day}</Text>
-                      <Text style={styles.scanMonth}>{scan.month}</Text>
+                    <View style={[styles.scanDateBox, { backgroundColor: "#dcfce7" }]}>
+                      <Scan size={20} color="#256428" />
                     </View>
                     <View style={styles.scanInfo}>
-                      <Text style={styles.scanCrop}>{scan.crop}</Text>
-                      <Text
-                        style={[
-                          styles.scanDisease,
-                          scan.status === "healthy"
-                            ? styles.scanHealthy
-                            : styles.scanInfected,
-                        ]}
-                      >
-                        {scan.status === "healthy"
-                          ? h.scanDiseases.healthy
-                          : isKn
-                          ? "ಬೆಳೆ ಸ್ಕ್ಯಾನ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ"
-                          : "Tap to Scan Crop"}
+                      <Text style={styles.scanCrop}>
+                        {isKn ? "ಇನ್ನೂ ಯಾವುದೇ ಸ್ಕ್ಯಾನ್ ಇಲ್ಲ" : "No Crop Scans Yet"}
+                      </Text>
+                      <Text style={styles.scanDisease}>
+                        {isKn
+                          ? "ಕೀಟ ಅಥವಾ ರೋಗ ಪತ್ತೆಗಾಗಿ ಎಲೆಯ ಚಿತ್ರವನ್ನು ಸ್ಕ್ಯಾನ್ ಮಾಡಿ"
+                          : "Scan your first crop leaf for AI diagnosis & remedies"}
                       </Text>
                     </View>
-                    <View style={styles.confidenceBadge}>
-                      <Text style={styles.confidenceText}>{scan.confidence}%</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                    <ChevronRight size={18} color="#256428" />
+                  </ScalePressable>
+                )}
           </View>
-        </View>
+        </FadeSlideIn>
 
         {/* Live Mandi Prices */}
-        <View style={[styles.section, { marginBottom: 30 }]}>
+        <FadeSlideIn delay={260} style={[styles.section, { marginBottom: 30 }]}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>{t.market.title}</Text>
             <TouchableOpacity onPress={() => open("market")}>
@@ -532,10 +582,10 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
           </View>
           <View style={styles.marketRow}>
             {livePrices.map((item, idx) => (
-              <TouchableOpacity
+              <ScalePressable
                 key={`${item.key}_${idx}`}
                 onPress={() => open("market")}
-                activeOpacity={0.8}
+                scaleTo={0.95}
                 style={styles.marketCard}
               >
                 <Text style={styles.marketCropName}>
@@ -548,24 +598,15 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                   {item.price !== null ? `₹${item.price}${t.market.perKg}` : "..."}
                 </Text>
                 <View style={styles.changeRow}>
-                  {item.change >= 0 ? (
-                    <TrendingUp size={13} color="#16a34a" />
-                  ) : (
-                    <TrendingDown size={13} color="#dc2626" />
-                  )}
-                  <Text
-                    style={[
-                      styles.changeText,
-                      { color: item.change >= 0 ? "#16a34a" : "#dc2626" },
-                    ]}
-                  >
-                    {item.change >= 0 ? `+${item.change}%` : `${item.change}%`}
+                  <TrendingUp size={12} color="#16a34a" />
+                  <Text style={[styles.changeText, { color: "#16a34a" }]} numberOfLines={1}>
+                    {item.market}
                   </Text>
                 </View>
-              </TouchableOpacity>
+              </ScalePressable>
             ))}
           </View>
-        </View>
+        </FadeSlideIn>
       </ScrollView>
     </View>
   )
@@ -679,6 +720,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   weatherLeft: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,

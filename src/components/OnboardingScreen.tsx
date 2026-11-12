@@ -1,8 +1,9 @@
-import { useState } from "react"
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native"
+import { useEffect, useRef, useState } from "react"
+import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, Easing } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { ChevronRight, Leaf, TrendingUp, Globe } from "lucide-react-native"
 import { useLang } from "../i18n"
+import { ScalePressable } from "./Motion"
 
 type Props = { onDone: () => void; initialIndex?: number; onStep?: (i: number) => void }
 
@@ -46,6 +47,27 @@ export default function OnboardingScreen({ onDone, initialIndex = 0, onStep }: P
   const { t } = useLang()
   const insets = useSafeAreaInsets()
   const [idx, setIdx] = useState(initialIndex)
+  const slideFade = useRef(new Animated.Value(1)).current
+  const slideX = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    slideFade.setValue(0.3)
+    slideX.setValue(24)
+    Animated.parallel([
+      Animated.timing(slideFade, {
+        toValue: 1,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideX, {
+        toValue: 0,
+        speed: 18,
+        bounciness: 5,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [idx])
 
   const slide = slides[idx]
   const txt = t.x.info.onboarding.slides[idx]
@@ -77,7 +99,10 @@ export default function OnboardingScreen({ onDone, initialIndex = 0, onStep }: P
           {slides.map((_, i) => (
             <TouchableOpacity
               key={i}
-              onPress={() => setIdx(i)}
+              onPress={() => {
+                setIdx(i)
+                onStep?.(i)
+              }}
               style={[
                 styles.dot,
                 i === idx ? styles.dotActive : styles.dotInactive,
@@ -96,53 +121,59 @@ export default function OnboardingScreen({ onDone, initialIndex = 0, onStep }: P
       </View>
 
       {/* Hero Image Card */}
-      <View style={styles.imageCard}>
-        <Image source={{ uri: slide.img }} style={styles.heroImage} />
-        {/* Badge */}
-        <View style={[styles.badge, { backgroundColor: slide.badgeColor }]}>
-          <Text style={styles.badgeText}>{txt.badge}</Text>
+      <Animated.View
+        style={{
+          opacity: slideFade,
+          transform: [{ translateX: slideX }],
+        }}
+      >
+        <View style={styles.imageCard}>
+          <Image source={{ uri: slide.img }} style={styles.heroImage} />
+          {/* Badge */}
+          <View style={[styles.badge, { backgroundColor: slide.badgeColor }]}>
+            <Text style={styles.badgeText}>{txt.badge}</Text>
+          </View>
+
+          {/* Stats overlay */}
+          <View style={styles.statsBar}>
+            <View style={styles.statCol}>
+              <Text style={styles.statVal}>{slide.stat1}</Text>
+              <Text style={styles.statLabel}>{txt.stat1}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statCol}>
+              <Text style={styles.statVal}>{slide.stat2}</Text>
+              <Text style={styles.statLabel}>{txt.stat2}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statCol}>
+              <Text style={styles.statVal}>{slide.stat3}</Text>
+              <Text style={styles.statLabel}>{txt.stat3}</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Stats overlay */}
-        <View style={styles.statsBar}>
-          <View style={styles.statCol}>
-            <Text style={styles.statVal}>{slide.stat1}</Text>
-            <Text style={styles.statLabel}>{txt.stat1}</Text>
+        {/* Description */}
+        <View style={styles.textContainer}>
+          <View style={[styles.iconPill, { backgroundColor: slide.iconBg }]}>
+            <slide.icon size={22} color={slide.iconColor} />
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCol}>
-            <Text style={styles.statVal}>{slide.stat2}</Text>
-            <Text style={styles.statLabel}>{txt.stat2}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCol}>
-            <Text style={styles.statVal}>{slide.stat3}</Text>
-            <Text style={styles.statLabel}>{txt.stat3}</Text>
-          </View>
+          <Text style={styles.title}>{txt.title}</Text>
+          <Text style={styles.body}>{txt.body}</Text>
         </View>
-      </View>
-
-      {/* Description */}
-      <View style={styles.textContainer}>
-        <View style={[styles.iconPill, { backgroundColor: slide.iconBg }]}>
-          <slide.icon size={22} color={slide.iconColor} />
-        </View>
-        <Text style={styles.title}>{txt.title}</Text>
-        <Text style={styles.body}>{txt.body}</Text>
-      </View>
+      </Animated.View>
 
       {/* Bottom Button */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity
+        <ScalePressable
           onPress={next}
-          activeOpacity={0.85}
           style={styles.nextButton}
         >
           <Text style={styles.nextButtonText}>
             {isLast ? t.x.info.onboarding.getStarted : (t.x.info.onboarding.cont || "Next")}
           </Text>
           <ChevronRight size={20} color="#ffffff" />
-        </TouchableOpacity>
+        </ScalePressable>
       </View>
     </View>
   )

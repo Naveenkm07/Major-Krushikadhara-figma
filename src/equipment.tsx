@@ -1,8 +1,35 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react"
 import { useLang, fmt } from "./i18n"
 import { useProfile } from "./profile"
+import {
+  syncEquipmentMarketplaceFromBackend,
+  uploadEquipmentPhotoToBackend,
+  createEquipmentOnBackend,
+  updateEquipmentOnBackend,
+  deleteEquipmentOnBackend,
+  toggleEquipmentNotifyOnBackend,
+  createBookingOnBackend,
+  updateBookingStatusOnBackend,
+  reviewBookingOnBackend,
+  markEquipmentNotifsReadOnBackend,
+  type EquipmentDTO,
+  type RentalDTO,
+  type OwnerRequestDTO,
+  type EquipmentNotificationDTO,
+  type EquipmentStatsDTO,
+  type EquipmentMarketplaceStateDTO,
+} from "./api/equipment"
 
 export type Availability = "available" | "booked"
+export type RawAvailability = "AVAILABLE" | "BOOKED" | "MAINTENANCE"
 export type RentalStatus =
   | "pending"
   | "approved"
@@ -10,198 +37,195 @@ export type RentalStatus =
   | "completed"
   | "cancelled"
   | "rejected"
-export type RequestStatus = "pending" | "approved" | "rejected"
+export type RequestStatus = RentalStatus
 
-export type Equipment = {
-  id: string
-  name: string
-  type: string
-  owner: string
-  location: string
-  distanceKm: number
-  pricePerDay: number
-  availability: Availability
-  rating: number
-  reviews: number
-  image: string
-  hp: string
-  fuel: string
-  crops: string
-  condition: string
-  minDuration: string
-  mine?: boolean
-  notifyMe?: boolean
-  requestCount?: number
-}
+export type Equipment = EquipmentDTO
+export type Rental = RentalDTO
+export type OwnerRequest = OwnerRequestDTO
+export type NotifKind = EquipmentNotificationDTO["kind"]
+export type RentalNotification = EquipmentNotificationDTO
+export type EquipmentStats = EquipmentStatsDTO
 
-export type Rental = {
-  id: string
-  equipmentId: string
-  equipmentName: string
-  owner: string
-  location: string
-  image: string
-  startDate: string
-  endDate: string
-  days: number
-  pricePerDay: number
-  total: number
-  status: RentalStatus
-}
-
-export type OwnerRequest = {
-  id: string
-  equipmentId: string
-  equipmentName: string
-  renter: string
-  location: string
-  distanceKm: number
-  startDate: string
-  endDate: string
-  days: number
-  total: number
-  status: RequestStatus
-}
-
-export type NotifKind =
-  | "request"
-  | "available"
-  | "accepted"
-  | "rejected"
-  | "starting"
-  | "ending"
-  | "returned"
-  | "nearby"
-
-export type RentalNotification = {
-  id: string
-  kind: NotifKind
-  title: string
-  body: string
-  time: string
-  read?: boolean
-  equipmentId?: string
-  /** Translation template key (t.x.equipmentA.notif) + placeholder values. */
-  tpl?: string
-  vars?: Record<string, string | number>
-}
-
-const IMG = {
-  tractor:
-    "https://images.unsplash.com/photo-1605338803155-8b46c0fe7e5e?w=400&h=300&fit=crop&auto=format",
-  rotavator:
-    "https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=400&h=300&fit=crop&auto=format",
-  seedDrill:
-    "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=400&h=300&fit=crop&auto=format",
-  sprayer:
-    "https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?w=400&h=300&fit=crop&auto=format",
-  harvester:
-    "https://images.unsplash.com/photo-1571913196242-d0c1a45ee5c2?w=400&h=300&fit=crop&auto=format",
-  cultivator:
-    "https://images.unsplash.com/photo-1530267981375-f0de937f5f13?w=400&h=300&fit=crop&auto=format",
+export const EQUIP_PRESET_IMAGES: Record<string, string> = {
+  Tractor:
+    "https://images.unsplash.com/photo-1605338803155-8b46c0fe7e5e?w=600&h=420&fit=crop&auto=format",
+  Rotavator:
+    "https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=600&h=420&fit=crop&auto=format",
+  "Seed Drill":
+    "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=600&h=420&fit=crop&auto=format",
+  Sprayer:
+    "https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?w=600&h=420&fit=crop&auto=format",
+  Harvester:
+    "https://images.unsplash.com/photo-1571913196242-d0c1a45ee5c2?w=600&h=420&fit=crop&auto=format",
+  Cultivator:
+    "https://images.unsplash.com/photo-1530267981375-f0de937f5f13?w=600&h=420&fit=crop&auto=format",
 }
 
 const seedEquipment: Equipment[] = [
   {
-    id: "e1", name: "Tractor (45 HP)", type: "Tractor", owner: "Ramesh Kumar",
-    location: "Mandya", distanceKm: 3, pricePerDay: 1200, availability: "available",
-    rating: 4.8, reviews: 34, image: IMG.tractor, hp: "45 HP", fuel: "Diesel",
-    crops: "Rice, Ragi, Sugarcane", condition: "Well maintained", minDuration: "1 day",
+    id: "eq-mandya-1",
+    name: "Tractor (45 HP)",
+    type: "Tractor",
+    owner: "Ramesh Kumar",
+    ownerPhone: "9845011122",
+    location: "Mandya",
+    distanceKm: 3,
+    pricePerDay: 1200,
+    availability: "available",
+    rawAvailability: "AVAILABLE",
+    rating: 4.8,
+    reviews: 34,
+    image: EQUIP_PRESET_IMAGES.Tractor,
+    hp: "45 HP",
+    fuel: "Diesel",
+    crops: "Rice, Ragi, Sugarcane",
+    condition: "Well maintained",
+    minDuration: "1 day",
+    description:
+      "Mahindra 575 DI 45 HP tractor serviced regularly, ideal for wetland puddling, ploughing, and trolley haulage.",
+    deliveryAvailable: true,
+    deliveryFee: 250,
+    operatorIncluded: true,
+    operatorFeePerDay: 400,
   },
   {
-    id: "e2", name: "Rotavator", type: "Rotavator", owner: "Shankar",
-    location: "Maddur", distanceKm: 8, pricePerDay: 700, availability: "available",
-    rating: 4.6, reviews: 21, image: IMG.rotavator, hp: "—", fuel: "PTO driven",
-    crops: "All field crops", condition: "Good", minDuration: "1 day",
+    id: "eq-maddur-2",
+    name: "Rotavator",
+    type: "Rotavator",
+    owner: "Shankar Gowda",
+    ownerPhone: "9845022233",
+    location: "Maddur",
+    distanceKm: 8,
+    pricePerDay: 700,
+    availability: "available",
+    rawAvailability: "AVAILABLE",
+    rating: 4.6,
+    reviews: 21,
+    image: EQUIP_PRESET_IMAGES.Rotavator,
+    hp: "6 ft PTO",
+    fuel: "PTO driven",
+    crops: "All field crops",
+    condition: "Good",
+    minDuration: "1 day",
+    deliveryAvailable: true,
+    deliveryFee: 200,
+    operatorIncluded: false,
+    operatorFeePerDay: 0,
   },
   {
-    id: "e3", name: "Seed Drill", type: "Seed Drill", owner: "Ravi",
-    location: "Srirangapatna", distanceKm: 12, pricePerDay: 500, availability: "booked",
-    rating: 4.4, reviews: 12, image: IMG.seedDrill, hp: "—", fuel: "PTO driven",
-    crops: "Ragi, Wheat, Pulses", condition: "Good", minDuration: "2 days",
+    id: "eq-sriranga-3",
+    name: "Seed Drill",
+    type: "Seed Drill",
+    owner: "Ravi Shetty",
+    ownerPhone: "9845033344",
+    location: "Srirangapatna",
+    distanceKm: 12,
+    pricePerDay: 500,
+    availability: "booked",
+    rawAvailability: "BOOKED",
+    rating: 4.4,
+    reviews: 12,
+    image: EQUIP_PRESET_IMAGES["Seed Drill"],
+    hp: "9-Tyne PTO",
+    fuel: "PTO driven",
+    crops: "Ragi, Wheat, Pulses",
+    condition: "Good",
+    minDuration: "2 days",
+    deliveryAvailable: false,
+    deliveryFee: 0,
+    operatorIncluded: false,
+    operatorFeePerDay: 0,
   },
   {
-    id: "e4", name: "Power Sprayer", type: "Sprayer", owner: "Kumar",
-    location: "Mandya", distanceKm: 5, pricePerDay: 300, availability: "available",
-    rating: 4.7, reviews: 28, image: IMG.sprayer, hp: "5 HP", fuel: "Petrol",
-    crops: "Vegetables, Paddy", condition: "Excellent", minDuration: "1 day",
+    id: "eq-mandya-4",
+    name: "Power Sprayer",
+    type: "Sprayer",
+    owner: "Kumar Swamy",
+    ownerPhone: "9845044455",
+    location: "Mandya",
+    distanceKm: 5,
+    pricePerDay: 300,
+    availability: "available",
+    rawAvailability: "AVAILABLE",
+    rating: 4.7,
+    reviews: 28,
+    image: EQUIP_PRESET_IMAGES.Sprayer,
+    hp: "5 HP",
+    fuel: "Petrol",
+    crops: "Vegetables, Paddy",
+    condition: "Excellent",
+    minDuration: "1 day",
+    deliveryAvailable: true,
+    deliveryFee: 100,
+    operatorIncluded: true,
+    operatorFeePerDay: 250,
   },
   {
-    id: "e5", name: "Harvester", type: "Harvester", owner: "Mahesh",
-    location: "Mysore", distanceKm: 22, pricePerDay: 2500, availability: "available",
-    rating: 4.9, reviews: 41, image: IMG.harvester, hp: "76 HP", fuel: "Diesel",
-    crops: "Paddy, Wheat", condition: "Well maintained", minDuration: "1 day",
+    id: "eq-mysore-5",
+    name: "Harvester",
+    type: "Harvester",
+    owner: "Mahesh Nayak",
+    ownerPhone: "9845055566",
+    location: "Mysore",
+    distanceKm: 22,
+    pricePerDay: 2500,
+    availability: "available",
+    rawAvailability: "AVAILABLE",
+    rating: 4.9,
+    reviews: 41,
+    image: EQUIP_PRESET_IMAGES.Harvester,
+    hp: "76 HP",
+    fuel: "Diesel",
+    crops: "Paddy, Wheat",
+    condition: "Well maintained",
+    minDuration: "1 day",
+    deliveryAvailable: true,
+    deliveryFee: 500,
+    operatorIncluded: true,
+    operatorFeePerDay: 600,
   },
 ]
 
-// Equipment owned by the current user (for the owner side of the marketplace)
 const seedMine: Equipment[] = [
   {
-    id: "m1", name: "Tractor (45 HP)", type: "Tractor", owner: "Naveen Kumar km",
-    location: "Mandya", distanceKm: 0, pricePerDay: 1200, availability: "available",
-    rating: 4.8, reviews: 19, image: IMG.tractor, hp: "45 HP", fuel: "Diesel",
-    crops: "Rice, Ragi, Sugarcane", condition: "Well maintained", minDuration: "1 day",
-    mine: true, requestCount: 3,
-  },
-  {
-    id: "m2", name: "Cultivator", type: "Cultivator", owner: "Naveen Kumar km",
-    location: "Mandya", distanceKm: 0, pricePerDay: 700, availability: "booked",
-    rating: 4.5, reviews: 8, image: IMG.cultivator, hp: "—", fuel: "PTO driven",
-    crops: "All field crops", condition: "Good", minDuration: "1 day",
-    mine: true, requestCount: 0,
-  },
-]
-
-const seedOwnerRequests: OwnerRequest[] = [
-  {
-    id: "r1", equipmentId: "m1", equipmentName: "Tractor (45 HP)", renter: "Suresh Kumar",
-    location: "Mandya", distanceKm: 4, startDate: "12 Sep", endDate: "14 Sep", days: 3,
-    total: 3600, status: "pending",
-  },
-  {
-    id: "r2", equipmentId: "m1", equipmentName: "Tractor (45 HP)", renter: "Prakash",
-    location: "Maddur", distanceKm: 9, startDate: "18 Sep", endDate: "19 Sep", days: 2,
-    total: 2400, status: "pending",
-  },
-  {
-    id: "r3", equipmentId: "m1", equipmentName: "Tractor (45 HP)", renter: "Lokesh",
-    location: "Mandya", distanceKm: 2, startDate: "22 Sep", endDate: "25 Sep", days: 4,
-    total: 4800, status: "pending",
+    id: "eq-owner-m1",
+    name: "Tractor (45 HP)",
+    type: "Tractor",
+    owner: "Naveen Kumar KM",
+    ownerPhone: "9591502209",
+    location: "Mandya",
+    distanceKm: 0,
+    pricePerDay: 1200,
+    availability: "available",
+    rawAvailability: "AVAILABLE",
+    rating: 4.8,
+    reviews: 19,
+    image: EQUIP_PRESET_IMAGES.Tractor,
+    hp: "45 HP",
+    fuel: "Diesel",
+    crops: "Rice, Ragi, Sugarcane",
+    condition: "Well maintained",
+    minDuration: "1 day",
+    deliveryAvailable: true,
+    deliveryFee: 200,
+    operatorIncluded: true,
+    operatorFeePerDay: 350,
+    mine: true,
+    requestCount: 1,
   },
 ]
 
-const seedRentals: Rental[] = [
-  {
-    id: "rt1", equipmentId: "e5", equipmentName: "Harvester", owner: "Mahesh",
-    location: "Mysore", image: IMG.harvester, startDate: "8 Sep", endDate: "9 Sep",
-    days: 1, pricePerDay: 2500, total: 2500, status: "active",
-  },
-  {
-    id: "rt2", equipmentId: "e2", equipmentName: "Rotavator", owner: "Shankar",
-    location: "Maddur", image: IMG.rotavator, startDate: "20 Aug", endDate: "22 Aug",
-    days: 2, pricePerDay: 700, total: 1400, status: "completed",
-  },
-]
+let localUid = 100
+const nextLocalId = (prefix = "eq-local") => `${prefix}-${Date.now()}-${localUid++}`
 
-const seedNotifs: RentalNotification[] = [
-  {
-    id: "n1", kind: "request", title: "New Rental Request",
-    body: "Suresh Kumar wants to rent your Tractor (45 HP) for 3 days.",
-    time: "1h ago", read: false, equipmentId: "m1",
-    tpl: "request", vars: { renter: "Suresh Kumar", equip: "Tractor (45 HP)", days: 3 },
-  },
-  {
-    id: "n2", kind: "nearby", title: "New Equipment Nearby 🚜",
-    body: "Rotavator available 8 km from you.", time: "3h ago", read: false, equipmentId: "e2", tpl: "nearby",
-  },
-  {
-    id: "n3", kind: "starting", title: "Rental Starting Soon ⏰",
-    body: "Your Harvester rental starts tomorrow.", time: "Yesterday", read: true, tpl: "starting",
-  },
-]
-
-let uid = 100
-const nid = () => `x${uid++}`
+type BookingInput = {
+  start: string
+  end: string
+  days: number
+  pickupMode?: "pickup" | "delivery"
+  includeOperator?: boolean
+  notes?: string
+}
 
 type Ctx = {
   equipment: Equipment[]
@@ -209,16 +233,26 @@ type Ctx = {
   rentals: Rental[]
   ownerRequests: OwnerRequest[]
   notifications: RentalNotification[]
+  stats: EquipmentStats
   unreadCount: number
+  loading: boolean
+  syncSource: string
+  refreshEquipment: (opts?: { lat?: number; lng?: number; silent?: boolean }) => Promise<void>
   getEquipment: (id: string) => Equipment | undefined
   getRental: (id: string) => Rental | undefined
-  requestRental: (equipmentId: string, dates: { start: string; end: string; days: number }) => string
-  cancelRental: (rentalId: string) => void
-  acceptRequest: (reqId: string) => void
-  rejectRequest: (reqId: string) => void
-  listEquipment: (draft: Partial<Equipment>) => void
-  toggleNotify: (equipmentId: string) => void
-  markNotifsRead: () => void
+  requestRental: (equipmentId: string, dates: BookingInput) => Promise<Rental | null>
+  cancelRental: (rentalId: string) => Promise<void>
+  acceptRequest: (reqId: string) => Promise<void>
+  rejectRequest: (reqId: string, reason?: string) => Promise<void>
+  startRentalHandover: (reqId: string) => Promise<void>
+  completeRental: (bookingId: string) => Promise<void>
+  submitRentalReview: (bookingId: string, rating: number, comment?: string) => Promise<boolean>
+  listEquipment: (draft: Partial<Equipment>) => Promise<Equipment | null>
+  updateEquipmentListing: (id: string, patch: Partial<Equipment> & { rawAvailability?: RawAvailability }) => Promise<Equipment | null>
+  deleteEquipmentListing: (id: string) => Promise<boolean>
+  uploadEquipmentPhoto: (imageUri: string) => Promise<string>
+  toggleNotify: (equipmentId: string) => Promise<void>
+  markNotifsRead: (notificationId?: string) => Promise<void>
 }
 
 const EquipmentContext = createContext<Ctx | null>(null)
@@ -227,130 +261,348 @@ export function EquipmentProvider({ children }: { children: ReactNode }) {
   const { profile } = useProfile()
   const [equipment, setEquipment] = useState<Equipment[]>(seedEquipment)
   const [mine, setMine] = useState<Equipment[]>(seedMine)
-  const [rentals, setRentals] = useState<Rental[]>(seedRentals)
-  const [ownerRequests, setOwnerRequests] = useState<OwnerRequest[]>(seedOwnerRequests)
-  const [notifications, setNotifications] = useState<RentalNotification[]>(seedNotifs)
+  const [rentals, setRentals] = useState<Rental[]>([])
+  const [ownerRequests, setOwnerRequests] = useState<OwnerRequest[]>([])
+  const [notifications, setNotifications] = useState<RentalNotification[]>([])
+  const [stats, setStats] = useState<EquipmentStats>({
+    listedCount: seedMine.length,
+    pendingCount: 0,
+    activeCount: 0,
+    completedCount: 0,
+    approvedEarnings: 0,
+    completedEarnings: 0,
+  })
+  const [loading, setLoading] = useState(false)
+  const [syncSource, setSyncSource] = useState("Offline Preview")
 
-  const getEquipment = (id: string) =>
-    equipment.find((e) => e.id === id) ?? mine.find((e) => e.id === id)
-  const getRental = (id: string) => rentals.find((r) => r.id === id)
+  const applyServerState = useCallback((state: EquipmentMarketplaceStateDTO) => {
+    setEquipment(Array.isArray(state.allMarketplace) ? state.allMarketplace : state.equipment || [])
+    setMine(state.mine || [])
+    setRentals(state.rentals || [])
+    setOwnerRequests(state.ownerRequests || [])
+    setNotifications(state.notifications || [])
+    if (state.stats) setStats(state.stats)
+    if (state.source) setSyncSource(state.source)
+  }, [])
 
-  function pushNotif(n: Omit<RentalNotification, "id" | "time">) {
-    setNotifications((list) => [{ id: nid(), time: "Just now", read: false, ...n }, ...list])
-  }
+  const refreshEquipment = useCallback(
+    async (opts?: { lat?: number; lng?: number; silent?: boolean }) => {
+      const mobile = (profile.mobile || "9591502209").replace(/\D/g, "").slice(-10) || "9591502209"
+      if (!opts?.silent) setLoading(true)
+      try {
+        const res = await syncEquipmentMarketplaceFromBackend({
+          mobile,
+          lat: opts?.lat,
+          lng: opts?.lng,
+        })
+        if (res?.success) {
+          applyServerState(res)
+        }
+      } finally {
+        if (!opts?.silent) setLoading(false)
+      }
+    },
+    [applyServerState, profile.mobile]
+  )
 
-  function requestRental(equipmentId: string, dates: { start: string; end: string; days: number }) {
+  useEffect(() => {
+    refreshEquipment({ silent: true })
+  }, [refreshEquipment])
+
+  const displayMine = useMemo(
+    () =>
+      mine.map((m) => ({
+        ...m,
+        owner: m.owner || profile.name || "Farmer",
+        location: m.location || profile.district || "Mandya",
+      })),
+    [mine, profile.district, profile.name]
+  )
+
+  const getEquipment = useCallback(
+    (id: string) =>
+      equipment.find((e) => e.id === id) ?? displayMine.find((e) => e.id === id),
+    [equipment, displayMine]
+  )
+
+  const getRental = useCallback(
+    (id: string) => rentals.find((r) => r.id === id),
+    [rentals]
+  )
+
+  const mobileClean = useMemo(
+    () => (profile.mobile || "9591502209").replace(/\D/g, "").slice(-10) || "9591502209",
+    [profile.mobile]
+  )
+
+  async function requestRental(
+    equipmentId: string,
+    dates: BookingInput
+  ): Promise<Rental | null> {
     const eq = getEquipment(equipmentId)
-    if (!eq) return ""
-    const id = nid()
-    const total = eq.pricePerDay * dates.days
-    setRentals((list) => [
-      {
-        id, equipmentId, equipmentName: eq.name, owner: eq.owner, location: eq.location,
-        image: eq.image, startDate: dates.start, endDate: dates.end, days: dates.days,
-        pricePerDay: eq.pricePerDay, total, status: "pending",
-      },
-      ...list,
-    ])
-    pushNotif({
-      kind: "request", title: "Rental Request Sent", tpl: "sent",
-      vars: { equip: eq.name, owner: eq.owner },
-      body: `Your request for ${eq.name} was sent to ${eq.owner}.`,
-    })
-    return id
-  }
+    if (!eq) return null
 
-  function cancelRental(rentalId: string) {
-    setRentals((list) =>
-      list.map((r) => (r.id === rentalId ? { ...r, status: "cancelled" } : r)),
-    )
-  }
-
-  function acceptRequest(reqId: string) {
-    let req: OwnerRequest | undefined
-    setOwnerRequests((list) =>
-      list.map((r) => {
-        if (r.id === reqId) {
-          req = r
-          return { ...r, status: "approved" }
-        }
-        return r
-      }),
-    )
-    if (req) {
-      setMine((list) =>
-        list.map((e) => (e.id === req!.equipmentId ? { ...e, availability: "booked" } : e)),
-      )
-      pushNotif({
-        kind: "accepted", title: "Request Accepted ✓", tpl: "accepted",
-        vars: { renter: req.renter, equip: req.equipmentName },
-        body: `You accepted ${req.renter}'s request for ${req.equipmentName}.`,
+    try {
+      const res = await createBookingOnBackend(equipmentId, {
+        mobile: mobileClean,
+        startDate: dates.start,
+        endDate: dates.end,
+        days: dates.days,
+        pickupMode: dates.pickupMode || "pickup",
+        includeOperator: Boolean(dates.includeOperator),
+        notes: dates.notes,
       })
+      if (res?.state) applyServerState(res.state)
+      return res.booking
+    } catch (err: any) {
+      if (err?.isHttpError) {
+        throw err
+      }
+      const deliveryFee =
+        dates.pickupMode === "delivery" && eq.deliveryAvailable ? eq.deliveryFee || 0 : 0
+      const operatorFee =
+        dates.includeOperator && eq.operatorIncluded
+          ? (eq.operatorFeePerDay || 0) * dates.days
+          : 0
+      const total = eq.pricePerDay * dates.days + deliveryFee + operatorFee
+      const localBooking: Rental = {
+        id: nextLocalId("bk-local"),
+        equipmentId,
+        equipmentName: eq.name,
+        equipmentType: eq.type,
+        owner: eq.owner,
+        ownerPhone: eq.ownerPhone,
+        location: eq.location,
+        image: eq.image,
+        startDate: dates.start,
+        endDate: dates.end,
+        days: dates.days,
+        pricePerDay: eq.pricePerDay,
+        deliveryFee,
+        operatorFee,
+        total,
+        pickupMode: dates.pickupMode || "pickup",
+        operatorIncluded: Boolean(dates.includeOperator && eq.operatorIncluded),
+        notes: dates.notes || "",
+        status: "pending",
+      }
+      setRentals((list) => [localBooking, ...list])
+      return localBooking
     }
   }
 
-  function rejectRequest(reqId: string) {
-    let req: OwnerRequest | undefined
-    setOwnerRequests((list) =>
-      list.map((r) => {
-        if (r.id === reqId) {
-          req = r
-          return { ...r, status: "rejected" }
-        }
-        return r
-      }),
-    )
-    if (req) {
-      setMine((list) =>
-        list.map((e) => (e.id === req!.equipmentId ? { ...e, availability: "available" } : e)),
-      )
-      pushNotif({
-        kind: "rejected", title: "Request Rejected", tpl: "rejected",
-        vars: { renter: req.renter, equip: req.equipmentName },
-        body: `You rejected ${req.renter}'s request for ${req.equipmentName}.`,
+  async function updateBookingStatus(
+    bookingId: string,
+    statusUpper: "APPROVED" | "REJECTED" | "ACTIVE" | "COMPLETED" | "CANCELLED",
+    reason?: string
+  ) {
+    try {
+      const res = await updateBookingStatusOnBackend(bookingId, {
+        mobile: mobileClean,
+        status: statusUpper,
+        reason,
       })
+      if (res?.state) applyServerState(res.state)
+    } catch {
+      const lower = statusUpper.toLowerCase() as RentalStatus
+      setRentals((list) =>
+        list.map((r) => (r.id === bookingId ? { ...r, status: lower } : r))
+      )
+      setOwnerRequests((list) =>
+        list.map((r) => (r.id === bookingId ? { ...r, status: lower } : r))
+      )
     }
   }
 
-  function listEquipment(draft: Partial<Equipment>) {
-    const id = nid()
-    const eq: Equipment = {
-      id, name: draft.name || "New Equipment", type: draft.type || "Other",
-      owner: profile.name || "Farmer", location: draft.location || profile.district || "Mandya", distanceKm: 0,
-      pricePerDay: draft.pricePerDay || 0, availability: draft.availability || "available",
-      rating: 5.0, reviews: 0, image: draft.image || IMG.tractor, hp: draft.hp || "—",
-      fuel: draft.fuel || "—", crops: draft.crops || "—", condition: draft.condition || "Good",
-      minDuration: draft.minDuration || "1 day", mine: true, requestCount: 0,
+  const cancelRental = (rentalId: string) => updateBookingStatus(rentalId, "CANCELLED")
+  const acceptRequest = (reqId: string) => updateBookingStatus(reqId, "APPROVED")
+  const rejectRequest = (reqId: string, reason?: string) =>
+    updateBookingStatus(reqId, "REJECTED", reason)
+  const startRentalHandover = (reqId: string) => updateBookingStatus(reqId, "ACTIVE")
+  const completeRental = (bookingId: string) => updateBookingStatus(bookingId, "COMPLETED")
+
+  async function submitRentalReview(
+    bookingId: string,
+    rating: number,
+    comment?: string
+  ): Promise<boolean> {
+    try {
+      const res = await reviewBookingOnBackend(bookingId, {
+        mobile: mobileClean,
+        rating,
+        comment,
+      })
+      if (res?.state) applyServerState(res.state)
+      return true
+    } catch {
+      setRentals((list) =>
+        list.map((r) =>
+          r.id === bookingId ? { ...r, rating, reviewComment: comment || null } : r
+        )
+      )
+      return true
     }
-    setMine((list) => [eq, ...list])
-    setEquipment((list) => [{ ...eq, distanceKm: 0 }, ...list])
-    pushNotif({
-      kind: "nearby", title: "New Equipment Available Near You 🚜", tpl: "listed",
-      vars: { equip: eq.name, price: eq.pricePerDay },
-      body: `You listed a ${eq.name} for ₹${eq.pricePerDay}/day. Nearby farmers have been notified.`,
-      equipmentId: id,
-    })
   }
 
-  function toggleNotify(equipmentId: string) {
+  async function listEquipment(draft: Partial<Equipment>): Promise<Equipment | null> {
+    try {
+      const res = await createEquipmentOnBackend({
+        mobile: mobileClean,
+        name: draft.name || "Tractor",
+        type: draft.type || "Tractor",
+        location: draft.location || profile.district || "Mandya",
+        latitude: draft.latitude,
+        longitude: draft.longitude,
+        pricePerDay: draft.pricePerDay || 1000,
+        availability: draft.rawAvailability || (draft.availability === "booked" ? "BOOKED" : "AVAILABLE"),
+        hp: draft.hp || "45 HP",
+        fuel: draft.fuel || "Diesel",
+        suitableCrops: draft.crops || "All field crops",
+        condition: draft.condition || "Well maintained",
+        minDuration: draft.minDuration || "1 day",
+        description: draft.description || "",
+        deliveryAvailable: Boolean(draft.deliveryAvailable),
+        deliveryFee: Number(draft.deliveryFee || 0),
+        operatorIncluded: Boolean(draft.operatorIncluded),
+        operatorFeePerDay: Number(draft.operatorFeePerDay || 0),
+        imageUrl: draft.image || EQUIP_PRESET_IMAGES[draft.type || "Tractor"] || EQUIP_PRESET_IMAGES.Tractor,
+      })
+      if (res?.state) applyServerState(res.state)
+      return res.equipment
+    } catch {
+      const eq: Equipment = {
+        id: nextLocalId("eq-local"),
+        name: draft.name || "New Equipment",
+        type: draft.type || "Tractor",
+        owner: profile.name || "Farmer",
+        ownerPhone: mobileClean,
+        location: draft.location || profile.district || "Mandya",
+        distanceKm: 0,
+        pricePerDay: draft.pricePerDay || 1000,
+        availability: draft.availability || "available",
+        rawAvailability: draft.rawAvailability || "AVAILABLE",
+        rating: 5.0,
+        reviews: 0,
+        image: draft.image || EQUIP_PRESET_IMAGES[draft.type || "Tractor"] || EQUIP_PRESET_IMAGES.Tractor,
+        hp: draft.hp || "45 HP",
+        fuel: draft.fuel || "Diesel",
+        crops: draft.crops || "All field crops",
+        condition: draft.condition || "Good",
+        minDuration: draft.minDuration || "1 day",
+        description: draft.description || "",
+        deliveryAvailable: Boolean(draft.deliveryAvailable),
+        deliveryFee: Number(draft.deliveryFee || 0),
+        operatorIncluded: Boolean(draft.operatorIncluded),
+        operatorFeePerDay: Number(draft.operatorFeePerDay || 0),
+        mine: true,
+        requestCount: 0,
+      }
+      setMine((list) => [eq, ...list])
+      return eq
+    }
+  }
+
+  async function updateEquipmentListing(
+    id: string,
+    patch: Partial<Equipment> & { rawAvailability?: RawAvailability }
+  ): Promise<Equipment | null> {
+    try {
+      const res = await updateEquipmentOnBackend(id, {
+        mobile: mobileClean,
+        ...patch,
+        availability:
+          patch.rawAvailability ||
+          (patch.availability ? patch.availability.toUpperCase() : undefined),
+      })
+      if (res?.state) applyServerState(res.state)
+      return res.equipment
+    } catch {
+      const nextAvailability: Availability | undefined = patch.rawAvailability
+        ? patch.rawAvailability === "AVAILABLE"
+          ? "available"
+          : "booked"
+        : patch.availability
+      const applyPatch = (e: Equipment) =>
+        e.id === id
+          ? {
+              ...e,
+              ...patch,
+              ...(nextAvailability ? { availability: nextAvailability } : {}),
+            }
+          : e
+      setMine((list) => list.map(applyPatch))
+      setEquipment((list) => list.map(applyPatch))
+      return null
+    }
+  }
+
+  async function deleteEquipmentListing(id: string): Promise<boolean> {
+    try {
+      const res = await deleteEquipmentOnBackend(id, mobileClean)
+      if (res?.state) applyServerState(res.state)
+      return true
+    } catch {
+      setMine((list) => list.filter((e) => e.id !== id))
+      setEquipment((list) => list.filter((e) => e.id !== id))
+      return true
+    }
+  }
+
+  async function uploadEquipmentPhoto(imageUri: string): Promise<string> {
+    return await uploadEquipmentPhotoToBackend(imageUri, mobileClean)
+  }
+
+  async function toggleNotify(equipmentId: string) {
     setEquipment((list) =>
-      list.map((e) => (e.id === equipmentId ? { ...e, notifyMe: !e.notifyMe } : e)),
+      list.map((e) => (e.id === equipmentId ? { ...e, notifyMe: !e.notifyMe } : e))
     )
+    try {
+      const res = await toggleEquipmentNotifyOnBackend(equipmentId, mobileClean)
+      if (res?.state) applyServerState(res.state)
+    } catch {}
   }
 
-  function markNotifsRead() {
-    setNotifications((list) => list.map((n) => ({ ...n, read: true })))
+  async function markNotifsRead(notificationId?: string) {
+    setNotifications((list) =>
+      list.map((n) => (!notificationId || n.id === notificationId ? { ...n, read: true } : n))
+    )
+    try {
+      const res = await markEquipmentNotifsReadOnBackend(mobileClean, notificationId)
+      if (res?.state) applyServerState(res.state)
+    } catch {}
   }
 
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.read).length,
-    [notifications],
+    [notifications]
   )
 
   const value: Ctx = {
-    equipment, mine, rentals, ownerRequests, notifications, unreadCount,
-    getEquipment, getRental, requestRental, cancelRental, acceptRequest, rejectRequest,
-    listEquipment, toggleNotify, markNotifsRead,
+    equipment,
+    mine: displayMine,
+    rentals,
+    ownerRequests,
+    notifications,
+    stats,
+    unreadCount,
+    loading,
+    syncSource,
+    refreshEquipment,
+    getEquipment,
+    getRental,
+    requestRental,
+    cancelRental,
+    acceptRequest,
+    rejectRequest,
+    startRentalHandover,
+    completeRental,
+    submitRentalReview,
+    listEquipment,
+    updateEquipmentListing,
+    deleteEquipmentListing,
+    uploadEquipmentPhoto,
+    toggleNotify,
+    markNotifsRead,
   }
 
   return <EquipmentContext.Provider value={value}>{children}</EquipmentContext.Provider>
@@ -390,7 +642,11 @@ export function useEquipText() {
       if (!tpl) return { title: n.title, body: n.body, time: look(e.times, n.time) }
       const vars: Record<string, string | number> = { ...n.vars }
       if (typeof vars.equip === "string") vars.equip = name(vars.equip)
-      return { title: fmt(tpl.title, vars), body: fmt(tpl.body, vars), time: look(e.times, n.time) }
+      return {
+        title: fmt(tpl.title, vars),
+        body: fmt(tpl.body, vars),
+        time: look(e.times, n.time),
+      }
     },
   }
 }

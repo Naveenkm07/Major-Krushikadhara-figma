@@ -32,6 +32,7 @@ import {
   type NearbyMandiItem,
 } from "../api/mandi"
 import { getCurrentLocation } from "../utils/location"
+import { FadeSlideIn, SkeletonBox } from "./Motion"
 
 // Preset fallback verified farming hubs for manual selection
 const MANUAL_LOCATION_HUBS = [
@@ -47,15 +48,53 @@ const MANUAL_LOCATION_HUBS = [
   { label: "Hubballi (ಹುಬ್ಬಳ್ಳಿ)", lat: 15.3647, lng: 75.1240, district: "Dharwad" },
 ]
 
+const MARKET_CROP_KN: Record<string, string> = {
+  Tomato: "ಟೊಮ್ಯಾಟೊ",
+  Rice: "ಭತ್ತ / ಅಕ್ಕಿ",
+  "Rice (Paddy)": "ಭತ್ತ",
+  Paddy: "ಭತ್ತ",
+  "Paddy(Common)": "ಭತ್ತ (ಸಾಮಾನ್ಯ)",
+  Ragi: "ರಾಗಿ",
+  "Ragi(Finger Millet)": "ರಾಗಿ",
+  Onion: "ಈರುಳ್ಳಿ",
+  Potato: "ಆಲೂಗಡ್ಡೆ",
+  "Green Chilli": "ಹಸಿರು ಮೆಣಸಿನಕಾಯಿ",
+  Chilli: "ಮೆಣಸಿನಕಾಯಿ",
+  Capsicum: "ದೊಡ್ಡ ಮೆಣಸಿನಕಾಯಿ",
+  Cauliflower: "ಹೂಕೋಸು",
+  Beans: "ಹುರುಳಿಕಾಯಿ",
+  Cabbage: "ಎಲೆಕೋಸು",
+  Brinjal: "ಬದನೆಕಾಯಿ",
+  Radish: "ಮೂಲಂಗಿ",
+  Maize: "ಮೆಕ್ಕೆಜೋಳ",
+  Wheat: "ಗೋಧಿ",
+  Cotton: "ಹತ್ತಿ",
+  Sugarcane: "ಕಬ್ಬು",
+  Banana: "ಬಾಳೆಹಣ್ಣು",
+  Coconut: "ತೆಂಗಿನಕಾಯಿ",
+  Arecanut: "ಅಡಿಕೆ",
+  Groundnut: "ಶೇಂಗಾ",
+  Jowar: "ಜೋಳ",
+  Bajra: "ಸಜ್ಜೆ",
+  Soybean: "ಸೋಯಾಬೀನ್",
+  Ginger: "ಶುಂಠಿ",
+  Garlic: "ಬೆಳ್ಳುಳ್ಳಿ",
+}
+
 export default function MarketPricesScreen() {
-  const { lang } = useLang()
+  const { lang, t } = useLang()
   const { profile } = useProfile()
   const isKn = lang === "kn"
+  const cropMap = (t.x.coreA.crops as Record<string, string>) || {}
+  const cropLabel = (name: string) => {
+    if (!isKn) return name
+    return MARKET_CROP_KN[name] || cropMap[name] || name
+  }
 
   // GPS Location State
   const [farmerCoords, setFarmerCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [gpsStatus, setGpsStatus] = useState<"detecting" | "success" | "denied" | "manual">("detecting")
-  const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null)
+  const [gpsErrorReason, setGpsErrorReason] = useState<"denied" | "timeout" | null>(null)
   const [showManualPicker, setShowManualPicker] = useState<boolean>(false)
   const [selectedHubName, setSelectedHubName] = useState<string>("Detecting GPS...")
 
@@ -84,12 +123,20 @@ export default function MarketPricesScreen() {
   const [mandis, setMandis] = useState<NearbyMandiItem[]>([])
   const [nearestActiveMarket, setNearestActiveMarket] = useState<NearbyMandiItem | null>(null)
   const [activeCommoditiesToday, setActiveCommoditiesToday] = useState<string[]>([])
-  const [rateLimitError, setRateLimitError] = useState<string | null>(null)
+  const [rateLimitError, setRateLimitError] = useState<boolean>(false)
 
   // 1. Detect farmer's current GPS location dynamically
   const requestGpsLocation = useCallback(async () => {
     setGpsStatus("detecting")
-    setGpsErrorMsg(null)
+    setGpsErrorReason(null)
+
+    const distKey = (profile.district || "Mandya").trim().toLowerCase()
+    const fallbackHub =
+      MANUAL_LOCATION_HUBS.find(
+        (h) =>
+          h.district.toLowerCase() === distKey ||
+          h.label.toLowerCase().includes(distKey)
+      ) || MANUAL_LOCATION_HUBS[0]
 
     const loc = await getCurrentLocation(9000)
     if (loc.ok) {
@@ -97,26 +144,16 @@ export default function MarketPricesScreen() {
       setGpsStatus("success")
       setSelectedHubName(`${loc.lat.toFixed(3)}°N, ${loc.lng.toFixed(3)}°E`)
     } else if (loc.reason === "unavailable") {
-      const fallbackHub = MANUAL_LOCATION_HUBS[0]
       setFarmerCoords({ lat: fallbackHub.lat, lng: fallbackHub.lng })
       setGpsStatus("manual")
       setSelectedHubName(fallbackHub.label)
     } else {
       setGpsStatus("denied")
-      setGpsErrorMsg(
-        loc.reason === "denied"
-          ? isKn
-            ? "ಸ್ಥಳ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ಹತ್ತಿರದ ಮಾರುಕಟ್ಟೆಗಳನ್ನು ನೋಡಲು ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
-            : "Location permission denied. Please select your nearest farming hub below."
-          : isKn
-          ? "ಜಿಪಿಎಸ್ ಸಿಗ್ನಲ್ ಸಿಗುತ್ತಿಲ್ಲ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
-          : "GPS signal timed out. Please choose a nearby hub below."
-      )
-      const fallbackHub = MANUAL_LOCATION_HUBS[0]
+      setGpsErrorReason(loc.reason === "denied" ? "denied" : "timeout")
       setFarmerCoords({ lat: fallbackHub.lat, lng: fallbackHub.lng })
       setSelectedHubName(fallbackHub.label)
     }
-  }, [isKn])
+  }, [profile.district])
 
   useEffect(() => {
     requestGpsLocation()
@@ -127,7 +164,7 @@ export default function MarketPricesScreen() {
     if (!farmerCoords) return
 
     setLoading(true)
-    setRateLimitError(null)
+    setRateLimitError(false)
 
     try {
       const res = await fetchNearbyMandis({
@@ -139,11 +176,7 @@ export default function MarketPricesScreen() {
       })
 
       if (res.rateLimited) {
-        setRateLimitError(
-          isKn
-            ? "ಸರ್ಕಾರಿ API ಮಿತಿ ತಲುಪಿತು. 1 ನಿಮಿಷ ಕಾದು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
-            : "Government API rate limit reached. Please wait a minute and tap retry."
-        )
+        setRateLimitError(true)
       }
 
       setMandis(res.results || [])
@@ -160,7 +193,7 @@ export default function MarketPricesScreen() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [farmerCoords, selectedCrop, radiusKm, isKn])
+  }, [farmerCoords, selectedCrop, radiusKm])
 
   useEffect(() => {
     if (farmerCoords) {
@@ -292,10 +325,18 @@ export default function MarketPricesScreen() {
           </TouchableOpacity>
         </View>
 
-        {gpsErrorMsg && (
+        {gpsErrorReason && (
           <View style={styles.gpsNoticeBox}>
             <AlertCircle size={13} color="#b45309" />
-            <Text style={styles.gpsNoticeText}>{gpsErrorMsg}</Text>
+            <Text style={styles.gpsNoticeText}>
+              {gpsErrorReason === "denied"
+                ? isKn
+                  ? "ಸ್ಥಳ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ಹತ್ತಿರದ ಮಾರುಕಟ್ಟೆಗಳನ್ನು ನೋಡಲು ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+                  : "Location permission denied. Please select your nearest farming hub below."
+                : isKn
+                ? "ಜಿಪಿಎಸ್ ಸಿಗ್ನಲ್ ಸಿಗುತ್ತಿಲ್ಲ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+                : "GPS signal timed out. Please choose a nearby hub below."}
+            </Text>
           </View>
         )}
 
@@ -432,7 +473,7 @@ export default function MarketPricesScreen() {
                     isLiveToday && !isSelected && styles.liveTodayChipText,
                   ]}
                 >
-                  {crop}
+                  {cropLabel(crop)}
                 </Text>
                 {isLiveToday && (
                   <View style={[styles.liveDot, isSelected && styles.liveDotSelected]} />
@@ -468,9 +509,12 @@ export default function MarketPricesScreen() {
               </Text>
             </View>
             <View style={styles.priceWrap}>
-              <Text style={styles.activePriceKg}>₹{nearestActiveMarket.modalPriceKg}/kg</Text>
+              <Text style={styles.activePriceKg}>
+                ₹{nearestActiveMarket.modalPriceKg}/{isKn ? "ಕೆಜಿ" : "kg"}
+              </Text>
               <Text style={styles.activeQuintalPrice}>
-                ₹{nearestActiveMarket.modalPrice?.toLocaleString("en-IN")}/Quintal
+                ₹{nearestActiveMarket.modalPrice?.toLocaleString("en-IN")}/
+                {isKn ? "ಕ್ವಿಂಟಲ್" : "Quintal"}
               </Text>
             </View>
           </View>
@@ -495,7 +539,9 @@ export default function MarketPricesScreen() {
           <Text style={styles.nearestSub}>
             {nearestMandi.district}, {nearestMandi.state} •{" "}
             {nearestMandi.hasPrice
-              ? `${isKn ? "ಇಂದಿನ ಬೆಲೆ" : "Today's Rate"}: ₹${nearestMandi.modalPrice}/Quintal`
+              ? `${isKn ? "ಇಂದಿನ ಬೆಲೆ" : "Today's Rate"}: ₹${nearestMandi.modalPrice}/${
+                  isKn ? "ಕ್ವಿಂಟಲ್" : "Quintal"
+                }`
               : isKn
               ? "ಇಂದು ಈ ಮಾರುಕಟ್ಟೆಯಿಂದ ದರ ಪಟ್ಟಿ ಅಪ್‌ಲೋಡ್ ಆಗಿಲ್ಲ"
               : "Today's arrival sheet not yet uploaded to AGMARKNET"}
@@ -510,7 +556,7 @@ export default function MarketPricesScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.noTradeNoticeTitle}>
               {isKn
-                ? `"${selectedCrop}" ಬೆಳೆಗೆ ಹತ್ತಿರದ ಮಂಡಿಗಳಲ್ಲಿ ಇಂದಿನ ಆವಕ ದಾಖಲಾಗಿಲ್ಲ`
+                ? `"${cropLabel(selectedCrop)}" ಬೆಳೆಗೆ ಹತ್ತಿರದ ಮಂಡಿಗಳಲ್ಲಿ ಇಂದಿನ ಆವಕ ದಾಖಲಾಗಿಲ್ಲ`
                 : `No arrivals logged for "${selectedCrop}" in nearby mandis today yet.`}
             </Text>
             <Text style={styles.noTradeNoticeDesc}>
@@ -526,7 +572,7 @@ export default function MarketPricesScreen() {
       <View style={styles.resultsHeaderRow}>
         <Text style={styles.resultsHeaderTitle}>
           {isKn
-            ? `ಹತ್ತಿರದ 5 ಮಾರುಕಟ್ಟೆಗಳು (${selectedCrop})`
+            ? `ಹತ್ತಿರದ 5 ಮಾರುಕಟ್ಟೆಗಳು (${cropLabel(selectedCrop)})`
             : `Nearest 5 Mandis for ${selectedCrop}`}
         </Text>
         <Text style={styles.resultsCount}>
@@ -536,9 +582,11 @@ export default function MarketPricesScreen() {
 
       {/* 6. UI States (Loading / Rate Limit / Empty / Success Results) */}
       {loading ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color="#166534" />
-          <Text style={styles.loadingText}>
+        <View style={{ gap: 12, marginTop: 4 }}>
+          <SkeletonBox height={106} borderRadius={18} />
+          <SkeletonBox height={116} borderRadius={18} />
+          <SkeletonBox height={116} borderRadius={18} />
+          <Text style={[styles.loadingText, { textAlign: "center" }]}>
             {isKn
               ? `${radiusKm} ಕಿ.ಮೀ ವ್ಯಾಪ್ತಿಯ ಎಪಿಎಂಸಿ ದರಗಳನ್ನು ಪಡೆಯಲಾಗುತ್ತಿದೆ...`
               : `Discovering verified mandis within ${radiusKm}km and fetching live AGMARKNET rates...`}
@@ -550,7 +598,11 @@ export default function MarketPricesScreen() {
           <Text style={[styles.emptyTitle, { color: "#991b1b" }]}>
             {isKn ? "ಸರ್ಕಾರಿ API ಮಿತಿ ತಲುಪಿತು" : "Govt API Rate Limit Reached"}
           </Text>
-          <Text style={[styles.emptyDesc, { color: "#b91c1c" }]}>{rateLimitError}</Text>
+          <Text style={[styles.emptyDesc, { color: "#b91c1c" }]}>
+            {isKn
+              ? "ಸರ್ಕಾರಿ API ಮಿತಿ ತಲುಪಿತು. 1 ನಿಮಿಷ ಕಾದು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+              : "Government API rate limit reached. Please wait a minute and tap retry."}
+          </Text>
           <TouchableOpacity
             onPress={handleRefresh}
             activeOpacity={0.8}
@@ -595,7 +647,9 @@ export default function MarketPricesScreen() {
                     {m.isVerified && (
                       <View style={styles.verifiedTag}>
                         <CheckCircle2 size={11} color="#15803d" />
-                        <Text style={styles.verifiedTagText}>Verified APMC</Text>
+                        <Text style={styles.verifiedTagText}>
+                          {isKn ? "ಅಧಿಕೃತ APMC" : "Verified APMC"}
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -613,17 +667,18 @@ export default function MarketPricesScreen() {
 
               <View style={styles.commodityRow}>
                 <View>
-                  <Text style={styles.commodityName}>{selectedCrop}</Text>
+                  <Text style={styles.commodityName}>{cropLabel(selectedCrop)}</Text>
                   <Text style={styles.varietyGrade}>
-                    {m.variety || "Standard Variety"} • {m.grade || "FAQ Grade"}
+                    {m.variety || (isKn ? "ಸಾಮಾನ್ಯ ತಳಿ" : "Standard Variety")} •{" "}
+                    {m.grade || (isKn ? "FAQ ದರ್ಜೆ" : "FAQ Grade")}
                   </Text>
                 </View>
 
                 {m.hasPrice ? (
                   <View style={styles.priceWrap}>
-                    <Text style={styles.modalPriceKg}>₹{m.modalPriceKg}/kg</Text>
+                    <Text style={styles.modalPriceKg}>₹{m.modalPriceKg}/{isKn ? "ಕೆಜಿ" : "kg"}</Text>
                     <Text style={styles.quintalPrice}>
-                      ₹{m.modalPrice?.toLocaleString("en-IN")}/Quintal
+                      ₹{m.modalPrice?.toLocaleString("en-IN")}/{isKn ? "ಕ್ವಿಂಟಲ್" : "Quintal"}
                     </Text>
                   </View>
                 ) : (
@@ -638,10 +693,10 @@ export default function MarketPricesScreen() {
               {m.hasPrice && (
                 <View style={styles.rangeRow}>
                   <Text style={styles.rangeText}>
-                    {isKn ? "ಕನಿಷ್ಠ" : "Min"}: ₹{m.minPriceKg}/kg (₹{m.minPrice}/Q)
+                    {isKn ? "ಕನಿಷ್ಠ" : "Min"}: ₹{m.minPriceKg}/{isKn ? "ಕೆಜಿ" : "kg"} (₹{m.minPrice}/Q)
                   </Text>
                   <Text style={styles.rangeText}>
-                    {isKn ? "ಗರಿಷ್ಠ" : "Max"}: ₹{m.maxPriceKg}/kg (₹{m.maxPrice}/Q)
+                    {isKn ? "ಗರಿಷ್ಠ" : "Max"}: ₹{m.maxPriceKg}/{isKn ? "ಕೆಜಿ" : "kg"} (₹{m.maxPrice}/Q)
                   </Text>
                 </View>
               )}
@@ -658,7 +713,13 @@ export default function MarketPricesScreen() {
                   </Text>
                 </View>
                 <Text style={styles.sourceTag}>
-                  {m.hasPrice ? "data.gov.in · Live" : "Verified APMC"}
+                  {m.hasPrice
+                    ? isKn
+                      ? "data.gov.in · ಲೈವ್"
+                      : "data.gov.in · Live"
+                    : isKn
+                    ? "ಅಧಿಕೃತ APMC"
+                    : "Verified APMC"}
                 </Text>
               </View>
             </View>

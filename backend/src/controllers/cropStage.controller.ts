@@ -7,11 +7,21 @@ import {
 } from "../services/stageAdvisory.service.js"
 import { transcribeAudioWithSarvam } from "../services/sarvam.service.js"
 import { getAgriAdvisory } from "../services/gemini.service.js"
+import {
+  cacheFallbackFarmer,
+  getOrCreateFallbackFarmer,
+} from "../services/farmerFallback.service.js"
+
+function normalizeMobile(raw: unknown): string {
+  const digits = String(raw || "").replace(/\D/g, "")
+  return digits.length >= 10 ? digits.slice(-10) : "9591502209"
+}
 
 interface FarmerWithCropResult {
   farmer: {
     id: string | null
     name: string | null
+    nameKn?: string | null
     district: string | null
   }
   activeField: {
@@ -26,15 +36,14 @@ interface FarmerWithCropResult {
   dbBacked: boolean
 }
 
-async function findOrCreateFarmerWithCrop(mobile: string): Promise<FarmerWithCropResult> {
+async function findOrCreateFarmerWithCrop(mobile: string, preferredFieldId?: string): Promise<FarmerWithCropResult & { allFields: any[] }> {
   try {
     return await withDbRetry(async () => {
       let farmer = await prisma.farmer.findUnique({
         where: { mobile },
         include: {
           activeCrops: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
+            orderBy: { createdAt: "asc" },
           },
         },
       })
@@ -57,13 +66,13 @@ async function findOrCreateFarmerWithCrop(mobile: string): Promise<FarmerWithCro
         })
       }
 
-      let activeField = farmer.activeCrops[0]
+      let allFields = farmer.activeCrops
 
-      if (!activeField) {
+      if (!allFields || allFields.length === 0) {
         const sowingDate = new Date()
         sowingDate.setDate(sowingDate.getDate() - 35)
 
-        activeField = await prisma.cropField.create({
+        const created = await prisma.cropField.create({
           data: {
             farmerId: farmer.id,
             cropName: "Rice (Paddy)",
@@ -74,42 +83,59 @@ async function findOrCreateFarmerWithCrop(mobile: string): Promise<FarmerWithCro
             healthStatus: "HEALTHY",
           },
         })
+        allFields = [created]
       }
 
-      return { farmer, activeField, dbBacked: true }
+      const activeField =
+        (preferredFieldId && allFields.find((f) => f.id === preferredFieldId)) ||
+        allFields[0]
+
+      cacheFallbackFarmer(farmer)
+      return { farmer, activeField, allFields, dbBacked: true }
     }, "findOrCreateFarmerWithCrop")
   } catch (err: any) {
-    console.warn("⚠️ [CropStage DB Fallback] Using default crop profile:", err?.message || err)
-    const sowingDate = new Date()
-    sowingDate.setDate(sowingDate.getDate() - 35)
+    console.warn("⚠️ [CropStage DB Fallback] Using resilient farm store:", err?.message || err)
+    const clean = String(mobile || "").replace(/\D/g, "").slice(-10) || "9591502209"
+    const fb = getOrCreateFallbackFarmer(clean)
+    const fbFields = (fb.activeCrops && fb.activeCrops.length > 0
+      ? fb.activeCrops
+      : [
+          {
+            id: "default-field",
+            cropName: "Rice (Paddy)",
+            variety: "BPT 5204 (Sona Masoori)",
+            sowingDate: new Date(Date.now() - 35 * 86400000),
+            currentStage: "TILLERING_VEGETATIVE",
+            healthStatus: "HEALTHY",
+            latestFarmerNote: null,
+          },
+        ]) as any[]
+    const activeField =
+      (preferredFieldId && fbFields.find((f) => f.id === preferredFieldId)) ||
+      fbFields[0]
     return {
       farmer: {
         id: null,
-        name: "Naveen Kumar KM",
-        district: "Mandya",
+        name: fb.name || "Naveen Kumar KM",
+        nameKn: fb.nameKn || fb.name || "ನವೀನ್ ಕುಮಾರ್ ಕೆಎಂ",
+        district: fb.district || "Mandya",
       },
-      activeField: {
-        id: "default-field",
-        cropName: "Rice (Paddy)",
-        variety: "BPT 5204 (Sona Masoori)",
-        sowingDate,
-        currentStage: "TILLERING_VEGETATIVE",
-        healthStatus: "HEALTHY",
-        latestFarmerNote: null,
-      },
+      activeField,
+      allFields: fbFields,
       dbBacked: false,
     }
   }
 }
 
 /**
- * GET /api/crop-stage/active
- * Returns the farmer's active crop field, calculated growth stage, and tailored advisories.
+ * GET /api/crop-stage/active?mobile=...&fieldId=...
+ * Returns the farmer's active crop field, list of all crop fields, calculated growth stage, and tailored advisories.
  */
 export async function getActiveCropStage(req: Request, res: Response) {
   try {
-    const mobile = (req.query.mobile as string) || "9591502209"
-    const { farmer, activeField } = await findOrCreateFarmerWithCrop(mobile)
+    const mobile = normalizeMobile(req.query.mobile)
+    const fieldId = (req.query.fieldId as string) || undefined
+    const { farmer, activeField, allFields } = await findOrCreateFarmerWithCrop(mobile, fieldId)
 
     // Calculate days since sowing
     const now = new Date()
@@ -124,9 +150,20 @@ export async function getActiveCropStage(req: Request, res: Response) {
       success: true,
       farmer: {
         name: farmer.name,
-        nameKn: farmer.name,
+        nameKn: farmer.nameKn || farmer.name,
         district: farmer.district,
       },
+      fields: allFields.map((f) => {
+        const d = Math.max(1, Math.floor((now.getTime() - new Date(f.sowingDate).getTime()) / 86400000))
+        return {
+          id: f.id,
+          cropName: f.cropName,
+          variety: f.variety,
+          sowingDate: f.sowingDate,
+          daysSinceSowing: d,
+          healthStatus: f.healthStatus,
+        }
+      }),
       cropField: {
         id: activeField.id,
         cropName: activeField.cropName,
@@ -166,16 +203,17 @@ export async function getActiveCropStage(req: Request, res: Response) {
  * Manually update crop stage or sowing date
  */
 export async function updateCropStage(req: Request, res: Response) {
-  try {
-    const { fieldId } = req.params
-    const { stageKey, healthStatus, latestNote } = req.body
+  const { fieldId } = req.params
+  const { stageKey, healthStatus, latestNote, mobile } = req.body || {}
+  const clean = String(mobile || "").replace(/\D/g, "").slice(-10) || "9591502209"
 
+  try {
     const updated = await withDbRetry(
       () =>
         prisma.cropField.update({
           where: { id: fieldId },
           data: {
-            currentStage: stageKey,
+            currentStage: stageKey || undefined,
             healthStatus: healthStatus || undefined,
             latestFarmerNote: latestNote || undefined,
           },
@@ -187,12 +225,23 @@ export async function updateCropStage(req: Request, res: Response) {
       success: true,
       data: updated,
     })
-  } catch (error) {
-    console.error("❌ [CropStage Controller] Update Error:", error)
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update crop stage",
-      error: error instanceof Error ? error.message : "Internal Error",
+  } catch (error: any) {
+    console.warn("⚠️ [CropStage Update Fallback]:", error?.message || error)
+    const fb = getOrCreateFallbackFarmer(clean)
+    let field = fb.activeCrops.find((f: any) => f.id === fieldId)
+    if (!field && fb.activeCrops.length > 0) {
+      field = fb.activeCrops[0]
+    }
+    if (field) {
+      if (stageKey) field.currentStage = stageKey
+      if (healthStatus) field.healthStatus = healthStatus
+      if (latestNote) field.latestFarmerNote = latestNote
+    }
+    cacheFallbackFarmer(fb)
+    return res.json({
+      success: true,
+      source: "Resilient Local Store",
+      data: field,
     })
   }
 }
@@ -206,7 +255,7 @@ export async function updateCropStage(req: Request, res: Response) {
 export async function handleVoiceObservation(req: Request, res: Response) {
   try {
     const file = req.file
-    const mobile = (req.body.mobile as string) || "9591502209"
+    const mobile = normalizeMobile(req.body?.mobile)
     const language = (req.body.language as string) || "kn-IN"
 
     if (!file || !file.buffer) {
@@ -261,7 +310,7 @@ export async function handleVoiceObservation(req: Request, res: Response) {
     const finalAdviceKn = !isEnglish && geminiAdvice ? geminiAdvice : advice.adviceKn
     const finalAdviceEn = isEnglish && geminiAdvice ? geminiAdvice : advice.adviceEn
 
-    // 4. Log interaction in Neon PostgreSQL (best-effort with retry)
+    // 4. Log interaction in Neon PostgreSQL (best-effort) or resilient local store
     if (dbBacked && farmer.id) {
       const farmerId = farmer.id
       await withDbRetry(async () => {
@@ -282,6 +331,11 @@ export async function handleVoiceObservation(req: Request, res: Response) {
       }, "logVoiceObservation").catch((dbErr) =>
         console.warn("⚠️ [CropStage Voice Log Warning]:", dbErr?.message || dbErr)
       )
+    } else {
+      const fb = getOrCreateFallbackFarmer(mobile)
+      const fbField = fb.activeCrops?.find((f: any) => f.id === field.id) || fb.activeCrops?.[0]
+      if (fbField) fbField.latestFarmerNote = transcript
+      cacheFallbackFarmer(fb)
     }
 
     return res.json({
@@ -312,7 +366,8 @@ export async function handleVoiceObservation(req: Request, res: Response) {
  */
 export async function handleTextObservation(req: Request, res: Response) {
   try {
-    const { text, mobile = "9591502209", language = "kn" } = req.body
+    const { text, mobile: rawMobile, language = "kn" } = req.body || {}
+    const mobile = normalizeMobile(rawMobile)
 
     if (!text || typeof text !== "string") {
       return res.status(400).json({
@@ -371,6 +426,11 @@ export async function handleTextObservation(req: Request, res: Response) {
       }, "logTextObservation").catch((dbErr) =>
         console.warn("⚠️ [CropStage Text Log Warning]:", dbErr?.message || dbErr)
       )
+    } else {
+      const fb = getOrCreateFallbackFarmer(mobile)
+      const fbField = fb.activeCrops?.find((f: any) => f.id === field.id) || fb.activeCrops?.[0]
+      if (fbField) fbField.latestFarmerNote = text
+      cacheFallbackFarmer(fb)
     }
 
     return res.json({

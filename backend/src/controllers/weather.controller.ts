@@ -12,7 +12,8 @@ export async function getWeatherForecast(req: Request, res: Response): Promise<v
   try {
     const lat = parseFloat(req.query.lat as string)
     const lng = parseFloat(req.query.lng as string)
-    const days = Math.min(parseInt((req.query.days as string) || "3", 10), 7)
+    const parsedDays = parseInt((req.query.days as string) || "3", 10)
+    const days = Math.min(Math.max(Number.isFinite(parsedDays) ? parsedDays : 3, 1), 7)
 
     if (isNaN(lat) || isNaN(lng)) {
       res.status(400).json({

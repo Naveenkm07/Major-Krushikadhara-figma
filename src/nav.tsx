@@ -58,6 +58,8 @@ export type Route =
   | "howAiWorks"
   | "technicalArch"
   | "settings"
+  | "privacyPolicy"
+  | "termsOfService"
 
 type Params = Record<string, any>
 type StackItem = { name: Route; params?: Params }

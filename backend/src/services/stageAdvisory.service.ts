@@ -331,6 +331,110 @@ export const CROP_STAGE_DEFINITIONS: Record<string, GrowthStageDef[]> = {
       ],
     },
   ],
+
+  // General Field & Horticultural Crops (ಸಾಮಾನ್ಯ ಬೆಳೆಗಳು)
+  general: [
+    {
+      key: "SOWING_ESTABLISHMENT",
+      nameEn: "Sowing & Establishment",
+      nameKn: "ಬಿತ್ತನೆ ಮತ್ತು ಸಸಿ ಬೇರೂರುವ ಹಂತ",
+      startDay: 0,
+      endDay: 22,
+      descriptionEn: "Seed germination, root anchoring, and early seedling vigor.",
+      descriptionKn: "ಬೀಜ ಮೊಳಕೆಯೊಡೆದು ಬೇರುಗಳು ಮಣ್ಣಿನಲ್ಲಿ ಬಲವಾಗುವ ಹಂತ.",
+      advisories: [
+        {
+          category: "IRRIGATION",
+          titleEn: "Ensure Even Soil Moisture Without Waterlogging",
+          titleKn: "ನೀರು ನಿಲ್ಲದಂತೆ ಸಮಾನ ತೇವಾಂಶ ಕಾಪಾಡಿ",
+          bodyEn: "Give light irrigation to support germination and drain excess rainwater promptly.",
+          bodyKn: "ಮೊಳಕೆಯೊಡೆಯಲು ಲಘು ನೀರಾವರಿ ನೀಡಿ ಮತ್ತು ಮಳೆ ನೀರು ನಿಲ್ಲದಂತೆ ಬಸಿದುಬಿಡಿ.",
+          urgency: "MEDIUM",
+        },
+        {
+          category: "FERTILIZER",
+          titleEn: "Basal Dose & Root Starter",
+          titleKn: "ಬುಡದ ರಸಗೊಬ್ಬರ ಮತ್ತು ಸಾವಯವ ಗೊಬ್ಬರ",
+          bodyEn: "Ensure recommended basal phosphorus/NPK and well-decomposed FYM around root zones.",
+          bodyKn: "ಬೇರು ಬಲವಾಗಲು ಶಿಫಾರಸು ಮಾಡಿದ ಬುಡದ ಎನ್‌ಪಿಕೆ ಮತ್ತು ಕಳಿತ ಕೊಟ್ಟಿಗೆ ಗೊಬ್ಬರ ನೀಡಿ.",
+          urgency: "HIGH",
+        },
+      ],
+    },
+    {
+      key: "VEGETATIVE_GROWTH",
+      nameEn: "Vegetative Growth & Canopy",
+      nameKn: "ಕಾಯಿಕ ಬೆಳವಣಿಗೆ ಮತ್ತು ಎಲೆ ವಿಸ್ತರಣೆ",
+      startDay: 23,
+      endDay: 50,
+      descriptionEn: "Active leaf, stem, and branch expansion for healthy canopy building.",
+      descriptionKn: "ಗಿಡದ ಎಲೆಗಳು, ಕಾಂಡ ಮತ್ತು ಕವಲುಗಳು ವೇಗವಾಗಿ ಬೆಳೆಯುವ ಹಂತ.",
+      advisories: [
+        {
+          category: "FERTILIZER",
+          titleEn: "Nitrogen Top-Dressing & Weeding",
+          titleKn: "ನೈಟ್ರೋಜನ್ ಮೇಲುಗೊಬ್ಬರ ಮತ್ತು ಕಳೆ ನಿರ್ವಹಣೆ",
+          bodyEn: "Keep plot weed-free and split-apply nitrogen fertilizer when soil has good moisture.",
+          bodyKn: "ಹೊಲವನ್ನು ಕಳೆರಹಿತವಾಗಿಡಿ ಮತ್ತು ತೇವಾಂಶವಿದ್ದಾಗ ಹಂತ ಹಂತವಾಗಿ ನೈಟ್ರೋಜನ್ ಗೊಬ್ಬರ ನೀಡಿ.",
+          urgency: "HIGH",
+        },
+        {
+          category: "PEST_PREVENTION",
+          titleEn: "Scout Sucking Pests & Defoliators",
+          titleKn: "ರಸ ಹೀರುವ ಕೀಟಗಳ ಪರಿಶೀಲನೆ",
+          bodyEn: "Inspect leaf undersides weekly. Use neem oil (5 ml/L) at first sign of aphids or thrips.",
+          bodyKn: "ವಾರಕ್ಕೊಮ್ಮೆ ಎಲೆಗಳ ಕೆಳಭಾಗ ಪರೀಕ್ಷಿಸಿ. ಹೇನು ಕಂಡರೆ 5 ಮಿ.ಲೀ ಬೇವಿನ ಎಣ್ಣೆ ಸಿಂಪಡಿಸಿ.",
+          urgency: "MEDIUM",
+        },
+      ],
+    },
+    {
+      key: "FLOWERING_FRUITING",
+      nameEn: "Flowering & Seed/Fruit Set",
+      nameKn: "ಹೂವಾಡುವ ಮತ್ತು ಕಾಯಿ/ಕಾಳು ಕಟ್ಟುವ ಹಂತ",
+      startDay: 51,
+      endDay: 85,
+      descriptionEn: "Pollination and yield formation; moisture and micronutrient stress sensitive.",
+      descriptionKn: "ಪರಾಗಸ್ಪರ್ಶ ಮತ್ತು ಇಳುವರಿ ಕಟ್ಟುವ ನಿರ್ಣಾಯಕ ಹಂತ.",
+      advisories: [
+        {
+          category: "IRRIGATION",
+          titleEn: "Critical Moisture During Flowering",
+          titleKn: "ಹೂವಾಡುವ ಸಮಯದಲ್ಲಿ ನಿಯಮಿತ ನೀರಾವರಿ",
+          bodyEn: "Prevent dry stress during flowering and grain/pod setting so flowers do not drop.",
+          bodyKn: "ಹೂವು ಉದುರುವುದನ್ನು ತಡೆಯಲು ಈ ಹಂತದಲ್ಲಿ ನೀರಿನ ಕೊರತೆಯಾಗದಂತೆ ನೋಡಿಕೊಳ್ಳಿ.",
+          urgency: "HIGH",
+        },
+        {
+          category: "FERTILIZER",
+          titleEn: "Potash & Boron Support",
+          titleKn: "ಪೊಟ್ಯಾಷ್ ಮತ್ತು ಲಘು ಪೋಷಕಾಂಶ ಸಿಂಪಡಣೆ",
+          bodyEn: "Apply potash/water-soluble 0:0:50 to improve grain weight, pod filling, or fruit quality.",
+          bodyKn: "ಉತ್ತಮ ಕಾಳು/ಕಾಯಿ ತೂಕಕ್ಕಾಗಿ ಪೊಟ್ಯಾಷ್ (0:0:50) ಗೊಬ್ಬರ ನೀಡಿ.",
+          urgency: "MEDIUM",
+        },
+      ],
+    },
+    {
+      key: "MATURATION_HARVEST",
+      nameEn: "Maturation & Harvest",
+      nameKn: "ಬಲಿತ ಹಂತ ಮತ್ತು ಕೊಯ್ಲು",
+      startDay: 86,
+      endDay: 140,
+      descriptionEn: "Crop physiological maturity, drying, and timely harvesting.",
+      descriptionKn: "ಬೆಳೆ ಸಂಪೂರ್ಣ ಬಲಿತು ಕೊಯ್ಲಿಗೆ ಸಿದ್ಧವಾಗುವ ಹಂತ.",
+      advisories: [
+        {
+          category: "WEATHER_ALERT",
+          titleEn: "Check 5-Day Weather Before Harvest",
+          titleKn: "ಕೊಯ್ಲಿಗೆ ಮುನ್ನ 5 ದಿನಗಳ ಹವಾಮಾನ ಪರಿಶೀಲಿಸಿ",
+          bodyEn: "Withhold late irrigation 7–10 days before harvest and plan harvesting during dry spells.",
+          bodyKn: "ಕೊಯ್ಲಿಗೆ 7–10 ದಿನ ಮುಂಚೆ ನೀರು ನಿಲ್ಲಿಸಿ ಒಣ ಹವಾಮಾನದಲ್ಲಿ ಕೊಯ್ಲು ಮಾಡಿ.",
+          urgency: "MEDIUM",
+        },
+      ],
+    },
+  ],
 }
 
 /**
@@ -347,7 +451,7 @@ export function getStagesForCrop(cropName: string): GrowthStageDef[] {
   if (norm.includes("rice") || norm.includes("paddy")) {
     return CROP_STAGE_DEFINITIONS.rice
   }
-  return CROP_STAGE_DEFINITIONS.rice
+  return CROP_STAGE_DEFINITIONS.general
 }
 
 /**

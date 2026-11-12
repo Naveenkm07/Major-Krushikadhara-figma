@@ -11,6 +11,10 @@ import aiAdvisorRoutes from "./routes/aiAdvisor.routes.js"
 import scanRoutes from "./routes/scan.routes.js"
 import schemesRoutes from "./routes/schemes.routes.js"
 import profileRoutes from "./routes/profile.routes.js"
+import authRoutes from "./routes/auth.routes.js"
+import insightsRoutes from "./routes/insights.routes.js"
+import equipmentRoutes from "./routes/equipment.routes.js"
+import insuranceRoutes from "./routes/insurance.routes.js"
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -38,6 +42,10 @@ app.use("/api/ai", aiAdvisorRoutes)
 app.use("/api/scan", scanRoutes)
 app.use("/api/schemes", schemesRoutes)
 app.use("/api/profile", profileRoutes)
+app.use("/api/auth", authRoutes)
+app.use("/api/insights", insightsRoutes)
+app.use("/api/equipment", equipmentRoutes)
+app.use("/api/insurance", insuranceRoutes)
 
 // Global JSON error handler (ensures multer/upload and runtime errors return JSON instead of HTML)
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

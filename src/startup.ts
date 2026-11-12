@@ -45,3 +45,18 @@ export function completeOnboarding() {
 export const startSession = () => write(KEYS.session, "1")
 export const endSession = () => write(KEYS.session, null)
 
+const logoutListeners = new Set<() => void>()
+
+export function subscribeLogoutRequest(cb: () => void): () => void {
+  logoutListeners.add(cb)
+  return () => {
+    logoutListeners.delete(cb)
+  }
+}
+
+export function triggerAppLogout() {
+  endSession()
+  logoutListeners.forEach((cb) => cb())
+}
+
+

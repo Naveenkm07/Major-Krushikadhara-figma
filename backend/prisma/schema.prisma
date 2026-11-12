@@ -14,6 +14,8 @@ model Farmer {
   id                String   @id @default(uuid())
   mobile            String   @unique
   name              String?  @default("Farmer")
+  nameKn            String?
+  email             String?
   state             String   @default("Karnataka")
   district          String   @default("Mandya")
   taluk             String?
@@ -24,6 +26,15 @@ model Farmer {
   experienceYears   Int      @default(5)
   photoUrl          String?
   preferredLanguage String   @default("kn") // "kn" for Kannada, "en" for English
+  soilType          String   @default("Red Loam")
+  irrigationType    String   @default("Borewell + Drip")
+  rtcVerified       Boolean  @default(false)
+  soilN             Int?
+  soilP             Int?
+  soilK             Int?
+  soilPh            Float?
+  notificationsOn   Boolean  @default(true)
+  offlineModeOn     Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -34,6 +45,7 @@ model Farmer {
   scans             CropScan[]
   interactions      FarmerInteraction[]
   schemeProgress    FarmerSchemeProgress[]
+  savedTips         SavedTip[]
 
   @@index([mobile])
   @@index([district, taluk])
@@ -67,6 +79,9 @@ model CropField {
   // Present Crop Stage
   currentStage          String   // e.g. "SOWING", "VEGETATIVE", "TILLERING", "PANICLE_INITIATION", "FLOWERING", "FRUIT_FORMATION", "RIPENING", "HARVEST"
   stageDayCount         Int      @default(1)
+  acreage               Float?   // Optional per-plot area in acres
+  season                String   @default("Kharif") // "Kharif", "Rabi", "Summer"
+  irrigationMethod      String?  // Optional plot-specific irrigation method
   
   // Real-time Health & Farmer Feedback
   healthStatus          String   @default("HEALTHY") // "HEALTHY", "PEST_SUSPECTED", "DISEASED", "WATER_STRESSED", "NUTRIENT_DEFICIENT"
@@ -125,49 +140,64 @@ model FarmerInteraction {
 // 3. Equipment Rental Marketplace (Farmers renting to other farmers)
 // ==============================================================================
 model Equipment {
-  id           String          @id @default(uuid())
-  ownerId      String
-  owner        Farmer          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id                String          @id @default(uuid())
+  ownerId           String
+  owner             Farmer          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   
-  name         String          // e.g. "Mahindra 575 DI Tractor", "Fieldking Rotavator 6ft"
-  type         String          // "Tractor", "Rotavator", "Seed Drill", "Sprayer", "Harvester", "Cultivator"
-  location     String          // e.g. "Pandavapura, Mandya"
-  latitude     Float?
-  longitude    Float?
-  pricePerDay  Float
-  availability String          @default("AVAILABLE") // "AVAILABLE", "BOOKED", "MAINTENANCE"
+  name              String          // e.g. "Mahindra 575 DI Tractor", "Fieldking Rotavator 6ft"
+  type              String          // "Tractor", "Rotavator", "Seed Drill", "Sprayer", "Harvester", "Cultivator"
+  location          String          // e.g. "Pandavapura, Mandya"
+  latitude          Float?
+  longitude         Float?
+  pricePerDay       Float
+  availability      String          @default("AVAILABLE") // "AVAILABLE", "BOOKED", "MAINTENANCE"
   
-  hp           String?         @default("45 HP")
-  fuel         String?         @default("Diesel")
-  condition    String?         @default("Good")
-  minDuration  String?         @default("1 day")
-  imageUrl     String          // Cloudinary image URL of the machine
+  hp                String?         @default("45 HP")
+  fuel              String?         @default("Diesel")
+  condition         String?         @default("Good")
+  minDuration       String?         @default("1 day")
+  suitableCrops     String?         @default("Rice, Ragi, Sugarcane")
+  description       String?
+  deliveryAvailable Boolean         @default(false)
+  deliveryFee       Float           @default(0)
+  operatorIncluded  Boolean         @default(false)
+  operatorFeePerDay Float           @default(0)
+  rating            Float           @default(4.8)
+  reviewsCount      Int             @default(0)
+  imageUrl          String          // Cloudinary image URL of the machine
   
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
-  bookings     RentalBooking[]
+  bookings          RentalBooking[]
 
   @@index([ownerId])
   @@index([location, type])
 }
 
 model RentalBooking {
-  id            String    @id @default(uuid())
-  equipmentId   String
-  equipment     Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-  renterId      String
-  renter        Farmer    @relation("RenterBookings", fields: [renterId], references: [id], onDelete: Cascade)
+  id               String    @id @default(uuid())
+  equipmentId      String
+  equipment        Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  renterId         String
+  renter           Farmer    @relation("RenterBookings", fields: [renterId], references: [id], onDelete: Cascade)
   
-  startDate     DateTime
-  endDate       DateTime
-  totalDays     Int
-  pricePerDay   Float
-  totalAmount   Float
-  status        String    @default("PENDING") // "PENDING", "APPROVED", "REJECTED", "ACTIVE", "COMPLETED", "CANCELLED"
+  startDate        DateTime
+  endDate          DateTime
+  totalDays        Int
+  pricePerDay      Float
+  deliveryFee      Float     @default(0)
+  operatorFee      Float     @default(0)
+  totalAmount      Float
+  pickupMode       String    @default("pickup") // "pickup" | "delivery"
+  operatorIncluded Boolean   @default(false)
+  notes            String?
+  rating           Int?
+  reviewComment    String?
+  status           String    @default("PENDING") // "PENDING", "APPROVED", "REJECTED", "ACTIVE", "COMPLETED", "CANCELLED"
   
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([equipmentId])
   @@index([renterId])
@@ -253,6 +283,27 @@ model FarmerSchemeProgress {
   updatedAt   DateTime  @updatedAt
 
   @@unique([farmerId, schemeId])
+  @@index([farmerId])
+}
+
+// ==============================================================================
+// 7. Bookmarked Agronomic & Scan Remedy Tips (Persisted across devices)
+// ==============================================================================
+model SavedTip {
+  id          String   @id @default(uuid())
+  farmerId    String
+  farmer      Farmer   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  tipKey      String
+  categoryEn  String
+  categoryKn  String
+  titleEn     String
+  titleKn     String
+  bodyEn      String
+  bodyKn      String
+  isUserSaved Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([farmerId, tipKey])
   @@index([farmerId])
 }
 

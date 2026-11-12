@@ -1,0 +1,10 @@
+node_modules/
+dist/
+uploads/
+.local-cache/
+.env
+*.env
+*.log
+__pycache__/
+.git/
+

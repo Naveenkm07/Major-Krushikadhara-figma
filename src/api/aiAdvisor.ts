@@ -229,3 +229,34 @@ export async function streamVoiceAudio(
     callbacks.onError?.(err?.message || "Audio streaming failed")
   }
 }
+
+/**
+ * Request Sarvam Bulbul v3 TTS audio (base64 WAV) for Kannada / English advisory playback.
+ */
+export async function synthesizeSpeechAudio(
+  text: string,
+  language: string = "kn-IN"
+): Promise<{ ok: boolean; dataUri?: string; error?: string }> {
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 15000)
+    const res = await fetch(`${API_BASE}/ai/tts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ text, language }),
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok || !json?.success || !json?.audioBase64) {
+      return { ok: false, error: json?.error || "TTS synthesis failed" }
+    }
+    const mime = json.mimeType || "audio/wav"
+    return {
+      ok: true,
+      dataUri: `data:${mime};base64,${json.audioBase64}`,
+    }
+  } catch (err: any) {
+    return { ok: false, error: err?.message || "TTS request failed" }
+  }
+}

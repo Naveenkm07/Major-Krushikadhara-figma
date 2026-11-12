@@ -26,8 +26,9 @@ type HistoryFilter = "all" | "issue" | "healthy"
 export default function ScanHistoryScreen() {
   const { open, back } = useNav()
   const { profile, refreshProfile } = useProfile()
-  const { lang } = useLang()
+  const { lang, t } = useLang()
   const isKn = lang === "kn"
+  const cropMap = (t.x.coreA.crops as Record<string, string>) || {}
   const [items, setItems] = useState<ScanHistoryItem[]>(getScanHistory())
   const [filter, setFilter] = useState<HistoryFilter>("all")
   const [search, setSearch] = useState("")
@@ -169,7 +170,9 @@ export default function ScanHistoryScreen() {
                       <Image source={{ uri: item.imageUrl }} style={styles.thumb} />
                       <View style={styles.info}>
                         <View style={styles.topRow}>
-                          <Text style={styles.cropTitle}>{item.crop}</Text>
+                          <Text style={styles.cropTitle}>
+                            {cropMap[item.crop] || item.crop}
+                          </Text>
                           <View
                             style={[
                               styles.badge,

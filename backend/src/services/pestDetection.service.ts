@@ -331,53 +331,101 @@ function assessSeverity(confidence: number, totalPests: number): string {
 // Fallback remedy database for top pests (when Gemini is unavailable)
 const FALLBACK_REMEDIES: Record<string, Partial<DiagnosisResult>> = {
   aphids: {
+    pest_name_kn: "ಹೇನು ಕೀಟ (Aphids)",
     about:
       "Aphids are small soft-bodied insects that suck plant sap, causing curling leaves, stunted growth, and honeydew secretion that attracts sooty mold.",
+    about_kn:
+      "ಹೇನು ಕೀಟಗಳು ಸಸ್ಯದ ರಸವನ್ನು ಹೀರುವ ಸಣ್ಣ ಮೃದು ದೇಹದ ಕೀಟಗಳಾಗಿವೆ. ಇವುಗಳಿಂದ ಎಲೆಗಳು ಸುರುಳಿಯಾಗುವುದು, ಬೆಳವಣಿಗೆ ಕುಂಠಿತಗೊಳ್ಳುವುದು ಮತ್ತು ಕಪ್ಪು ಬೂಷ್ಟು ಆಕರ್ಷಿಸುವ ಜೇನುತುಪ್ಪದಂತಹ ದ್ರವ ಸ್ರವಿಸುವಿಕೆ ಉಂಟಾಗುತ್ತದೆ.",
     symptoms: [
       "Curling and yellowing of leaves",
       "Sticky honeydew on leaf surfaces",
       "Stunted plant growth",
       "Presence of ants farming aphids",
     ],
+    symptoms_kn: [
+      "ಎಲೆಗಳು ಸುರುಳಿಯಾಗುವುದು ಮತ್ತು ಹಳದಿ ಬಣ್ಣಕ್ಕೆ ತಿರುಗುವುದು",
+      "ಎಲೆಗಳ ಮೇಲೆ ಅಂಟಾದ ಜೇನುತುಪ್ಪದಂತಹ ದ್ರವ ಕಾಣಿಸುವುದು",
+      "ಸಸ್ಯದ ಬೆಳವಣಿಗೆ ಕುಂಠಿತವಾಗುವುದು",
+      "ಕೀಟಗಳ ಸುತ್ತ ಇರುವೆಗಳ ಓಡಾಟ ಹೆಚ್ಚಾಗುವುದು",
+    ],
     chemical: [
       "Imidacloprid 17.8% SL @ 0.3 ml/L water",
       "Thiamethoxam 25% WG @ 0.3 g/L water",
       "Dimethoate 30% EC @ 1.5 ml/L water",
+    ],
+    chemical_kn: [
+      "ಇಮಿಡಾಕ್ಲೋಪ್ರಿಡ್ 17.8% SL @ 0.3 ಮಿ.ಲೀ/ಲೀಟರ್ ನೀರಿಗೆ ಬೆರೆಸಿ ಸಿಂಪಡಿಸಿ",
+      "ಥಯಾಮೆಥಾಕ್ಸಮ್ 25% WG @ 0.3 ಗ್ರಾಂ/ಲೀಟರ್ ನೀರಿಗೆ ಬೆರೆಸಿ ಸಿಂಪಡಿಸಿ",
+      "ಡೈಮೆಥೋಯೇಟ್ 30% EC @ 1.5 ಮಿ.ಲೀ/ಲೀಟರ್ ನೀರಿಗೆ ಸಿಂಪಡಿಸಿ",
     ],
     organic: [
       "Neem oil 5 ml/L + liquid soap as foliar spray",
       "Yellow sticky traps for monitoring",
       "Release ladybird beetles (natural predator)",
     ],
+    organic_kn: [
+      "ಪ್ರತಿ ಲೀಟರ್ ನೀರಿಗೆ 5 ಮಿ.ಲೀ ಬೇವಿನ ಎಣ್ಣೆ + ದ್ರವ ಸಾಬೂನು ಬೆರೆಸಿ ಸಿಂಪಡಿಸಿ",
+      "ಕೀಟ ನಿಯಂತ್ರಣಕ್ಕಾಗಿ ಹಳದಿ ಅಂಟು ಬಲೆಗಳನ್ನು (Yellow sticky traps) ಅಳವಡಿಸಿ",
+      "ಗುಲಗಂಜಿ ಹುಳುಗಳಂತಹ (Ladybird beetles) ಮಿತ್ರ ಕೀಟಗಳನ್ನು ಪ್ರೋತ್ಸಾಹಿಸಿ",
+    ],
     prevention: [
       "Avoid excess nitrogen fertilizer",
       "Regular field monitoring every 3-5 days",
       "Maintain proper plant spacing for air circulation",
     ],
+    prevention_kn: [
+      "ಹೆಚ್ಚುವರಿ ಸಾರಜನಕ (ಯೂರಿಯಾ) ಗೊಬ್ಬರ ಬಳಕೆಯನ್ನು ತಪ್ಪಿಸಿ",
+      "ಪ್ರತಿ 3-5 ದಿನಗಳಿಗೊಮ್ಮೆ ಬೆಳೆಯನ್ನು ನಿಯಮಿತವಾಗಿ ಪರಿಶೀಲಿಸಿ",
+      "ಗಾಳಿ ಸಂಚಾರಕ್ಕಾಗಿ ಗಿಡಗಳ ನಡುವೆ ಸರಿಯಾದ ಅಂತರ ಕಾಯ್ದುಕೊಳ್ಳಿ",
+    ],
   },
   "army worm": {
+    pest_name_kn: "ಸೈನಿಕ ಹುಳು (Army Worm)",
     about:
       "Army worms are destructive caterpillar larvae that march in large groups consuming entire crop fields, especially cereals and grasses.",
+    about_kn:
+      "ಸೈನಿಕ ಹುಳುಗಳು (ಕಂಬಳಿ ಹುಳು) ದೊಡ್ಡ ಗುಂಪುಗಳಲ್ಲಿ ಬಂದು ಎಲೆಗಳನ್ನು ತಿಂದು ಬೆಳೆಗಳನ್ನು ನಾಶಪಡಿಸುವ ಹಾನಿಕಾರಕ ಕೀಟಗಳಾಗಿವೆ.",
     symptoms: [
       "Ragged, chewed leaf edges",
       "Skeletonized leaves (only veins remaining)",
       "Larvae visible during early morning or evening",
       "Frass (droppings) on leaves and ground",
     ],
+    symptoms_kn: [
+      "ಎಲೆಗಳ ಅಂಚುಗಳು ಹರಿದಂತೆ ಕಚ್ಚಲ್ಪಟ್ಟಿರುವುದು",
+      "ಎಲೆಗಳ ಹಸಿರು ಭಾಗ ತಿಂದು ಕೇವಲ ನರಗಳು ಮಾತ್ರ ಉಳಿದಿರುವುದು",
+      "ಬೆಳಿಗ್ಗೆ ಅಥವಾ ಸಂಜೆ ವೇಳೆ ಹುಳುಗಳು ಕಾಣಿಸಿಕೊಳ್ಳುವುದು",
+      "ಎಲೆ ಮತ್ತು ನೆಲದ ಮೇಲೆ ಹುಳುಗಳ ಹಿಕ್ಕೆ ಕಂಡುಬರುವುದು",
+    ],
     chemical: [
       "Chlorantraniliprole 18.5% SC @ 0.3 ml/L water",
       "Emamectin benzoate 5% SG @ 0.4 g/L water",
       "Lambda-cyhalothrin 5% EC @ 1 ml/L water",
+    ],
+    chemical_kn: [
+      "ಕ್ಲೋರಾಂಟ್ರಾನಿಲಿಪ್ರೋಲ್ 18.5% SC @ 0.3 ಮಿ.ಲೀ/ಲೀಟರ್ ನೀರಿಗೆ ಸಿಂಪಡಿಸಿ",
+      "ಎಮಾಮೆಕ್ಟಿನ್ ಬೆಂಜೊಯೇಟ್ 5% SG @ 0.4 ಗ್ರಾಂ/ಲೀಟರ್ ನೀರಿಗೆ ಸಿಂಪಡಿಸಿ",
+      "ಲ್ಯಾಂಬ್ಡಾ-ಸೈಹಲೋಥ್ರಿನ್ 5% EC @ 1 ಮಿ.ಲೀ/ಲೀಟರ್ ನೀರಿಗೆ ಸಿಂಪಡಿಸಿ",
     ],
     organic: [
       "Bt (Bacillus thuringiensis) spray @ 2 g/L water",
       "Neem seed kernel extract 5% spray",
       "Bird perches in field for natural predation",
     ],
+    organic_kn: [
+      "Bt (ಬ್ಯಾಸಿಲಸ್ ತುರಿಂಜಿಯೆನ್ಸಿಸ್) @ 2 ಗ್ರಾಂ/ಲೀಟರ್ ನೀರಿಗೆ ಬೆರೆಸಿ ಸಿಂಪಡಿಸಿ",
+      "5% ಬೇವಿನ ಬೀಜದ ಕಷಾಯ (NSKE) ಸಿಂಪಡಿಸಿ",
+      "ಪಕ್ಷಿಗಳು ಕೂತು ಹುಳು ತಿನ್ನಲು ಹೊಲದಲ್ಲಿ ಪಕ್ಷಿ ಆಸರೆ ಕಂಬಗಳನ್ನು ನೆಡಿ",
+    ],
     prevention: [
       "Deep ploughing to expose pupae",
       "Light traps to monitor adult moths",
       "Early sowing to avoid peak infestation period",
+    ],
+    prevention_kn: [
+      "ಕೋಶಾವಸ್ಥೆಯ ಹುಳುಗಳನ್ನು ನಾಶಪಡಿಸಲು ಬೇಸಿಗೆಯಲ್ಲಿ ಆಳವಾದ ಉಳುಮೆ ಮಾಡಿ",
+      "ತಾಯಿ ಪತಂಗಗಳನ್ನು ಹಿಡಿಯಲು ಹೊಲದಲ್ಲಿ ಬೆಳಕಿನ ಬಲೆ (Light trap) ಹಾಕಿ",
+      "ಕೀಟ ಬಾಧೆ ಹೆಚ್ಚಾಗುವ ಮುನ್ನವೇ ಸಕಾಲದಲ್ಲಿ ಬಿತ್ತನೆ ಮಾಡಿ",
     ],
   },
 }
@@ -399,16 +447,22 @@ export async function getDetailedDiagnosis(
   try {
     const prompt = `A farmer's ${cropLabel} has been scanned and detected: "${pestName}" pest/insect with ${confidence}% confidence. ${totalPests} pest(s) detected total.
 
-Please provide a structured diagnosis report in this EXACT JSON format (respond ONLY with valid JSON, no markdown):
+Please provide a structured bilingual (English + natural rural Karnataka Kannada) diagnosis report in this EXACT JSON format (respond ONLY with valid JSON, no markdown fences):
 {
-  "about": "2-3 sentence description of this pest, its lifecycle, and damage pattern",
+  "pest_name_kn": "Common Kannada name for ${pestName}",
+  "about": "2-3 sentence English description of this pest, its lifecycle, and damage pattern",
+  "about_kn": "2-3 sentence natural Kannada explanation of this pest and its damage",
   "symptoms": ["symptom 1", "symptom 2", "symptom 3", "symptom 4"],
+  "symptoms_kn": ["Kannada symptom 1", "Kannada symptom 2", "Kannada symptom 3", "Kannada symptom 4"],
   "chemical": ["Chemical treatment 1 with exact dosage per liter", "Chemical treatment 2 with dosage", "Chemical treatment 3 with dosage"],
+  "chemical_kn": ["Kannada chemical treatment 1 with dosage", "Kannada chemical treatment 2 with dosage", "Kannada chemical treatment 3 with dosage"],
   "organic": ["Organic remedy 1 with dosage", "Organic remedy 2", "Organic remedy 3"],
-  "prevention": ["Prevention measure 1", "Prevention measure 2", "Prevention measure 3"]
+  "organic_kn": ["Kannada organic remedy 1 with dosage", "Kannada organic remedy 2", "Kannada organic remedy 3"],
+  "prevention": ["Prevention measure 1", "Prevention measure 2", "Prevention measure 3"],
+  "prevention_kn": ["Kannada prevention 1", "Kannada prevention 2", "Kannada prevention 3"]
 }
 
-Important: Include exact dosages (g/L or ml/L). Mention both brand-name pesticides and generic active ingredients. Focus on Indian agriculture context and locally available products.`
+Important: Include exact dosages (g/L or ml/L). Mention locally available Indian agriculture products and write clear Kannada (ಕನ್ನಡ) in all *_kn fields.`
 
     const geminiResponse = await getAgriAdvisory(
       prompt,
@@ -416,12 +470,22 @@ Important: Include exact dosages (g/L or ml/L). Mention both brand-name pesticid
         cropName: cropName && cropName !== "Crop Leaf" ? cropName : undefined,
         preferredLanguage: "en",
       },
-      { timeoutMs: 10000, maxModels: 2 }
+      { timeoutMs: 12000, maxModels: 2 }
     )
 
     const jsonMatch = geminiResponse.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0])
+      const key = pestName.toLowerCase()
+      const known = FALLBACK_REMEDIES[key]
+      const arr = (v: unknown, fb: string[]): string[] =>
+        Array.isArray(v) && v.length > 0 ? v.map((x) => String(x)) : fb
+
+      const symptomsEn = arr(parsed.symptoms, known?.symptoms || [])
+      const chemicalEn = arr(parsed.chemical, known?.chemical || [])
+      const organicEn = arr(parsed.organic, known?.organic || [])
+      const preventionEn = arr(parsed.prevention, known?.prevention || [])
+
       return {
         success: true,
         mode: "pest",
@@ -432,7 +496,7 @@ Important: Include exact dosages (g/L or ml/L). Mention both brand-name pesticid
         scientific_name: "—",
         issue_type: "pest",
         pest_name: pestName,
-        pest_name_kn: pestName,
+        pest_name_kn: String(parsed.pest_name_kn || known?.pest_name_kn || pestName),
         confidence,
         total_pests_found: totalPests,
         all_detections: allDetections.map((d) => ({ ...d, source: "yolo11s" })),
@@ -440,16 +504,19 @@ Important: Include exact dosages (g/L or ml/L). Mention both brand-name pesticid
         affected_area_pct: totalPests >= 3 ? 35 : 15,
         spread_risk: severity === "High" ? "High" : "Moderate",
         healthy: false,
-        about: parsed.about || `${pestName} detected with ${confidence}% confidence.`,
-        about_kn: `${pestName} ಕೀಟವು ${confidence}% ನಿಖರತೆಯೊಂದಿಗೆ ಪತ್ತೆಯಾಗಿದೆ.`,
-        symptoms: parsed.symptoms || [],
-        symptoms_kn: parsed.symptoms || [],
-        chemical: parsed.chemical || [],
-        chemical_kn: parsed.chemical || [],
-        organic: parsed.organic || [],
-        organic_kn: parsed.organic || [],
-        prevention: parsed.prevention || [],
-        prevention_kn: parsed.prevention || [],
+        about: parsed.about || known?.about || `${pestName} detected with ${confidence}% confidence.`,
+        about_kn:
+          parsed.about_kn ||
+          known?.about_kn ||
+          `${pestName} ಕೀಟವು ${confidence}% ನಿಖರತೆಯೊಂದಿಗೆ ಪತ್ತೆಯಾಗಿದೆ.`,
+        symptoms: symptomsEn,
+        symptoms_kn: arr(parsed.symptoms_kn, known?.symptoms_kn || symptomsEn),
+        chemical: chemicalEn,
+        chemical_kn: arr(parsed.chemical_kn, known?.chemical_kn || chemicalEn),
+        organic: organicEn,
+        organic_kn: arr(parsed.organic_kn, known?.organic_kn || organicEn),
+        prevention: preventionEn,
+        prevention_kn: arr(parsed.prevention_kn, known?.prevention_kn || preventionEn),
         gemini_used: true,
         yolo_used: true,
       }
@@ -471,7 +538,7 @@ Important: Include exact dosages (g/L or ml/L). Mention both brand-name pesticid
     scientific_name: "—",
     issue_type: "pest",
     pest_name: pestName,
-    pest_name_kn: pestName,
+    pest_name_kn: fallback.pest_name_kn || pestName,
     confidence,
     total_pests_found: totalPests,
     all_detections: allDetections.map((d) => ({ ...d, source: "yolo11s" })),
@@ -482,13 +549,15 @@ Important: Include exact dosages (g/L or ml/L). Mention both brand-name pesticid
     about:
       fallback.about ||
       `${pestName} pest detected with ${confidence}% confidence. This pest can cause significant crop damage if not controlled promptly.`,
-    about_kn: `${pestName} ಕೀಟವು ${confidence}% ನಿಖರತೆಯೊಂದಿಗೆ ಪತ್ತೆಯಾಗಿದೆ. ತಕ್ಷಣ ನಿಯಂತ್ರಣ ಕ್ರಮ ಕೈಗೊಳ್ಳಿ.`,
+    about_kn:
+      fallback.about_kn ||
+      `${pestName} ಕೀಟವು ${confidence}% ನಿಖರತೆಯೊಂದಿಗೆ ಪತ್ತೆಯಾಗಿದೆ. ತಕ್ಷಣ ನಿಯಂತ್ರಣ ಕ್ರಮ ಕೈಗೊಳ್ಳಿ.`,
     symptoms: fallback.symptoms || [
       "Visible pest damage on leaves and stems",
       "Discoloration or wilting of affected plant parts",
       "Reduced crop vigor and growth",
     ],
-    symptoms_kn: [
+    symptoms_kn: fallback.symptoms_kn || [
       "ಎಲೆ ಮತ್ತು ಕಾಂಡಗಳ ಮೇಲೆ ಕೀಟ ಹಾನಿಯ ಗುರುತುಗಳು",
       "ಬಾಧಿತ ಭಾಗಗಳ ಬಣ್ಣ ಬದಲಾವಣೆ ಅಥವಾ ಬಾಡುವಿಕೆ",
       "ಬೆಳೆಯ ಬೆಳವಣಿಗೆ ಕುಂಠಿತವಾಗುವುದು",
@@ -497,7 +566,7 @@ Important: Include exact dosages (g/L or ml/L). Mention both brand-name pesticid
       "Consult your local KVK or agricultural officer for specific pesticide recommendations",
       "Use IPM (Integrated Pest Management) approach",
     ],
-    chemical_kn: [
+    chemical_kn: fallback.chemical_kn || [
       "ನಿಖರ ಕೀಟನಾಶಕ ಶಿಫಾರಸುಗಳಿಗಾಗಿ ಹತ್ತಿರದ KVK ಅಥವಾ ಕೃಷಿ ಅಧಿಕಾರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ",
       "ಸಮಗ್ರ ಕೀಟ ನಿರ್ವಹಣೆ (IPM) ಪದ್ಧತಿ ಅನುಸರಿಸಿ",
     ],
@@ -506,7 +575,7 @@ Important: Include exact dosages (g/L or ml/L). Mention both brand-name pesticid
       "Manually remove visible pests",
       "Encourage natural predators in the field",
     ],
-    organic_kn: [
+    organic_kn: fallback.organic_kn || [
       "ಪ್ರತಿ ಲೀಟರ್ ನೀರಿಗೆ 5 ಮಿ.ಲೀ ಬೇವಿನ ಎಣ್ಣೆ ಸಿಂಪಡಿಸಿ",
       "ಕಾಣಿಸುವ ಕೀಟಗಳನ್ನು ಕೈಯಿಂದ ತೆಗೆದು ನಾಶಪಡಿಸಿ",
       "ಮಿತ್ರ ಕೀಟಗಳ ಸಂಖ್ಯೆಯನ್ನು ಹೆಚ್ಚಿಸಿ",
@@ -516,7 +585,7 @@ Important: Include exact dosages (g/L or ml/L). Mention both brand-name pesticid
       "Crop rotation with non-host crops",
       "Maintain field hygiene — remove crop residues",
     ],
-    prevention_kn: [
+    prevention_kn: fallback.prevention_kn || [
       "ಪ್ರತಿ 3-5 ದಿನಗಳಿಗೊಮ್ಮೆ ಜಮೀನು ಪರಿಶೀಲಿಸಿ",
       "ಬೆಳೆ ಸರದಿ ಪದ್ಧತಿಯನ್ನು ಅನುಸರಿಸಿ",
       "ಬೆಳೆ ತ್ಯಾಜ್ಯಗಳನ್ನು ಸ್ವಚ್ಛಗೊಳಿಸಿ ಹೊಲವನ್ನು ಶುಚಿಯಾಗಿಡಿ",

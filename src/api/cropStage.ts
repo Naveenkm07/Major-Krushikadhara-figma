@@ -27,6 +27,14 @@ export interface StageAdvisoryItem {
 
 export interface ActiveCropStageResponse {
   success: boolean
+  fields?: Array<{
+    id: string
+    cropName: string
+    variety?: string
+    sowingDate: string
+    daysSinceSowing: number
+    healthStatus: string
+  }>
   cropField: {
     id: string
     cropName: string
@@ -113,12 +121,18 @@ const FALLBACK_CROP_STAGE: ActiveCropStageResponse = {
 /**
  * Fetches farmer's active crop, current growth stage and tailored advisories
  */
-export async function fetchActiveCropStage(mobile: string = "9591502209"): Promise<ActiveCropStageResponse> {
+export async function fetchActiveCropStage(
+  mobile: string = "9591502209",
+  fieldId?: string
+): Promise<ActiveCropStageResponse> {
   try {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 8000)
 
-    const res = await fetch(`${API_BASE}/crop-stage/active?mobile=${encodeURIComponent(mobile)}`, {
+    const qs = new URLSearchParams({ mobile })
+    if (fieldId) qs.set("fieldId", fieldId)
+
+    const res = await fetch(`${API_BASE}/crop-stage/active?${qs.toString()}`, {
       signal: controller.signal,
     })
     clearTimeout(timer)
@@ -134,6 +148,28 @@ export async function fetchActiveCropStage(mobile: string = "9591502209"): Promi
   }
 
   return FALLBACK_CROP_STAGE
+}
+
+export async function updateCropStageStatus(
+  fieldId: string,
+  payload: {
+    mobile?: string
+    stageKey?: string
+    healthStatus?: string
+    latestNote?: string
+  }
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/crop-stage/${encodeURIComponent(fieldId)}/stage`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const json = await res.json().catch(() => ({}))
+    return Boolean(res.ok && json?.success)
+  } catch {
+    return false
+  }
 }
 
 /**

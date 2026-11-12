@@ -1,6 +1,24 @@
-import { createContext, Fragment, useContext, useMemo, useState, type ReactNode } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react"
 import { Text } from "react-native"
 import { useProfile } from "./profile"
+import {
+  addInsuranceDocumentOnBackend,
+  advanceInsuranceApplicationOnBackend,
+  advanceInsuranceClaimOnBackend,
+  markInsuranceNotifsReadOnBackend,
+  submitInsuranceApplicationOnBackend,
+  submitInsuranceClaimOnBackend,
+  syncInsuranceFromBackend,
+  type InsuranceStateDTO,
+} from "./api/insurance"
 
 /** Look up a translated label for a stored internal value; falls back to the raw value. */
 export function tr(map: Record<string, string>, key: string): string {
@@ -19,10 +37,17 @@ export function RichText({ text }: { text: string }) {
           </Text>
         ) : (
           <Text key={i}>{p}</Text>
-        ),
+        )
       )}
     </Text>
   )
+}
+
+export function getSeasonPremiumRate(season?: string): number {
+  const s = String(season || "Kharif").toLowerCase()
+  if (s.includes("rabi")) return 0.015
+  if (s.includes("comm") || s.includes("hort") || s.includes("annual")) return 0.05
+  return 0.02
 }
 
 export type AppStatus =
@@ -132,8 +157,10 @@ type InsuranceCtx = {
   documents: InsuranceDoc[]
   notifications: InsuranceNotif[]
   unreadCount: number
+  syncing: boolean
   eligibilityResult: "idle" | "checking" | "eligible" | "needs_info" | "not_eligible"
   setEligibilityResult: (r: InsuranceCtx["eligibilityResult"]) => void
+  refreshInsurance: () => Promise<void>
   submitApplication: (data: Partial<InsuranceApplication>) => string
   advanceApplicationStatus: (id: string) => void
   submitClaim: (data: {
@@ -146,13 +173,14 @@ type InsuranceCtx = {
     description: string
   }) => string
   advanceClaimStatus: (id: string) => void
+  addUploadedDocument: (name: string, relatedId?: string) => void
   markNotifsRead: () => void
 }
 
 const InsuranceContext = createContext<InsuranceCtx | null>(null)
 
 let uid = 300
-const nid = () => `ins${uid++}`
+const nid = (prefix = "ins") => `${prefix}-${Date.now().toString(36)}-${uid++}`
 
 const APP_STEPS: AppStatus[] = [
   "submitted",
@@ -177,29 +205,56 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
   const [claims, setClaims] = useState<InsuranceClaim[]>([])
   const [documents, setDocuments] = useState<InsuranceDoc[]>([])
   const [notifications, setNotifications] = useState<InsuranceNotif[]>([])
+  const [syncing, setSyncing] = useState(false)
   const [eligibilityResult, setEligibilityResult] =
     useState<InsuranceCtx["eligibilityResult"]>("idle")
 
+  const applyServerState = useCallback((state: InsuranceStateDTO | null) => {
+    if (!state) return
+    setApplications(state.applications || [])
+    setPolicies(state.policies || [])
+    setClaims(state.claims || [])
+    setDocuments(state.documents || [])
+    setNotifications(state.notifications || [])
+  }, [])
+
+  const refreshInsurance = useCallback(async () => {
+    setSyncing(true)
+    try {
+      const state = await syncInsuranceFromBackend(profile.mobile)
+      applyServerState(state)
+    } finally {
+      setSyncing(false)
+    }
+  }, [profile.mobile, applyServerState])
+
+  useEffect(() => {
+    refreshInsurance()
+  }, [refreshInsurance])
+
   function pushNotif(n: Omit<InsuranceNotif, "id" | "at" | "read">) {
     setNotifications((prev) => [
-      { id: nid(), at: Date.now(), read: false, ...n },
+      { id: nid("notif"), at: Date.now(), read: false, ...n },
       ...prev,
     ])
   }
 
   function submitApplication(data: Partial<InsuranceApplication>): string {
-    const id = nid()
-    const acres = parseFloat(String(data.area ?? profile.farmSize)) || 2.0
+    const id = nid("app")
+    const currentYear = new Date().getFullYear()
+    const acres = Math.max(0.1, parseFloat(String(data.area ?? profile.farmSize)) || 2.0)
+    const season = String(data.season ?? "Kharif")
+    const rate = getSeasonPremiumRate(season)
     const coverage = Math.round(acres * 45000)
-    const premium = Math.round(coverage * 0.02)
+    const premium = Math.round(coverage * rate)
     const today = new Date().toLocaleDateString("en-IN")
     const app: InsuranceApplication = {
       id,
       crop: data.crop ?? profile.crops[0] ?? "Rice",
-      season: data.season ?? "Kharif",
+      season,
       district: data.district ?? profile.district ?? "Mandya",
       taluk: data.taluk ?? profile.taluk ?? "Pandavapura",
-      area: data.area ?? profile.farmSize ?? "2.0",
+      area: String(data.area ?? profile.farmSize ?? "2.0"),
       status: "submitted",
       submittedDate: today,
       farmerName: data.farmerName ?? profile.name ?? "Farmer",
@@ -208,13 +263,14 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
       premium,
       surveyNumber: data.surveyNumber ?? "SY-001",
       ownershipType: data.ownershipType ?? "Owned",
-      sowingDate: data.sowingDate ?? "1 Jun 2026",
-      harvestDate: data.harvestDate ?? "15 Oct 2026",
+      sowingDate: data.sowingDate ?? `1 Jun ${currentYear}`,
+      harvestDate: data.harvestDate ?? `15 Oct ${currentYear}`,
     }
+
     setApplications((prev) => [app, ...prev])
     setDocuments((prev) => [
       {
-        id: nid(),
+        id: nid("doc"),
         name: "Application Receipt",
         type: "application_receipt",
         date: today,
@@ -228,6 +284,11 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
       key: "application",
       vars: { crop: app.crop, season: app.season },
     })
+
+    submitInsuranceApplicationOnBackend(profile.mobile, app).then((res) => {
+      if (res?.state) applyServerState(res.state)
+    })
+
     return id
   }
 
@@ -239,7 +300,7 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
     const nextStatus = APP_STEPS[idx + 1]
 
     setApplications((prev) =>
-      prev.map((a) => (a.id === appId ? { ...a, status: nextStatus } : a)),
+      prev.map((a) => (a.id === appId ? { ...a, status: nextStatus } : a))
     )
 
     if (nextStatus === "approved") {
@@ -249,9 +310,23 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
         vars: { crop: app.crop },
       })
     } else if (nextStatus === "policy_issued") {
-      const policyId = nid()
-      const policyNumber = `PMFBY-DEMO-2026-${String(policyId).slice(-3).padStart(3, "0")}`
+      const policyId = nid("pol")
+      const currentYear = new Date().getFullYear()
+      const policyNumber = `PMFBY-KA-${currentYear}-${String(policies.length + 101).padStart(3, "0")}`
       const today = new Date().toLocaleDateString("en-IN")
+      const isRabi = app.season.toLowerCase().includes("rabi")
+      const isComm = app.season.toLowerCase().includes("comm")
+      const startDate = isRabi
+        ? `1 Nov ${currentYear}`
+        : isComm
+        ? `1 Apr ${currentYear}`
+        : `1 Jun ${currentYear}`
+      const endDate = isRabi
+        ? `30 Apr ${currentYear + 1}`
+        : isComm
+        ? `31 Mar ${currentYear + 1}`
+        : `30 Nov ${currentYear}`
+
       setPolicies((prev) => [
         {
           id: policyId,
@@ -262,8 +337,8 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
           area: app.area,
           coverage: app.coverage,
           premium: app.premium,
-          startDate: "1 Jun 2026",
-          endDate: "30 Nov 2026",
+          startDate,
+          endDate,
           farmerName: app.farmerName,
           district: app.district,
         },
@@ -271,7 +346,7 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
       ])
       setDocuments((prev) => [
         {
-          id: nid(),
+          id: nid("doc"),
           name: "Policy Document",
           type: "policy",
           date: today,
@@ -279,7 +354,7 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
           relatedId: policyId,
         },
         {
-          id: nid(),
+          id: nid("doc"),
           name: "Premium Receipt",
           type: "premium_receipt",
           date: today,
@@ -294,6 +369,10 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
         vars: { policyNumber },
       })
     }
+
+    advanceInsuranceApplicationOnBackend(profile.mobile, appId).then((res) => {
+      if (res?.state) applyServerState(res.state)
+    })
   }
 
   function submitClaim(data: {
@@ -305,8 +384,8 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
     area: string
     description: string
   }): string {
-    const id = nid()
-    const claimNumber = `CLM-DEMO-${String(id).slice(-3).padStart(3, "0")}`
+    const id = nid("clm")
+    const claimNumber = `CLM-KA-${String(claims.length + 201).padStart(3, "0")}`
     const today = new Date().toLocaleDateString("en-IN")
     const claim: InsuranceClaim = {
       id,
@@ -318,7 +397,7 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
     setClaims((prev) => [claim, ...prev])
     setDocuments((prev) => [
       {
-        id: nid(),
+        id: nid("doc"),
         name: "Claim Receipt",
         type: "claim_receipt",
         date: today,
@@ -332,6 +411,11 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
       key: "claim",
       vars: { crop: data.crop, claimNumber },
     })
+
+    submitInsuranceClaimOnBackend(profile.mobile, { id, ...data }).then((res) => {
+      if (res?.state) applyServerState(res.state)
+    })
+
     return id
   }
 
@@ -342,7 +426,7 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
     if (idx < 0 || idx >= CLAIM_STEPS.length - 1) return
     const nextStatus = CLAIM_STEPS[idx + 1]
     setClaims((prev) =>
-      prev.map((c) => (c.id === claimId ? { ...c, status: nextStatus } : c)),
+      prev.map((c) => (c.id === claimId ? { ...c, status: nextStatus } : c))
     )
     if (nextStatus === "approved") {
       pushNotif({
@@ -357,15 +441,45 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
         vars: { claimNumber: claim.claimNumber },
       })
     }
+
+    advanceInsuranceClaimOnBackend(profile.mobile, claimId).then((res) => {
+      if (res?.state) applyServerState(res.state)
+    })
+  }
+
+  function addUploadedDocument(name: string, relatedId?: string) {
+    const cleanName = name.trim() || "Supporting Document"
+    const today = new Date().toLocaleDateString("en-IN")
+    setDocuments((prev) => [
+      {
+        id: nid("doc"),
+        name: cleanName,
+        type: "uploaded",
+        date: today,
+        status: "available",
+        relatedId,
+      },
+      ...prev,
+    ])
+
+    addInsuranceDocumentOnBackend(profile.mobile, {
+      name: cleanName,
+      relatedId,
+    }).then((res) => {
+      if (res?.state) applyServerState(res.state)
+    })
   }
 
   function markNotifsRead() {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    markInsuranceNotifsReadOnBackend(profile.mobile).then((res) => {
+      if (res?.state) applyServerState(res.state)
+    })
   }
 
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.read).length,
-    [notifications],
+    [notifications]
   )
 
   return (
@@ -377,12 +491,15 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
         documents,
         notifications,
         unreadCount,
+        syncing,
         eligibilityResult,
         setEligibilityResult,
+        refreshInsurance,
         submitApplication,
         advanceApplicationStatus,
         submitClaim,
         advanceClaimStatus,
+        addUploadedDocument,
         markNotifsRead,
       }}
     >

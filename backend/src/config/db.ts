@@ -44,21 +44,33 @@ export function isTransientDbError(error: unknown): boolean {
   )
 }
 
+let dbCircuitOpenUntil = 0
+const DB_CIRCUIT_COOLDOWN_MS = 30_000
+
 export async function withDbRetry<T>(
   operation: () => Promise<T>,
   label = "Prisma query",
-  retries = 3
+  retries = 2
 ): Promise<T> {
+  if (Date.now() < dbCircuitOpenUntil) {
+    throw new Error(`P1001: Database circuit temporarily open (${label})`)
+  }
   let lastError: unknown
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      return await operation()
+      const result = await operation()
+      dbCircuitOpenUntil = 0
+      return result
     } catch (error) {
       lastError = error
-      if (!isTransientDbError(error) || attempt === retries) {
+      if (!isTransientDbError(error)) {
         throw error
       }
-      const delayMs = attempt * 600
+      if (attempt === retries) {
+        dbCircuitOpenUntil = Date.now() + DB_CIRCUIT_COOLDOWN_MS
+        throw error
+      }
+      const delayMs = attempt * 400
       console.warn(
         `⚠️ [Neon PostgreSQL] ${label} hit transient error (attempt ${attempt}/${retries}), reconnecting in ${delayMs}ms:`,
         error instanceof Error ? error.message : error
@@ -86,11 +98,12 @@ export function startDbKeepAlive(intervalMs = 3 * 60 * 1000): void {
   keepAliveTimer.unref?.()
 }
 
-export async function connectDB(retries = 2): Promise<boolean> {
+export async function connectDB(retries = 1): Promise<boolean> {
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
       await prisma.$connect()
       await prisma.$queryRaw`SELECT 1`
+      dbCircuitOpenUntil = 0
       console.log("✅ [Neon PostgreSQL] Database connected successfully.")
       startDbKeepAlive()
       return true
@@ -100,8 +113,9 @@ export async function connectDB(retries = 2): Promise<boolean> {
         error instanceof Error ? error.message : error
       )
       if (attempt <= retries) {
-        await new Promise((r) => setTimeout(r, 2000))
+        await new Promise((r) => setTimeout(r, 1500))
       } else {
+        dbCircuitOpenUntil = Date.now() + DB_CIRCUIT_COOLDOWN_MS
         console.error("❌ [Neon PostgreSQL] Database connection error:", error)
       }
     }

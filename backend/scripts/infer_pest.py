@@ -55,15 +55,19 @@ def get_interpreter():
         return interpreter
 
     try:
-        import tflite_runtime.interpreter as tflite
+        import ai_edge_litert.interpreter as tflite
         interpreter = tflite.Interpreter(model_path=MODEL_PATH)
     except ImportError:
-        import tensorflow as tf
         try:
-            tf.get_logger().setLevel('ERROR')
-        except Exception:
-            pass
-        interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
+            import tflite_runtime.interpreter as tflite
+            interpreter = tflite.Interpreter(model_path=MODEL_PATH)
+        except ImportError:
+            import tensorflow as tf
+            try:
+                tf.get_logger().setLevel('ERROR')
+            except Exception:
+                pass
+            interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
 
     interpreter.allocate_tensors()
     return interpreter

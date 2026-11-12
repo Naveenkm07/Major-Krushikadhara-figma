@@ -9,6 +9,13 @@ import fs from "fs"
 import { prisma, withDbRetry } from "../config/db.js"
 import { runPestInference, runFullCropDiagnosis } from "../services/pestDetection.service.js"
 import { uploadImageToCloudinary } from "../services/cloudinary.service.js"
+import {
+  addFallbackScan,
+  deleteFallbackScan,
+  getFallbackScans,
+  setFallbackScans,
+  updateFallbackScanFeedback,
+} from "../services/farmerFallback.service.js"
 
 async function persistCropScanBestEffort(params: {
   mobile: string
@@ -20,7 +27,7 @@ async function persistCropScanBestEffort(params: {
   remediesJson?: any
 }): Promise<string | null> {
   try {
-    return await withDbRetry(async () => {
+    const dbScanId = await withDbRetry(async () => {
       let farmer = await prisma.farmer.findUnique({ where: { mobile: params.mobile } })
       if (!farmer) {
         farmer = await prisma.farmer.create({
@@ -45,10 +52,34 @@ async function persistCropScanBestEffort(params: {
       })
       return created.id
     }, "persistCropScanBestEffort")
+
+    addFallbackScan(params.mobile, {
+      id: dbScanId,
+      cropName: params.cropName,
+      diseaseName: params.diseaseName,
+      confidence: params.confidence,
+      severity: params.severity,
+      imageUrl: params.imageUrl,
+      remediesJson: params.remediesJson,
+    })
+    return dbScanId
   } catch (err: any) {
-    console.warn("⚠️ [Scan DB Persist Warning]:", err?.message || err)
-    return null
+    console.warn("⚠️ [Scan DB Persist Warning] Saving to local store:", err?.message || err)
+    const fallbackRec = addFallbackScan(params.mobile, {
+      cropName: params.cropName,
+      diseaseName: params.diseaseName,
+      confidence: params.confidence,
+      severity: params.severity,
+      imageUrl: params.imageUrl,
+      remediesJson: params.remediesJson,
+    })
+    return fallbackRec.id
   }
+}
+
+function normalizeScanMobile(raw: unknown): string {
+  const digits = String(raw || "").replace(/\D/g, "")
+  return digits.length >= 10 ? digits.slice(-10) : "9591502209"
 }
 
 function normalizeScanMode(raw: unknown): "pest" | "crop" | "leaf" {
@@ -72,7 +103,7 @@ export async function diagnosePest(req: Request, res: Response) {
   }
 
   const imagePath = file.path
-  const mobile = (req.body?.mobile as string) || "9591502209"
+  const mobile = normalizeScanMobile(req.body?.mobile)
   const rawCropName = (req.body?.cropName as string) || "Auto"
   const mode = normalizeScanMode(req.body?.mode)
 
@@ -197,11 +228,11 @@ export function scanHealth(_req: Request, res: Response) {
 
 /**
  * GET /api/scan/history
- * Returns recent stored crop scans from Neon PostgreSQL.
+ * Returns recent stored crop scans from Neon PostgreSQL or resilient local store.
  */
 export async function getScanHistory(req: Request, res: Response) {
+  const mobile = normalizeScanMobile(req.query.mobile)
   try {
-    const mobile = (req.query.mobile as string) || "9591502209"
     const scans = await withDbRetry(async () => {
       const farmer = await prisma.farmer.findUnique({ where: { mobile } })
       if (!farmer) return []
@@ -211,27 +242,48 @@ export async function getScanHistory(req: Request, res: Response) {
         take: 30,
       })
     }, "getScanHistory")
-    return res.json({ success: true, scans })
+
+    setFallbackScans(
+      mobile,
+      scans.map((s) => ({
+        id: s.id,
+        farmerId: s.farmerId,
+        cropName: s.cropName,
+        diseaseName: s.diseaseName,
+        confidence: s.confidence,
+        severity: s.severity,
+        imageUrl: s.imageUrl,
+        remediesJson:
+          s.remediesJson && typeof s.remediesJson === "object"
+            ? (s.remediesJson as Record<string, any>)
+            : null,
+        createdAt: s.createdAt,
+      }))
+    )
+    return res.json({ success: true, source: "Neon PostgreSQL", scans })
   } catch (err: any) {
-    return res.status(500).json({
-      success: false,
-      error: err?.message || "Failed to fetch scan history",
+    console.warn("⚠️ [Scan History GET Fallback]:", err?.message || err)
+    return res.json({
+      success: true,
+      source: "Resilient Local Store",
+      scans: getFallbackScans(mobile),
     })
   }
 }
 
 /**
  * DELETE /api/scan/history/:id?mobile=9591502209
- * Delete a persisted crop scan record from Neon PostgreSQL.
+ * Delete a persisted crop scan record from Neon PostgreSQL or resilient local store.
  */
 export async function deleteScanHistory(req: Request, res: Response) {
-  try {
-    const id = String(req.params.id || "").trim()
-    const mobile = String(req.query.mobile || "").trim()
-    if (!id) {
-      return res.status(400).json({ success: false, error: "Scan id is required" })
-    }
+  const id = String(req.params.id || "").trim()
+  const rawMobile = String(req.query.mobile || "").replace(/\D/g, "")
+  const mobile = rawMobile.length >= 10 ? rawMobile.slice(-10) : ""
+  if (!id) {
+    return res.status(400).json({ success: false, error: "Scan id is required" })
+  }
 
+  try {
     const deletedCount = await withDbRetry(async () => {
       if (mobile) {
         const farmer = await prisma.farmer.findUnique({ where: { mobile } })
@@ -245,11 +297,16 @@ export async function deleteScanHistory(req: Request, res: Response) {
       return result.count
     }, "deleteScanHistory")
 
+    deleteFallbackScan(id, mobile || undefined)
     return res.json({ success: true, deleted: deletedCount > 0, deletedCount })
   } catch (err: any) {
-    return res.status(500).json({
-      success: false,
-      error: err?.message || "Failed to delete scan record",
+    console.warn("⚠️ [Scan History DELETE Fallback]:", err?.message || err)
+    const deletedCount = deleteFallbackScan(id, mobile || undefined)
+    return res.json({
+      success: true,
+      source: "Resilient Local Store",
+      deleted: deletedCount > 0,
+      deletedCount,
     })
   }
 }
@@ -259,13 +316,13 @@ export async function deleteScanHistory(req: Request, res: Response) {
  * Record farmer helpfulness feedback on a diagnosis inside remediesJson.
  */
 export async function submitScanFeedback(req: Request, res: Response) {
-  try {
-    const id = String(req.params.id || "").trim()
-    const helpful = Boolean(req.body?.helpful)
-    if (!id) {
-      return res.status(400).json({ success: false, error: "Scan id is required" })
-    }
+  const id = String(req.params.id || "").trim()
+  const helpful = Boolean(req.body?.helpful)
+  if (!id) {
+    return res.status(400).json({ success: false, error: "Scan id is required" })
+  }
 
+  try {
     const updated = await withDbRetry(async () => {
       const existing = await prisma.cropScan.findUnique({ where: { id } })
       if (!existing) return null
@@ -285,11 +342,16 @@ export async function submitScanFeedback(req: Request, res: Response) {
       })
     }, "submitScanFeedback")
 
+    updateFallbackScanFeedback(id, helpful)
     return res.json({ success: true, updated: Boolean(updated), helpful })
   } catch (err: any) {
-    return res.status(500).json({
-      success: false,
-      error: err?.message || "Failed to record feedback",
+    console.warn("⚠️ [Scan Feedback Fallback]:", err?.message || err)
+    const updated = updateFallbackScanFeedback(id, helpful)
+    return res.json({
+      success: true,
+      source: "Resilient Local Store",
+      updated,
+      helpful,
     })
   }
 }

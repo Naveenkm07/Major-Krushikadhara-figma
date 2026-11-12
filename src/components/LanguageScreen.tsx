@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react"
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import { useLang, type Lang } from "../i18n"
 import { useNav } from "../nav"
@@ -14,11 +15,19 @@ export default function LanguageScreen() {
   const { lang, setLang } = useLang()
   const { saveProfile } = useProfile()
   const { back } = useNav()
+  const backTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (backTimerRef.current) clearTimeout(backTimerRef.current)
+    }
+  }, [])
 
   function handleSelect(id: Lang) {
     setLang(id)
     saveProfile({}, id).catch(() => {})
-    setTimeout(() => back(), 180)
+    if (backTimerRef.current) clearTimeout(backTimerRef.current)
+    backTimerRef.current = setTimeout(() => back(), 180)
   }
 
   return (

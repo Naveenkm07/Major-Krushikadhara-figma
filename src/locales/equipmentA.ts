@@ -89,9 +89,33 @@ export const en = {
       title: "Request Accepted ✓",
       body: "You accepted {renter}'s request for {equip}.",
     },
+    renterAccepted: {
+      title: "Booking Approved ✓",
+      body: "{owner} approved your {equip} rental.",
+    },
     rejected: {
       title: "Request Rejected",
       body: "You rejected {renter}'s request for {equip}.",
+    },
+    renterRejected: {
+      title: "Booking Declined",
+      body: "{owner} declined your request for {equip}.",
+    },
+    available: {
+      title: "Equipment Available Now ✓",
+      body: "{equip} is now available to rent at ₹{price}/day.",
+    },
+    returned: {
+      title: "Rental Completed ✓",
+      body: "{equip} rental has been marked completed.",
+    },
+    cancelled: {
+      title: "Booking Cancelled",
+      body: "{renter} cancelled the rental request for {equip}.",
+    },
+    reviewed: {
+      title: "New Review Received ★",
+      body: "{renter} rated {equip} {rating}/5 stars.",
     },
     listed: {
       title: "New Equipment Available Near You 🚜",
@@ -296,9 +320,33 @@ export const kn: typeof en = {
       title: "ಮನವಿ ಒಪ್ಪಿಕೊಳ್ಳಲಾಗಿದೆ ✓",
       body: "{equip} ಗಾಗಿ {renter} ಅವರ ಮನವಿಯನ್ನು ನೀವು ಒಪ್ಪಿಕೊಂಡಿದ್ದೀರಿ.",
     },
+    renterAccepted: {
+      title: "ಬುಕಿಂಗ್ ಅನುಮೋದಿತ ✓",
+      body: "{owner} ಅವರು ನಿಮ್ಮ {equip} ಬಾಡಿಗೆಯನ್ನು ಅನುಮೋದಿಸಿದ್ದಾರೆ.",
+    },
     rejected: {
       title: "ಮನವಿ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ",
       body: "{equip} ಗಾಗಿ {renter} ಅವರ ಮನವಿಯನ್ನು ನೀವು ತಿರಸ್ಕರಿಸಿದ್ದೀರಿ.",
+    },
+    renterRejected: {
+      title: "ಬುಕಿಂಗ್ ತಿರಸ್ಕೃತ",
+      body: "{owner} ಅವರು {equip} ಗಾಗಿ ನಿಮ್ಮ ಮನವಿಯನ್ನು ತಿರಸ್ಕರಿಸಿದ್ದಾರೆ.",
+    },
+    available: {
+      title: "ಯಂತ್ರ ಈಗ ಲಭ್ಯವಿದೆ ✓",
+      body: "{equip} ಈಗ ₹{price}/ದಿನಕ್ಕೆ ಬಾಡಿಗೆಗೆ ಲಭ್ಯವಿದೆ.",
+    },
+    returned: {
+      title: "ಬಾಡಿಗೆ ಪೂರ್ಣಗೊಂಡಿದೆ ✓",
+      body: "{equip} ಬಾಡಿಗೆಯನ್ನು ಪೂರ್ಣಗೊಂಡಿದೆ ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ.",
+    },
+    cancelled: {
+      title: "ಬುಕಿಂಗ್ ರದ್ದಾಗಿದೆ",
+      body: "{renter} ಅವರು {equip} ಬಾಡಿಗೆ ಮನವಿಯನ್ನು ರದ್ದುಮಾಡಿದ್ದಾರೆ.",
+    },
+    reviewed: {
+      title: "ಹೊಸ ವಿಮರ್ಶೆ ★",
+      body: "{renter} ಅವರು {equip} ಗೆ {rating}/5 ರೇಟಿಂಗ್ ನೀಡಿದ್ದಾರೆ.",
     },
     listed: {
       title: "ನಿಮ್ಮ ಹತ್ತಿರ ಹೊಸ ಯಂತ್ರ ಲಭ್ಯ 🚜",

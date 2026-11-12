@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native"
 import { useLang } from "../i18n"
+import { useProfile } from "../profile"
 import DetailShell from "./DetailShell"
 import {
   Cloud,
@@ -16,7 +17,6 @@ import {
   Sun,
   CloudRain,
   Thermometer,
-  Leaf,
   RefreshCw,
   MapPin,
   AlertTriangle,
@@ -25,61 +25,102 @@ import {
   ChevronDown,
   X,
   Gauge,
+  Sunrise,
+  Sunset,
   ShieldCheck,
   ShieldAlert,
+  Clock,
 } from "lucide-react-native"
 import { fetchLiveWeather, type LiveWeatherData } from "../api/weather"
 import { getCurrentLocation } from "../utils/location"
+import { FadeSlideIn, SkeletonBox } from "./Motion"
 
 // Preset fallback verified farming hubs for manual selection
 const MANUAL_LOCATION_HUBS = [
   { label: "Mandya (ಮಂಡ್ಯ)", lat: 12.5244, lng: 76.8958, district: "Mandya" },
-  { label: "Ramanagara (ರಾಮನಗರ)", lat: 12.7210, lng: 77.2810, district: "Ramanagara" },
-  { label: "Mysuru (ಮೈಸೂರು)", lat: 12.2770, lng: 76.6690, district: "Mysuru" },
+  { label: "Ramanagara (ರಾಮನಗರ)", lat: 12.721, lng: 77.281, district: "Ramanagara" },
+  { label: "Mysuru (ಮೈಸೂರು)", lat: 12.277, lng: 76.669, district: "Mysuru" },
   { label: "Bengaluru (ಬೆಂಗಳೂರು)", lat: 12.9716, lng: 77.5946, district: "Bengaluru" },
   { label: "Kolar (ಕೋಲಾರ)", lat: 13.1367, lng: 78.1292, district: "Kolar" },
-  { label: "Tumakuru (ತುಮಕೂರು)", lat: 13.3409, lng: 77.1010, district: "Tumakuru" },
+  { label: "Tumakuru (ತುಮಕೂರು)", lat: 13.3409, lng: 77.101, district: "Tumakuru" },
   { label: "Hassan (ಹಾಸನ)", lat: 13.0033, lng: 76.1004, district: "Hassan" },
   { label: "Shivamogga (ಶಿವಮೊಗ್ಗ)", lat: 13.9299, lng: 75.5681, district: "Shivamogga" },
   { label: "Davanagere (ದಾವಣಗೆರೆ)", lat: 14.4644, lng: 75.9218, district: "Davanagere" },
-  { label: "Hubballi (ಹುಬ್ಬಳ್ಳಿ)", lat: 15.3647, lng: 75.1240, district: "Dharwad" },
+  { label: "Hubballi (ಹುಬ್ಬಳ್ಳಿ)", lat: 15.3647, lng: 75.124, district: "Dharwad" },
 ]
+
+const DISTRICT_HUB_ALIAS: Record<string, string> = {
+  mysore: "Mysuru",
+  bangalore: "Bengaluru",
+  "bengaluru rural": "Bengaluru",
+  "bengaluru urban": "Bengaluru",
+  tumkur: "Tumakuru",
+  shimoga: "Shivamogga",
+  hubli: "Dharwad",
+}
+
+function resolveProfileHub(district?: string) {
+  const raw = (district || "Mandya").trim().toLowerCase()
+  const mapped = (DISTRICT_HUB_ALIAS[raw] || raw).toLowerCase()
+  return (
+    MANUAL_LOCATION_HUBS.find(
+      (h) =>
+        h.district.toLowerCase() === mapped ||
+        h.label.toLowerCase().includes(mapped)
+    ) || MANUAL_LOCATION_HUBS[0]
+  )
+}
 
 function getWeatherIcon(conditionEn: string) {
   const c = (conditionEn || "").toLowerCase()
-  if (c.includes("rain") || c.includes("drizzle") || c.includes("shower")) {
+  if (c.includes("rain") || c.includes("drizzle") || c.includes("shower") || c.includes("thunder")) {
     return { icon: CloudRain, color: "#38bdf8" }
   }
   if (c.includes("cloud") || c.includes("overcast")) {
-    return { icon: Cloud, color: "#94a3b8" }
+    return { icon: Cloud, color: "#cbd5e1" }
   }
   if (c.includes("fog") || c.includes("mist") || c.includes("haze")) {
-    return { icon: Cloud, color: "#cbd5e1" }
+    return { icon: Cloud, color: "#e2e8f0" }
   }
   return { icon: Sun, color: "#fef08a" }
 }
 
+function getAqiLabel(aqi: number | null, isKn: boolean): string {
+  if (!aqi) return isKn ? "ಲಭ್ಯವಿಲ್ಲ" : "N/A"
+  if (aqi <= 1) return isKn ? "ಉತ್ತಮ (Good)" : "Good (1)"
+  if (aqi <= 2) return isKn ? "ಸಾಧಾರಣ (Mod)" : "Moderate (2)"
+  if (aqi <= 3) return isKn ? "ಸೂಕ್ಷ್ಮ (Sens)" : "Fair (3)"
+  return isKn ? `ಕಳಪೆ (${aqi})` : `Poor (${aqi})`
+}
+
 export default function WeatherScreen() {
   const { lang } = useLang()
+  const { profile } = useProfile()
   const isKn = lang === "kn"
 
-  // GPS Location State
+  const profileFallbackHub = useMemo(
+    () => resolveProfileHub(profile.district),
+    [profile.district]
+  )
+
+  // GPS Location State (language-independent so toggling EN/KN never resets GPS)
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [gpsStatus, setGpsStatus] = useState<"detecting" | "success" | "denied" | "manual">("detecting")
-  const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null)
+  const [gpsErrorReason, setGpsErrorReason] = useState<"denied" | "timeout" | null>(null)
   const [showManualPicker, setShowManualPicker] = useState<boolean>(false)
-  const [selectedHubName, setSelectedHubName] = useState<string>("Detecting GPS...")
+  const [selectedHubName, setSelectedHubName] = useState<string>("")
 
   // Live Weather Data State
   const [weatherData, setWeatherData] = useState<LiveWeatherData | null>(null)
+  const [forecastDaysView, setForecastDaysView] = useState<3 | 7>(3)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [hasError, setHasError] = useState(false)
 
   // 1. Detect dynamic GPS coordinates
   const detectGps = useCallback(async () => {
     setGpsStatus("detecting")
-    setGpsErrorMsg(null)
+    setGpsErrorReason(null)
 
     const loc = await getCurrentLocation(9000)
     if (loc.ok) {
@@ -87,67 +128,54 @@ export default function WeatherScreen() {
       setGpsStatus("success")
       setSelectedHubName(`${loc.lat.toFixed(3)}°N, ${loc.lng.toFixed(3)}°E`)
     } else if (loc.reason === "unavailable") {
-      const fallback = MANUAL_LOCATION_HUBS[0]
-      setCoords({ lat: fallback.lat, lng: fallback.lng })
+      setCoords({ lat: profileFallbackHub.lat, lng: profileFallbackHub.lng })
       setGpsStatus("manual")
-      setSelectedHubName(fallback.label)
+      setSelectedHubName(profileFallbackHub.label)
     } else {
       setGpsStatus("denied")
-      setGpsErrorMsg(
-        loc.reason === "denied"
-          ? isKn
-            ? "ಸ್ಥಳ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
-            : "Location permission denied. Please choose a nearby farming hub."
-          : isKn
-          ? "ಜಿಪಿಎಸ್ ಸಿಗ್ನಲ್ ಸಿಗುತ್ತಿಲ್ಲ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
-          : "GPS signal timed out. Please choose a nearby farming hub."
-      )
-      const fallback = MANUAL_LOCATION_HUBS[0]
-      setCoords({ lat: fallback.lat, lng: fallback.lng })
-      setSelectedHubName(fallback.label)
+      setGpsErrorReason(loc.reason === "denied" ? "denied" : "timeout")
+      setCoords({ lat: profileFallbackHub.lat, lng: profileFallbackHub.lng })
+      setSelectedHubName(profileFallbackHub.label)
     }
-  }, [isKn])
+  }, [profileFallbackHub])
 
   useEffect(() => {
     detectGps()
   }, [detectGps])
 
-  // 2. Fetch live weather when coordinates change
-  const loadWeather = useCallback(async () => {
+  // 2. Fetch live 7-day + hourly weather when coordinates change
+  const loadWeather = useCallback(async (isSilentRefresh = false) => {
     if (!coords) return
-    setLoading(true)
-    setError(null)
+    if (!isSilentRefresh) setLoading(true)
+    setHasError(false)
     try {
-      const data = await fetchLiveWeather(coords.lat, coords.lng, 3)
+      const data = await fetchLiveWeather(coords.lat, coords.lng, 7)
       setWeatherData(data)
     } catch (err: any) {
       console.error("[WeatherScreen] Fetch error:", err)
-      setError(
-        isKn
-          ? "ಹವಾಮಾನ ಮಾಹಿತಿ ಪಡೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
-          : "Failed to fetch live weather data. Please try again."
-      )
+      setHasError(true)
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [coords, isKn])
+  }, [coords])
 
   useEffect(() => {
     if (coords) {
-      loadWeather()
+      loadWeather(false)
     }
   }, [coords, loadWeather])
 
   const handleRefresh = () => {
     setRefreshing(true)
-    loadWeather()
+    loadWeather(Boolean(weatherData))
   }
 
-  const selectManualHub = (hub: typeof MANUAL_LOCATION_HUBS[0]) => {
+  const selectManualHub = (hub: (typeof MANUAL_LOCATION_HUBS)[0]) => {
     setCoords({ lat: hub.lat, lng: hub.lng })
     setSelectedHubName(hub.label)
     setGpsStatus("manual")
+    setGpsErrorReason(null)
     setShowManualPicker(false)
   }
 
@@ -156,12 +184,20 @@ export default function WeatherScreen() {
     : { icon: Sun, color: "#fef08a" }
   const HeroIcon = currentIcon.icon
 
+  const visibleForecast = weatherData
+    ? weatherData.forecast.slice(0, forecastDaysView)
+    : []
+
   return (
     <DetailShell
       title={isKn ? "ಲೈವ್ ಹವಾಮಾನ ಮುನ್ಸೂಚನೆ" : "Live Weather Forecast"}
-      subtitle={isKn ? "ಕೃಷಿ ಸಲಹೆ ಮತ್ತು 3-ದಿನಗಳ ಮುನ್ಸೂಚನೆ" : "Agricultural Advisory & 3-Day Forecast"}
+      subtitle={
+        isKn
+          ? `ಕೃಷಿ ಸಲಹೆ, ಗಂಟೆವಾರು ಮತ್ತು ${forecastDaysView}-ದಿನಗಳ ಮುನ್ಸೂಚನೆ`
+          : `Agri Advisory, Hourly & ${forecastDaysView}-Day Forecast`
+      }
     >
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.container}>
         {/* GPS Location Bar */}
         <View style={styles.locationBar}>
           <TouchableOpacity
@@ -181,7 +217,7 @@ export default function WeatherScreen() {
               <Text style={styles.locationTitle} numberOfLines={1}>
                 {weatherData?.location
                   ? `${weatherData.location.name}, ${weatherData.location.region}`
-                  : selectedHubName}
+                  : selectedHubName || (isKn ? "ಪತ್ತೆಹಚ್ಚಲಾಗುತ್ತಿದೆ..." : "Detecting GPS...")}
               </Text>
             </View>
             <ChevronDown size={18} color="#6b7280" />
@@ -199,16 +235,24 @@ export default function WeatherScreen() {
               <Compass size={16} color="#15803d" />
             )}
             <Text style={styles.reGpsBtnText}>
-              {isKn ? "ಜಿಪಿಎಸ್ ಮರುಪಡೆಯಿರಿ" : "Use GPS"}
+              {isKn ? "ಜಿಪಿಎಸ್" : "Use GPS"}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* GPS Error Message */}
-        {gpsErrorMsg && (
+        {/* GPS Error Message (reactive to language switch) */}
+        {gpsErrorReason && (
           <View style={styles.gpsErrorBanner}>
             <AlertTriangle size={15} color="#b45309" />
-            <Text style={styles.gpsErrorText}>{gpsErrorMsg}</Text>
+            <Text style={styles.gpsErrorText}>
+              {gpsErrorReason === "denied"
+                ? isKn
+                  ? "ಸ್ಥಳ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+                  : "Location permission denied. Showing nearby farming hub."
+                : isKn
+                ? "ಜಿಪಿಎಸ್ ಸಿಗ್ನಲ್ ಸಿಗುತ್ತಿಲ್ಲ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+                : "GPS signal timed out. Showing nearby farming hub."}
+            </Text>
           </View>
         )}
 
@@ -224,32 +268,43 @@ export default function WeatherScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.hubsList}>
-              {MANUAL_LOCATION_HUBS.map((hub, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.hubItem}
-                  onPress={() => selectManualHub(hub)}
-                >
-                  <MapPin size={14} color="#15803d" />
-                  <Text style={styles.hubItemText}>{hub.label}</Text>
-                </TouchableOpacity>
-              ))}
+              {MANUAL_LOCATION_HUBS.map((hub) => {
+                const isSelected = selectedHubName === hub.label
+                return (
+                  <TouchableOpacity
+                    key={hub.district}
+                    style={[styles.hubItem, isSelected && styles.hubItemSelected]}
+                    onPress={() => selectManualHub(hub)}
+                  >
+                    <MapPin size={14} color={isSelected ? "#ffffff" : "#15803d"} />
+                    <Text style={[styles.hubItemText, isSelected && styles.hubItemTextSelected]}>
+                      {hub.label}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
             </View>
           </View>
         )}
 
         {/* Loading State */}
         {loading && !refreshing ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#15803d" />
-            <Text style={styles.loadingText}>
+          <View style={{ gap: 12, marginTop: 6 }}>
+            <SkeletonBox height={175} borderRadius={22} />
+            <SkeletonBox height={86} borderRadius={18} />
+            <SkeletonBox height={110} borderRadius={18} />
+            <Text style={[styles.loadingText, { textAlign: "center" }]}>
               {isKn ? "ಲೈವ್ ಹವಾಮಾನ ಮಾಹಿತಿ ಪಡೆಯಲಾಗುತ್ತಿದೆ..." : "Fetching live satellite weather..."}
             </Text>
           </View>
-        ) : error ? (
+        ) : hasError && !weatherData ? (
           <View style={styles.errorBox}>
             <AlertTriangle size={32} color="#dc2626" />
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={styles.errorText}>
+              {isKn
+                ? "ಹವಾಮಾನ ಮಾಹಿತಿ ಪಡೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+                : "Failed to fetch live weather data. Please try again."}
+            </Text>
             <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
               <RefreshCw size={16} color="#ffffff" />
               <Text style={styles.retryBtnText}>{isKn ? "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ" : "Try Again"}</Text>
@@ -258,7 +313,8 @@ export default function WeatherScreen() {
         ) : weatherData ? (
           <>
             {/* Live Weather Hero Card */}
-            <View style={styles.heroCard}>
+            <FadeSlideIn delay={40}>
+              <View style={styles.heroCard}>
               <View style={styles.heroTop}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.placeText}>
@@ -325,6 +381,39 @@ export default function WeatherScreen() {
                 </View>
               </View>
             </View>
+            </FadeSlideIn>
+
+            {/* Extra Agronomy Telemetry Strip: Sun Cycle, Rain mm, Pressure, AQI */}
+            <View style={styles.telemetryStrip}>
+              {weatherData.astro ? (
+                <>
+                  <View style={styles.telemetryChip}>
+                    <Sunrise size={13} color="#d97706" />
+                    <Text style={styles.telemetryText}>
+                      {isKn ? "ಸೂರ್ಯೋದಯ" : "Rise"} {weatherData.astro.sunrise}
+                    </Text>
+                  </View>
+                  <View style={styles.telemetryChip}>
+                    <Sunset size={13} color="#ea580c" />
+                    <Text style={styles.telemetryText}>
+                      {isKn ? "ಸೂರ್ಯಾಸ್ತ" : "Set"} {weatherData.astro.sunset}
+                    </Text>
+                  </View>
+                </>
+              ) : null}
+              <View style={styles.telemetryChip}>
+                <CloudRain size={13} color="#2563eb" />
+                <Text style={styles.telemetryText}>
+                  {isKn ? "ಮಳೆ:" : "Rain:"} {weatherData.forecast[0]?.totalPrecipMm ?? weatherData.current.precipMm} mm
+                </Text>
+              </View>
+              <View style={styles.telemetryChip}>
+                <Gauge size={13} color="#15803d" />
+                <Text style={styles.telemetryText}>
+                  {weatherData.current.pressureMb} hPa • AQI {getAqiLabel(weatherData.current.airQualityIndex, isKn)}
+                </Text>
+              </View>
+            </View>
 
             {/* Real-time Agricultural Farming Advisory Card */}
             <View
@@ -383,22 +472,116 @@ export default function WeatherScreen() {
               </View>
             </View>
 
-            {/* 3-Day Agricultural Forecast */}
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>
-                {isKn ? "3-ದಿನಗಳ ಕೃಷಿ ಹವಾಮಾನ ಮುನ್ಸೂಚನೆ" : "3-Day Agricultural Forecast"}
-              </Text>
-              <Text style={styles.sectionSubtitle}>
-                {isKn ? "ದೈನಂದಿನ ಮಳೆ ಮತ್ತು ತಾಪಮಾನ" : "Daily Rain & Temperature"}
-              </Text>
+            {/* Next Hours Spray & Rain Window Strip */}
+            {Array.isArray(weatherData.hourly) && weatherData.hourly.length > 0 ? (
+              <View style={styles.hourlySection}>
+                <View style={styles.hourlyHeaderRow}>
+                  <Clock size={15} color="#15803d" />
+                  <Text style={styles.sectionTitle}>
+                    {isKn ? "ಮುಂದಿನ ಗಂಟೆಗಳ ಹವಾಮಾನ (ಸಿಂಪಡಣೆ ಸಮಯ)" : "Upcoming Spray & Rain Windows"}
+                  </Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.hourlyScroll}
+                >
+                  {weatherData.hourly.map((hr, idx) => {
+                    const hrIcon = getWeatherIcon(hr.conditionTextEn)
+                    const HrIconComp = hrIcon.icon
+                    const safeHour = hr.chanceOfRain < 40 && hr.windKph < 20
+                    return (
+                      <View key={idx} style={styles.hourlyCard}>
+                        <Text style={styles.hourlyTime}>{hr.label}</Text>
+                        <HrIconComp
+                          size={20}
+                          color={hrIcon.color === "#fef08a" ? "#f59e0b" : "#0284c7"}
+                        />
+                        <Text style={styles.hourlyTemp}>{hr.tempC}°C</Text>
+                        <View style={styles.hourlyMetaRow}>
+                          <CloudRain size={10} color="#2563eb" />
+                          <Text style={styles.hourlyMetaText}>{hr.chanceOfRain}%</Text>
+                        </View>
+                        <Text style={styles.hourlyWind}>{hr.windKph} km/h</Text>
+                        <View
+                          style={[
+                            styles.hourlySprayDot,
+                            { backgroundColor: safeHour ? "#dcfce7" : "#fee2e2" },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.hourlySprayText,
+                              { color: safeHour ? "#166534" : "#991b1b" },
+                            ]}
+                          >
+                            {safeHour ? (isKn ? "ಸುರಕ್ಷಿತ" : "OK") : isKn ? "ಬೇಡ" : "Hold"}
+                          </Text>
+                        </View>
+                      </View>
+                    )
+                  })}
+                </ScrollView>
+              </View>
+            ) : null}
+
+            {/* 3-Day / 7-Day Agricultural Forecast Header + Toggle */}
+            <View style={styles.forecastHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitle}>
+                  {isKn
+                    ? `${forecastDaysView}-ದಿನಗಳ ಕೃಷಿ ಹವಾಮಾನ ಮುನ್ಸೂಚನೆ`
+                    : `${forecastDaysView}-Day Agricultural Forecast`}
+                </Text>
+                <Text style={styles.sectionSubtitle}>
+                  {isKn ? "ದೈನಂದಿನ ಮಳೆ, ಗಾಳಿ ಮತ್ತು ತಾಪಮಾನ" : "Daily Rain, Wind & Temperature"}
+                </Text>
+              </View>
+
+              {weatherData.forecast.length > 3 ? (
+                <View style={styles.rangeSwitch}>
+                  <TouchableOpacity
+                    onPress={() => setForecastDaysView(3)}
+                    style={[
+                      styles.rangeBtn,
+                      forecastDaysView === 3 && styles.rangeBtnActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.rangeBtnText,
+                        forecastDaysView === 3 && styles.rangeBtnTextActive,
+                      ]}
+                    >
+                      {isKn ? "3 ದಿನ" : "3D"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setForecastDaysView(7)}
+                    style={[
+                      styles.rangeBtn,
+                      forecastDaysView === 7 && styles.rangeBtnActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.rangeBtnText,
+                        forecastDaysView === 7 && styles.rangeBtnTextActive,
+                      ]}
+                    >
+                      {isKn ? "7 ದಿನ" : "7D"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.forecastList}>
-              {weatherData.forecast.map((f, i) => {
+              {visibleForecast.map((f, i) => {
                 const dayIcon = getWeatherIcon(f.conditionTextEn)
                 const DayIconComp = dayIcon.icon
                 return (
-                  <View key={i} style={styles.forecastCard}>
+                  <View key={f.date || i} style={styles.forecastCard}>
                     <View style={styles.forecastDayCol}>
                       <Text style={styles.forecastDayName}>
                         {isKn ? f.dayNameKn : f.dayNameEn}
@@ -408,7 +591,10 @@ export default function WeatherScreen() {
 
                     <View style={styles.forecastCenterCol}>
                       <View style={styles.forecastConditionRow}>
-                        <DayIconComp size={20} color={dayIcon.color === "#fef08a" ? "#f59e0b" : dayIcon.color} />
+                        <DayIconComp
+                          size={20}
+                          color={dayIcon.color === "#fef08a" ? "#f59e0b" : "#0284c7"}
+                        />
                         <Text style={styles.forecastConditionText} numberOfLines={1}>
                           {isKn ? f.conditionTextKn : f.conditionTextEn}
                         </Text>
@@ -419,6 +605,12 @@ export default function WeatherScreen() {
                         <Text style={styles.dotSeparator}>•</Text>
                         <Wind size={12} color="#64748b" />
                         <Text style={styles.windSubText}>{f.maxWindKph} km/h</Text>
+                        {f.totalPrecipMm > 0 ? (
+                          <>
+                            <Text style={styles.dotSeparator}>•</Text>
+                            <Text style={styles.rainChanceText}>{f.totalPrecipMm}mm</Text>
+                          </>
+                        ) : null}
                       </View>
                     </View>
 
@@ -431,26 +623,25 @@ export default function WeatherScreen() {
               })}
             </View>
 
-            {/* Data Source Footnote */}
+            {/* Honest Dynamic Data Source Footnote */}
             <View style={styles.sourceBox}>
               <CheckCircle2 size={13} color="#15803d" />
               <Text style={styles.sourceText}>
                 {isKn
-                  ? "ನೈಜ-ಸಮಯದ ಉಪಗ್ರಹ ಡೇಟಾ • WeatherAPI.com • ಕೃಷಿ ವಲಯ"
-                  : "Live Satellite & Meteorological Data • WeatherAPI.com"}
+                  ? `ನೈಜ-ಸಮಯದ ಡೇಟಾ • ${weatherData.source}`
+                  : `Live Meteorological Data • ${weatherData.source}`}
               </Text>
             </View>
           </>
         ) : null}
-      </ScrollView>
+      </View>
     </DetailShell>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 32,
   },
   locationBar: {
     backgroundColor: "#ffffff",
@@ -549,10 +740,17 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
   },
+  hubItemSelected: {
+    backgroundColor: "#15803d",
+  },
   hubItemText: {
     fontSize: 12,
     color: "#374151",
     fontWeight: "500",
+  },
+  hubItemTextSelected: {
+    color: "#ffffff",
+    fontWeight: "700",
   },
   loadingBox: {
     paddingVertical: 60,
@@ -596,7 +794,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1e3a8a",
     borderRadius: 24,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 12,
     shadowColor: "#1e3a8a",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
@@ -681,6 +879,28 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.75)",
     marginTop: 2,
   },
+  telemetryStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+  telemetryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  telemetryText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#374151",
+  },
   advisoryBanner: {
     backgroundColor: "#ffffff",
     borderRadius: 18,
@@ -688,7 +908,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 14,
     alignItems: "flex-start",
-    marginBottom: 20,
+    marginBottom: 18,
     borderLeftWidth: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -746,8 +966,70 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
   },
-  sectionHeaderRow: {
+  hourlySection: {
+    marginBottom: 18,
+  },
+  hourlyHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+  hourlyScroll: {
+    gap: 10,
+    paddingRight: 8,
+  },
+  hourlyCard: {
+    width: 78,
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  hourlyTime: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#4b5563",
+  },
+  hourlyTemp: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#111827",
+  },
+  hourlyMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  hourlyMetaText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#2563eb",
+  },
+  hourlyWind: {
+    fontSize: 10,
+    color: "#64748b",
+  },
+  hourlySprayDot: {
+    marginTop: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  hourlySprayText: {
+    fontSize: 9,
+    fontWeight: "700",
+  },
+  forecastHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 12,
+    gap: 10,
   },
   sectionTitle: {
     fontSize: 16,
@@ -758,6 +1040,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6b7280",
     marginTop: 2,
+  },
+  rangeSwitch: {
+    flexDirection: "row",
+    backgroundColor: "#e5e7eb",
+    borderRadius: 12,
+    padding: 3,
+    gap: 2,
+  },
+  rangeBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9,
+  },
+  rangeBtnActive: {
+    backgroundColor: "#15803d",
+  },
+  rangeBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#4b5563",
+  },
+  rangeBtnTextActive: {
+    color: "#ffffff",
   },
   forecastList: {
     gap: 10,
@@ -779,7 +1084,7 @@ const styles = StyleSheet.create({
     borderColor: "#f3f4f6",
   },
   forecastDayCol: {
-    width: 65,
+    width: 68,
   },
   forecastDayName: {
     fontSize: 14,
@@ -804,6 +1109,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#374151",
     fontWeight: "600",
+    flex: 1,
   },
   forecastMetricsRow: {
     flexDirection: "row",
@@ -849,5 +1155,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#15803d",
     fontWeight: "500",
+    textAlign: "center",
   },
 })

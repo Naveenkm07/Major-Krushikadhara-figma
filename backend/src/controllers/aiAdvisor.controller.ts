@@ -4,10 +4,17 @@
 // ==============================================================================
 
 import type { Request, Response } from "express"
-import { transcribeAudioWithSarvam } from "../services/sarvam.service.js"
+import {
+  synthesizeSpeechWithSarvam,
+  transcribeAudioWithSarvam,
+} from "../services/sarvam.service.js"
 import { streamAgriAdvisory, getAgriAdvisory, type AgriChatContext } from "../services/gemini.service.js"
 import { getCropGrowthStage, generateStageAwareAdvice } from "../services/stageAdvisory.service.js"
 import { prisma, withDbRetry } from "../config/db.js"
+import {
+  cacheFallbackFarmer,
+  getOrCreateFallbackFarmer,
+} from "../services/farmerFallback.service.js"
 
 async function resolveFarmerContext(params: {
   mobile?: string
@@ -27,8 +34,9 @@ async function resolveFarmerContext(params: {
   let daysSinceSowing = 35
 
   if (params.mobile) {
-    const mobile = params.mobile
-    const farmer = await withDbRetry(
+    const digits = String(params.mobile).replace(/\D/g, "")
+    const mobile = digits.length >= 10 ? digits.slice(-10) : params.mobile.trim()
+    let farmer: any = await withDbRetry(
       () =>
         prisma.farmer.findUnique({
           where: { mobile },
@@ -36,14 +44,20 @@ async function resolveFarmerContext(params: {
         }),
       "AI resolveFarmerContext"
     ).catch((err) => {
-      console.warn("⚠️ [AI Context DB Warning]:", err?.message || err)
+      console.warn("⚠️ [AI Context DB Fallback]:", err?.message || err)
       return null
     })
 
     if (farmer) {
       farmerId = farmer.id
+      cacheFallbackFarmer(farmer)
+    } else {
+      farmer = getOrCreateFallbackFarmer(mobile)
+    }
+
+    if (farmer) {
       if (!context.district) context.district = farmer.district
-      const crop = farmer.activeCrops[0]
+      const crop = farmer.activeCrops?.[0]
       if (crop) {
         cropFieldId = crop.id
         daysSinceSowing = Math.max(1, Math.floor((Date.now() - new Date(crop.sowingDate).getTime()) / 86400000))
@@ -122,7 +136,8 @@ export async function streamAgriChat(req: Request, res: Response): Promise<void>
  */
 export async function handleVoiceStream(req: Request, res: Response): Promise<void> {
   const file = req.file
-  const mobile = (req.body?.mobile as string) || "9591502209"
+  const rawMobile = String(req.body?.mobile || "").replace(/\D/g, "")
+  const mobile = rawMobile.length >= 10 ? rawMobile.slice(-10) : "9591502209"
   const lang = (req.body?.language as string) || "kn-IN"
   const cropNameBody = req.body?.cropName as string | undefined
   const districtBody = req.body?.district as string | undefined
@@ -228,6 +243,35 @@ export async function askAgriAdvisor(req: Request, res: Response): Promise<void>
       const fallbackText = buildStageFallbackText(query, context, daysSinceSowing)
       res.json({ success: true, answer: fallbackText, fallback: true })
     }
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || "Internal server error" })
+  }
+}
+
+/**
+ * POST /api/ai/tts
+ * Synthesizes bilingual Kannada/English speech audio (WAV base64) via Sarvam AI Bulbul v3.
+ */
+export async function synthesizeAiSpeech(req: Request, res: Response): Promise<void> {
+  try {
+    const { text, language } = req.body || {}
+    if (!text || typeof text !== "string") {
+      res.status(400).json({ success: false, error: "Text is required" })
+      return
+    }
+    const result = await synthesizeSpeechWithSarvam(text, String(language || "kn-IN"))
+    if (!result.success || !result.audioBase64) {
+      res.status(502).json({
+        success: false,
+        error: result.error || "Speech synthesis failed",
+      })
+      return
+    }
+    res.json({
+      success: true,
+      audioBase64: result.audioBase64,
+      mimeType: result.mimeType || "audio/wav",
+    })
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || "Internal server error" })
   }

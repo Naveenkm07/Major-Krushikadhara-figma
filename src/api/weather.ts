@@ -20,6 +20,17 @@ export interface ForecastDayItem {
   uv: number
 }
 
+export interface HourlyWeatherItem {
+  time: string
+  label: string
+  tempC: number
+  conditionTextEn: string
+  conditionTextKn: string
+  chanceOfRain: number
+  windKph: number
+  humidity: number
+}
+
 export interface LiveWeatherData {
   location: {
     name: string
@@ -45,6 +56,11 @@ export interface LiveWeatherData {
     pressureMb: number
     airQualityIndex: number | null
   }
+  astro?: {
+    sunrise: string
+    sunset: string
+  }
+  hourly?: HourlyWeatherItem[]
   forecast: ForecastDayItem[]
   advisory: {
     category: "FAVORABLE" | "RAIN_ALERT" | "WIND_ALERT" | "HEAT_ALERT" | "SPRAY_SAFE"

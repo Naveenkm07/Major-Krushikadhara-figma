@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { View, StyleSheet } from "react-native"
+import { Component, useEffect, useRef, useState, type ReactNode } from "react"
+import { Animated, Easing, View, Text, TouchableOpacity, StyleSheet } from "react-native"
 import { StatusBar } from "expo-status-bar"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 
@@ -18,8 +18,10 @@ import {
   resolveStartup,
   saveOnboardingStep,
   startSession,
+  subscribeLogoutRequest,
   type StartupStage,
 } from "./src/startup"
+import { clearAuthToken } from "./src/auth"
 
 // Onboarding & Root Screens
 import SplashScreen from "./src/components/SplashScreen"
@@ -41,12 +43,79 @@ import { routeScreens } from "./src/components/routeRegistry"
 type Stage = "splash" | StartupStage
 const MIN_SPLASH_MS = 1400
 
+class AppErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(err: any) {
+    console.error("[KrushikaDhara ErrorBoundary]:", err?.message || err)
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorEmoji}>🌾</Text>
+        <Text style={styles.errorTitle}>Something went wrong</Text>
+        <Text style={styles.errorTitleKn}>ತಾಂತ್ರಿಕ ದೋಷ ಕಂಡುಬಂದಿದೆ</Text>
+        <Text style={styles.errorSub}>
+          Tap below to safely reload your KrushikaDhara workspace.
+        </Text>
+        <TouchableOpacity
+          onPress={() => this.setState({ hasError: false })}
+          style={styles.errorBtn}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.errorBtnText}>Reload App · ಮತ್ತೆ ತೆರೆಯಿರಿ</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+}
+
 function MainApp() {
+  const { lang } = useLang()
   const [stage, setStage] = useState<Stage>("splash")
   const [tab, setTab] = useState<Tab>("home")
   const [onboardingStep, setOnboardingStep] = useState(0)
 
   const { current, reset } = useNav()
+  const stageFade = useRef(new Animated.Value(1)).current
+  const tabFade = useRef(new Animated.Value(1)).current
+
+  useEffect(() => {
+    stageFade.setValue(0.82)
+    Animated.timing(stageFade, {
+      toValue: 1,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start()
+  }, [stage])
+
+  useEffect(() => {
+    tabFade.setValue(0.88)
+    Animated.timing(tabFade, {
+      toValue: 1,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start()
+  }, [tab])
+
+  useEffect(() => {
+    return subscribeLogoutRequest(() => {
+      reset()
+      setTab("home")
+      setStage("auth")
+    })
+  }, [reset])
 
   useEffect(() => {
     if (stage !== "splash") return
@@ -67,36 +136,42 @@ function MainApp() {
 
   if (stage === "language") {
     return (
-      <LanguageSelectScreen
-        onDone={() => {
-          markLanguageChosen()
-          setStage("onboarding")
-        }}
-      />
+      <Animated.View style={[styles.stageWrap, { opacity: stageFade }]}>
+        <LanguageSelectScreen
+          onDone={() => {
+            markLanguageChosen()
+            setStage("onboarding")
+          }}
+        />
+      </Animated.View>
     )
   }
 
   if (stage === "onboarding") {
     return (
-      <OnboardingScreen
-        initialIndex={onboardingStep}
-        onStep={saveOnboardingStep}
-        onDone={() => {
-          completeOnboarding()
-          setStage("auth")
-        }}
-      />
+      <Animated.View style={[styles.stageWrap, { opacity: stageFade }]}>
+        <OnboardingScreen
+          initialIndex={onboardingStep}
+          onStep={saveOnboardingStep}
+          onDone={() => {
+            completeOnboarding()
+            setStage("auth")
+          }}
+        />
+      </Animated.View>
     )
   }
 
   if (stage === "auth") {
     return (
-      <AuthScreen
-        onDone={() => {
-          startSession()
-          setStage("app")
-        }}
-      />
+      <Animated.View style={[styles.stageWrap, { opacity: stageFade }]}>
+        <AuthScreen
+          onDone={() => {
+            startSession()
+            setStage("app")
+          }}
+        />
+      </Animated.View>
     )
   }
 
@@ -111,56 +186,105 @@ function MainApp() {
   function logout() {
     reset()
     setTab("home")
+    clearAuthToken()
     endSession()
     setStage("auth")
   }
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: stageFade }]}>
       <StatusBar style="light" />
 
       {/* Main Tab Screens */}
-      <View style={styles.tabContent}>
+      <Animated.View
+        key={lang}
+        style={[styles.tabContent, { opacity: tabFade }]}
+      >
         {tab === "home" && <HomeScreen onNavigate={changeTab} />}
         {tab === "scan" && <ScanScreen />}
         {tab === "insights" && <InsightsScreen />}
         {tab === "schemes" && <GovtSchemesScreen />}
         {tab === "profile" && <ProfileScreen onLogout={logout} />}
-      </View>
+      </Animated.View>
 
       {/* Floating/Persistent Bottom Tab Bar */}
       <BottomNav active={tab} onChange={changeTab} />
 
       {/* Overlay Stack Route Screen */}
       {RouteScreen && <RouteScreen key={routeKey} />}
-    </View>
+    </Animated.View>
   )
 }
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <LangProvider>
-        <ProfileProvider>
-          <EquipmentProvider>
-            <InsuranceProvider>
-              <NavProvider>
-                <MainApp />
-              </NavProvider>
-            </InsuranceProvider>
-          </EquipmentProvider>
-        </ProfileProvider>
-      </LangProvider>
+      <AppErrorBoundary>
+        <LangProvider>
+          <ProfileProvider>
+            <EquipmentProvider>
+              <InsuranceProvider>
+                <NavProvider>
+                  <MainApp />
+                </NavProvider>
+              </InsuranceProvider>
+            </EquipmentProvider>
+          </ProfileProvider>
+        </LangProvider>
+      </AppErrorBoundary>
     </SafeAreaProvider>
   )
 }
 
 const styles = StyleSheet.create({
+  stageWrap: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: "#f7f8ec",
   },
   tabContent: {
     flex: 1,
+  },
+  errorContainer: {
+    flex: 1,
+    backgroundColor: "#f7f8ec",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  errorEmoji: {
+    fontSize: 48,
+    marginBottom: 14,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#111827",
+  },
+  errorTitleKn: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#256428",
+    marginTop: 4,
+  },
+  errorSub: {
+    fontSize: 13,
+    color: "#4b5563",
+    textAlign: "center",
+    marginTop: 10,
+    marginBottom: 22,
+  },
+  errorBtn: {
+    backgroundColor: "#256428",
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
+  errorBtnText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "bold",
   },
 })

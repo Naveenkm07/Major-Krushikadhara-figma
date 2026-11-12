@@ -24,6 +24,7 @@ import ScanProcessingScreen from "./ScanProcessingScreen"
 import ScanResultScreen from "./ScanResultScreen"
 import ScanHistoryScreen from "./ScanHistoryScreen"
 import EquipmentRentalScreen from "./EquipmentRentalScreen"
+import { PrivacyPolicyScreen, TermsOfServiceScreen } from "./LegalScreen"
 
 // Subflow Screen Bundles
 import {
@@ -82,6 +83,8 @@ export const routeScreens: Record<Route, ComponentType> = {
   howAiWorks: HowAiWorksScreen,
   technicalArch: TechnicalArchScreen,
   settings: SettingsScreen,
+  privacyPolicy: PrivacyPolicyScreen,
+  termsOfService: TermsOfServiceScreen,
   schemeDetail: SchemeDetailScreen,
   scanProcessing: ScanProcessingScreen,
   scanResult: ScanResultScreen,

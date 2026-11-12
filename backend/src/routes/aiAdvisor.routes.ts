@@ -4,6 +4,7 @@ import {
   streamAgriChat,
   handleVoiceStream,
   askAgriAdvisor,
+  synthesizeAiSpeech,
 } from "../controllers/aiAdvisor.controller.js"
 
 const router = Router()
@@ -20,6 +21,9 @@ router.post("/voice-stream", upload.single("audio"), handleVoiceStream)
 
 // POST /api/ai/ask - Non-streaming standard endpoint
 router.post("/ask", askAgriAdvisor)
+
+// POST /api/ai/tts - Sarvam Bulbul v3 Text-to-Speech (Kannada / English)
+router.post("/tts", synthesizeAiSpeech)
 
 export default router
 

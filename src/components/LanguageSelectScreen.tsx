@@ -1,8 +1,9 @@
 import { useRef, useState } from "react"
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native"
+import { View, Text, StyleSheet } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Check, Globe, Languages, Sprout } from "lucide-react-native"
 import { useLang, type Lang } from "../i18n"
+import { FadeSlideIn, ScalePressable } from "./Motion"
 
 const options: {
   id: Lang
@@ -40,57 +41,62 @@ export default function LanguageSelectScreen({ onDone }: { onDone: () => void })
     >
       <View style={styles.centerContent}>
         {/* Sprout Icon */}
-        <View style={styles.iconCircle}>
-          <Sprout size={40} color="#ffffff" />
-        </View>
+        <FadeSlideIn delay={40}>
+          <View style={styles.iconCircle}>
+            <Sprout size={40} color="#ffffff" />
+          </View>
+        </FadeSlideIn>
 
-        <Text style={styles.kannadaHeading}>ನಿಮ್ಮ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ</Text>
-        <Text style={styles.englishHeading}>Choose Your Language</Text>
+        <FadeSlideIn delay={110}>
+          <Text style={styles.kannadaHeading}>ನಿಮ್ಮ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ</Text>
+          <Text style={styles.englishHeading}>Choose Your Language</Text>
 
-        <Text style={styles.subtext}>ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.</Text>
-        <Text style={styles.subtextEn}>Select your preferred language to continue.</Text>
+          <Text style={styles.subtext}>ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.</Text>
+          <Text style={styles.subtextEn}>Select your preferred language to continue.</Text>
+        </FadeSlideIn>
 
         {/* Language Options */}
         <View style={styles.optionsList}>
-          {options.map((o) => {
+          {options.map((o, idx) => {
             const active = selected === o.id
             return (
-              <TouchableOpacity
-                key={o.id}
-                onPress={() => choose(o.id)}
-                activeOpacity={0.85}
-                style={[
-                  styles.optionCard,
-                  active && styles.optionCardActive,
-                ]}
-              >
-                <View
+              <FadeSlideIn key={o.id} delay={190 + idx * 80}>
+                <ScalePressable
+                  onPress={() => choose(o.id)}
+                  scaleTo={0.97}
                   style={[
-                    styles.optionIconContainer,
-                    active && styles.optionIconActive,
+                    styles.optionCard,
+                    active && styles.optionCardActive,
                   ]}
                 >
-                  {o.id === "kn" ? (
-                    <Languages size={24} color={active ? "#ffffff" : "#256428"} />
-                  ) : (
-                    <Globe size={24} color={active ? "#ffffff" : "#256428"} />
-                  )}
-                </View>
+                  <View
+                    style={[
+                      styles.optionIconContainer,
+                      active && styles.optionIconActive,
+                    ]}
+                  >
+                    {o.id === "kn" ? (
+                      <Languages size={24} color={active ? "#ffffff" : "#256428"} />
+                    ) : (
+                      <Globe size={24} color={active ? "#ffffff" : "#256428"} />
+                    )}
+                  </View>
 
-                <View style={styles.optionTextContainer}>
-                  <Text style={styles.optionLabel}>{o.label}</Text>
-                  <Text style={styles.optionAction}>{o.action}</Text>
-                </View>
+                  <View style={styles.optionTextContainer}>
+                    <Text style={styles.optionLabel}>{o.label}</Text>
+                    <Text style={styles.optionAction}>{o.action}</Text>
+                  </View>
 
-                <View
-                  style={[
-                    styles.radioCircle,
-                    active && styles.radioCircleActive,
-                  ]}
-                >
-                  {active && <Check size={16} color="#ffffff" />}
-                </View>
-              </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.radioCircle,
+                      active && styles.radioCircleActive,
+                    ]}
+                  >
+                    {active && <Check size={16} color="#ffffff" />}
+                  </View>
+                </ScalePressable>
+              </FadeSlideIn>
             )
           })}
         </View>

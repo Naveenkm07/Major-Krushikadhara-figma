@@ -32,6 +32,17 @@ export interface ForecastDayItem {
   uv: number
 }
 
+export interface HourlyWeatherItem {
+  time: string
+  label: string
+  tempC: number
+  conditionTextEn: string
+  conditionTextKn: string
+  chanceOfRain: number
+  windKph: number
+  humidity: number
+}
+
 export interface LiveWeatherData {
   location: {
     name: string
@@ -57,6 +68,11 @@ export interface LiveWeatherData {
     pressureMb: number
     airQualityIndex: number | null
   }
+  astro?: {
+    sunrise: string
+    sunset: string
+  }
+  hourly?: HourlyWeatherItem[]
   forecast: ForecastDayItem[]
   advisory: {
     category: "FAVORABLE" | "RAIN_ALERT" | "WIND_ALERT" | "HEAT_ALERT" | "SPRAY_SAFE"
@@ -69,30 +85,63 @@ export interface LiveWeatherData {
   source: string
 }
 
-// Translation dictionary for common WeatherAPI condition strings
-const CONDITION_KN: Record<string, string> = {
-  sunny: "ಬಿಸಿಲು",
-  clear: "ಸ್ವಚ್ಛ ಆಕಾಶ",
-  "partly cloudy": "ಭಾಗಶಃ ಮೋಡ",
-  cloudy: "ಮೋಡ ಕವಿದ ವಾತಾವರಣ",
-  overcast: "ದಟ್ಟ ಮೋಡ",
-  mist: "ಮಂಜು",
-  "patchy rain nearby": "ಹತ್ತಿರದಲ್ಲಿ ಸಾಧಾರಣ ಮಳೆ ಸಾಧ್ಯತೆ",
-  "patchy light rain": "ಹಗುರ ಮಳೆ",
-  "light rain": "ಸಾಧಾರಣ ಮಳೆ",
-  "moderate rain": "ಮಧ್ಯಮ ಮಳೆ",
-  "heavy rain": "ಭಾರೀ ಮಳೆ",
-  "thundery outbreaks nearby": "ಗುಡುಗು ಸಹಿತ ಮಳೆ ಸಾಧ್ಯತೆ",
-  "smoky haze": "ಹೊಗೆಯುಕ್ತ ಮಂಜು",
-  fog: "ದಟ್ಟ ಮಂಜು",
-}
+// Ordered specificity: match longer phrases before shorter substrings
+const CONDITION_RULES_KN: Array<[string, string]> = [
+  ["thundery outbreaks", "ಗುಡುಗು ಸಹಿತ ಮಳೆ ಸಾಧ್ಯತೆ"],
+  ["moderate or heavy rain with thunder", "ಗುಡುಗು ಸಹಿತ ಭಾರೀ ಮಳೆ"],
+  ["patchy light rain with thunder", "ಗುಡುಗು ಸಹಿತ ಹಗುರ ಮಳೆ"],
+  ["thunderstorm", "ಗುಡುಗು ಸಹಿತ ಮಳೆ"],
+  ["moderate or heavy rain shower", "ಮಧ್ಯಮ ಅಥವಾ ಭಾರೀ ಮಳೆ ಸಿಂಚನ"],
+  ["light rain shower", "ಹಗುರ ಮಳೆ ಸಿಂಚನ"],
+  ["torrential rain shower", "ಧಾರಾಕಾರ ಮಳೆ"],
+  ["patchy rain nearby", "ಹತ್ತಿರದಲ್ಲಿ ಸಾಧಾರಣ ಮಳೆ ಸಾಧ್ಯತೆ"],
+  ["patchy light rain", "ಹಗುರ ಮಳೆ"],
+  ["patchy light drizzle", "ಹಗುರ ತುಂತುರು ಮಳೆ"],
+  ["light drizzle", "ಹಗುರ ತುಂತುರು ಮಳೆ"],
+  ["heavy rain", "ಭಾರೀ ಮಳೆ"],
+  ["moderate rain", "ಮಧ್ಯಮ ಮಳೆ"],
+  ["light rain", "ಸಾಧಾರಣ ಮಳೆ"],
+  ["rain shower", "ಮಳೆ ಸಿಂಚನ"],
+  ["drizzle", "ತುಂತುರು ಮಳೆ"],
+  ["partly cloudy", "ಭಾಗಶಃ ಮೋಡ"],
+  ["overcast", "ದಟ್ಟ ಮೋಡ"],
+  ["cloudy", "ಮೋಡ ಕವಿದ ವಾತಾವರಣ"],
+  ["sunny", "ಬಿಸಿಲು"],
+  ["clear", "ಸ್ವಚ್ಛ ಆಕಾಶ"],
+  ["fog", "ದಟ್ಟ ಮಂಜು"],
+  ["mist", "ಮಂಜು"],
+  ["haze", "ಮಸುಕಾದ ವಾತಾವರಣ"],
+  ["rain", "ಮಳೆ"],
+]
 
 function translateCondition(conditionText: string): string {
   const clean = conditionText.toLowerCase().trim()
-  for (const [key, kn] of Object.entries(CONDITION_KN)) {
+  for (const [key, kn] of CONDITION_RULES_KN) {
     if (clean.includes(key)) return kn
   }
   return conditionText
+}
+
+function degreesToCompass(deg: unknown): string {
+  const n = Number(deg)
+  if (!Number.isFinite(n)) return "E"
+  const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+  const idx = Math.round((((n % 360) + 360) % 360) / 22.5) % 16
+  return dirs[idx]
+}
+
+function getSafeDayOfWeek(dateStr: string): number {
+  const parsed = new Date(`${dateStr.slice(0, 10)}T12:00:00Z`)
+  return Number.isNaN(parsed.getTime()) ? new Date().getDay() : parsed.getUTCDay()
+}
+
+function formatHourLabel(isoOrLocalTime: string): string {
+  const m = /(\d{2}):(\d{2})/.exec(isoOrLocalTime)
+  if (!m) return isoOrLocalTime
+  const hour24 = parseInt(m[1], 10)
+  const suffix = hour24 >= 12 ? "PM" : "AM"
+  const h12 = hour24 % 12 || 12
+  return `${h12} ${suffix}`
 }
 
 const DAYS_KN: Record<number, string> = {
@@ -111,18 +160,19 @@ const DAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
  * Generates actionable agronomical farming recommendations based on weather forecast.
  */
 function generateFarmingAdvisory(current: any, day1: any): LiveWeatherData["advisory"] {
-  const chanceOfRain = day1?.day?.daily_chance_of_rain || current?.chance_of_rain || 0
-  const precipMm = day1?.day?.totalprecip_mm || current?.precip_mm || 0
-  const windKph = current?.wind_kph || 0
-  const tempC = current?.temp_c || 28
+  const chanceOfRain = Math.round(day1?.day?.daily_chance_of_rain ?? current?.chance_of_rain ?? 0)
+  const precipMm = Math.round((Number(day1?.day?.totalprecip_mm ?? current?.precip_mm ?? 0)) * 10) / 10
+  const windKph = Math.round(Number(current?.wind_kph ?? 0))
+  const tempC = Math.round(Number(current?.temp_c ?? 28))
+  const humidity = Math.round(Number(current?.humidity ?? 60))
 
   if (chanceOfRain >= 60 || precipMm >= 5) {
     return {
       category: "RAIN_ALERT",
       titleEn: "Rain Alert — Postpone Foliar Spraying",
       titleKn: "ಮಳೆ ಮುನ್ಸೂಚನೆ — ಕೀಟನಾಶಕ ಸಿಂಪಡಣೆ ಮುಂದೂಡಿ",
-      bodyEn: `High probability of rainfall (${chanceOfRain}%). Avoid pesticide spraying and nitrogen top-dressing to prevent wash-off. Ensure field drainage channels are clear.`,
-      bodyKn: `ಹೆಚ್ಚಿನ ಮಳೆ ಸಾಧ್ಯತೆ (${chanceOfRain}%). ರಸಗೊಬ್ಬರ ಮತ್ತು ಕೀಟನಾಶಕ ಸಿಂಪಡಣೆ ಮಾಡಬೇಡಿ, ಮಳೆಗೆ ಕೊಚ್ಚಿಹೋಗುವ ಸಂಭವವಿದೆ. ಜಮೀನಿನಲ್ಲಿ ನೀರು ಸರಾಗವಾಗಿ ಹರಿದುಹೋಗುವಂತೆ ನೋಡಿಕೊಳ್ಳಿ.`,
+      bodyEn: `High rainfall risk (${chanceOfRain}%, ~${precipMm} mm). Avoid pesticide spraying and nitrogen top-dressing to prevent wash-off. Keep field drainage channels clear.`,
+      bodyKn: `ಹೆಚ್ಚಿನ ಮಳೆ ಸಾಧ್ಯತೆ (${chanceOfRain}%, ~${precipMm} ಮಿ.ಮೀ). ರಸಗೊಬ್ಬರ ಮತ್ತು ಕೀಟನಾಶಕ ಸಿಂಪಡಣೆ ಮಾಡಬೇಡಿ, ಮಳೆಗೆ ಕೊಚ್ಚಿಹೋಗುವ ಸಂಭವವಿದೆ. ಜಮೀನಿನಲ್ಲಿ ನೀರು ಸರಾಗವಾಗಿ ಹರಿದುಹೋಗುವಂತೆ ನೋಡಿಕೊಳ್ಳಿ.`,
       sprayRecommended: false,
     }
   }
@@ -132,7 +182,7 @@ function generateFarmingAdvisory(current: any, day1: any): LiveWeatherData["advi
       category: "WIND_ALERT",
       titleEn: "High Wind Alert — Avoid Pesticide Spraying",
       titleKn: "ವೇಗದ ಗಾಳಿ — ಸಿಂಪಡಣೆ ಮಾಡಬೇಡಿ",
-      bodyEn: `Wind speed is high (${windKph} km/h). Foliar pesticide or herbicide spraying is not recommended due to chemical drift risk.`,
+      bodyEn: `Wind speed is high (${windKph} km/h). Foliar pesticide or herbicide spraying is not recommended due to spray drift risk.`,
       bodyKn: `ಗಾಳಿಯ ವೇಗ ಹೆಚ್ಚಾಗಿದೆ (${windKph} ಕಿ.ಮೀ/ಗಂ). ಸಿಂಪಡಿಸಿದ ಔಷಧ ಗಾಳಿಗೆ ಪಕ್ಕದ ಜಮೀನಿಗೆ ಹರಡುವ ಅಪಾಯವಿರುವುದರಿಂದ ಸಿಂಪಡಣೆ ಮಾಡಬೇಡಿ.`,
       sprayRecommended: false,
     }
@@ -143,8 +193,19 @@ function generateFarmingAdvisory(current: any, day1: any): LiveWeatherData["advi
       category: "HEAT_ALERT",
       titleEn: "High Temperature — Early Irrigation Recommended",
       titleKn: "ಹೆಚ್ಚಿನ ತಾಪಮಾನ — ಬೆಳಿಗ್ಗೆ ಅಥವಾ ಸಂಜೆ ನೀರು ಹಾಯಿಸಿ",
-      bodyEn: `Temperature is high (${tempC}°C). Schedule crop irrigation during early morning (6–9 AM) or late evening to minimize evaporation losses.`,
-      bodyKn: `ತಾಪಮಾನ ಹೆಚ್ಚಾಗಿದೆ (${tempC}°C). ಆವಿಯಾಗುವಿಕೆಯನ್ನು ತಡೆಗಟ್ಟಲು ಮುಂಜಾನೆ ಅಥವಾ ಸಂಜೆ ವೇಳೆ ಮಾತ್ರ ಬೆಳೆಗೆ ನೀರು ಹಾಯಿಸಿ.`,
+      bodyEn: `Temperature is high (${tempC}°C). Schedule crop irrigation and foliar sprays during early morning (6–9 AM) or evening to avoid evaporation loss and leaf scorch.`,
+      bodyKn: `ತಾಪಮಾನ ಹೆಚ್ಚಾಗಿದೆ (${tempC}°C). ಆವಿಯಾಗುವಿಕೆ ಮತ್ತು ಎಲೆ ಸುಡುವಿಕೆಯನ್ನು ತಡೆಗಟ್ಟಲು ಮುಂಜಾನೆ (6–9 ಗಂಟೆ) ಅಥವಾ ಸಂಜೆ ಮಾತ್ರ ನೀರು ಹಾಯಿಸಿ/ಸಿಂಪಡಿಸಿ.`,
+      sprayRecommended: true,
+    }
+  }
+
+  if (humidity >= 85) {
+    return {
+      category: "FAVORABLE",
+      titleEn: "High Humidity — Monitor Leaves for Fungal Spots",
+      titleKn: "ಹೆಚ್ಚಿನ ತೇವಾಂಶ — ಶಿಲೀಂಧ್ರ ರೋಗಗಳ ಬಗ್ಗೆ ಗಮನವಿರಲಿ",
+      bodyEn: `Humidity is elevated (${humidity}%) with calm winds (${windKph} km/h). Safe for morning spraying, but inspect lower leaves for early blight or blast lesions.`,
+      bodyKn: `ತೇವಾಂಶ ಹೆಚ್ಚಾಗಿದೆ (${humidity}%) ಮತ್ತು ಗಾಳಿ ಸಾಧಾರಣವಾಗಿದೆ (${windKph} ಕಿ.ಮೀ/ಗಂ). ಬೆಳಿಗ್ಗೆ ಸಿಂಪಡಣೆ ಸುರಕ್ಷಿತ, ಆದರೆ ಕೆಳಗಿನ ಎಲೆಗಳಲ್ಲಿ ಅಂಗಮಾರಿ/ಬೆಂಕಿ ರೋಗ ಲಕ್ಷಣಗಳನ್ನು ಗಮನಿಸಿ.`,
       sprayRecommended: true,
     }
   }
@@ -153,8 +214,8 @@ function generateFarmingAdvisory(current: any, day1: any): LiveWeatherData["advi
     category: "FAVORABLE",
     titleEn: "Favorable Weather for Field Operations",
     titleKn: "ಕೃಷಿ ಕೆಲಸಗಳಿಗೆ ಉತ್ತಮ ವಾತಾವರಣ",
-    bodyEn: `Clear skies, moderate winds (${windKph} km/h), and no heavy rain expected. Ideal time for weeding, fertilization, and foliar spray operations.`,
-    bodyKn: `ಸ್ವಚ್ಛ ಆಕಾಶ, ಸಾಧಾರಣ ಗಾಳಿ (${windKph} ಕಿ.ಮೀ/ಗಂ) ಹಾಗೂ ಮಳೆಯ ಸಂಭವವಿಲ್ಲ. ಕಳೆ ಕೀಳಲು, ರಸಗೊಬ್ಬರ ಹಾಕಲು ಹಾಗೂ ಔಷಧ ಸಿಂಪಡಣೆಗೆ ಸಕಾಲ.`,
+    bodyEn: `Calm winds (${windKph} km/h), ${humidity}% humidity, and low rain risk (${chanceOfRain}%). Suitable window for weeding, fertilization, and foliar spraying.`,
+    bodyKn: `ಸಾಧಾರಣ ಗಾಳಿ (${windKph} ಕಿ.ಮೀ/ಗಂ), ${humidity}% ತೇವಾಂಶ ಮತ್ತು ಕಡಿಮೆ ಮಳೆ ಸಂಭವ (${chanceOfRain}%). ಕಳೆ ಕೀಳಲು, ಗೊಬ್ಬರ ಹಾಕಲು ಮತ್ತು ಔಷಧ ಸಿಂಪಡಣೆಗೆ ಸಕಾಲ.`,
     sprayRecommended: true,
   }
 }
@@ -192,8 +253,12 @@ async function fetchOpenMeteoFallback(lat: number, lng: number, days: number): P
     "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m"
   )
   url.searchParams.set(
+    "hourly",
+    "temperature_2m,precipitation_probability,weather_code,wind_speed_10m,relative_humidity_2m"
+  )
+  url.searchParams.set(
     "daily",
-    "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max"
+    "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,sunrise,sunset"
   )
   url.searchParams.set("timezone", "Asia/Kolkata")
   url.searchParams.set("forecast_days", String(Math.max(1, Math.min(days, 7))))
@@ -205,15 +270,28 @@ async function fetchOpenMeteoFallback(lat: number, lng: number, days: number): P
   const om = (await res.json()) as any
   const cur = om.current || {}
   const daily = om.daily || {}
+  const hourlyObj = om.hourly || {}
   const times: string[] = Array.isArray(daily.time) ? daily.time : []
+  const hTimes: string[] = Array.isArray(hourlyObj.time) ? hourlyObj.time : []
 
   const forecast: ForecastDayItem[] = times.map((dateStr, idx) => {
-    const d = new Date(dateStr)
-    const dayOfWeek = d.getDay()
+    const dayOfWeek = getSafeDayOfWeek(dateStr)
     const maxT = Math.round(daily.temperature_2m_max?.[idx] ?? cur.temperature_2m ?? 28)
     const minT = Math.round(daily.temperature_2m_min?.[idx] ?? (maxT - 6))
     const code = Number(daily.weather_code?.[idx] ?? cur.weather_code ?? 1)
     const desc = describeWmoCode(code)
+
+    // Average hourly humidity for the given date if available
+    const dayHumidityValues: number[] = []
+    hTimes.forEach((ht, hIdx) => {
+      if (ht.startsWith(dateStr) && Number.isFinite(Number(hourlyObj.relative_humidity_2m?.[hIdx]))) {
+        dayHumidityValues.push(Number(hourlyObj.relative_humidity_2m[hIdx]))
+      }
+    })
+    const avgHum =
+      dayHumidityValues.length > 0
+        ? Math.round(dayHumidityValues.reduce((a, b) => a + b, 0) / dayHumidityValues.length)
+        : Math.round(cur.relative_humidity_2m ?? 65)
 
     return {
       date: dateStr,
@@ -228,20 +306,50 @@ async function fetchOpenMeteoFallback(lat: number, lng: number, days: number): P
       chanceOfRain: Math.round(daily.precipitation_probability_max?.[idx] ?? 0),
       totalPrecipMm: Number(daily.precipitation_sum?.[idx] ?? 0),
       maxWindKph: Math.round(daily.wind_speed_10m_max?.[idx] ?? cur.wind_speed_10m ?? 10),
-      humidity: Math.round(cur.relative_humidity_2m ?? 65),
+      humidity: avgHum,
       uv: Math.round(daily.uv_index_max?.[idx] ?? 5),
     }
   })
 
+  // Extract next 8 upcoming 2-hour slots from current IST time
+  const nowIsoPrefix = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 13)
+  let startIdx = hTimes.findIndex((ht) => ht.slice(0, 13) >= nowIsoPrefix)
+  if (startIdx < 0) startIdx = 0
+  const hourly: HourlyWeatherItem[] = []
+  for (let i = startIdx; i < hTimes.length && hourly.length < 8; i += 2) {
+    const desc = describeWmoCode(Number(hourlyObj.weather_code?.[i] ?? 1))
+    hourly.push({
+      time: hTimes[i],
+      label: formatHourLabel(hTimes[i]),
+      tempC: Math.round(hourlyObj.temperature_2m?.[i] ?? cur.temperature_2m ?? 26),
+      conditionTextEn: desc.en,
+      conditionTextKn: desc.kn,
+      chanceOfRain: Math.round(hourlyObj.precipitation_probability?.[i] ?? 0),
+      windKph: Math.round(hourlyObj.wind_speed_10m?.[i] ?? cur.wind_speed_10m ?? 8),
+      humidity: Math.round(hourlyObj.relative_humidity_2m?.[i] ?? cur.relative_humidity_2m ?? 60),
+    })
+  }
+
+  const formatOmSunTime = (raw: unknown): string => {
+    const s = String(raw || "")
+    const m = /T(\d{2}):(\d{2})/.exec(s)
+    if (!m) return "06:15 AM"
+    const h = parseInt(m[1], 10)
+    const ampm = h >= 12 ? "PM" : "AM"
+    return `${String(h % 12 || 12).padStart(2, "0")}:${m[2]} ${ampm}`
+  }
+
   const curTempC = Math.round(cur.temperature_2m ?? 28)
   const curDesc = describeWmoCode(Number(cur.weather_code ?? 1))
   const day0Rain = forecast[0]?.chanceOfRain ?? 0
+  const curHumidity = Math.round(cur.relative_humidity_2m ?? 65)
   const advisory = generateFarmingAdvisory(
     {
       chance_of_rain: day0Rain,
       precip_mm: cur.precipitation ?? 0,
       wind_kph: cur.wind_speed_10m ?? 10,
       temp_c: curTempC,
+      humidity: curHumidity,
     },
     {
       day: {
@@ -267,15 +375,20 @@ async function fetchOpenMeteoFallback(lat: number, lng: number, days: number): P
       conditionTextEn: curDesc.en,
       conditionTextKn: curDesc.kn,
       iconUrl: "",
-      humidity: Math.round(cur.relative_humidity_2m ?? 65),
+      humidity: curHumidity,
       windKph: Math.round(cur.wind_speed_10m ?? 10),
-      windDir: String(cur.wind_direction_10m ?? "E"),
+      windDir: degreesToCompass(cur.wind_direction_10m),
       precipMm: Number(cur.precipitation ?? 0),
       chanceOfRain: day0Rain,
       uv: forecast[0]?.uv ?? 5,
       pressureMb: Math.round(cur.surface_pressure ?? 1013),
       airQualityIndex: null,
     },
+    astro: {
+      sunrise: formatOmSunTime(daily.sunrise?.[0]),
+      sunset: formatOmSunTime(daily.sunset?.[0]),
+    },
+    hourly,
     forecast,
     advisory,
     source: "Open-Meteo (Live GPS Weather Fallback)",
@@ -283,7 +396,7 @@ async function fetchOpenMeteoFallback(lat: number, lng: number, days: number): P
 }
 
 /**
- * Retrieves real-time weather and 3-day agricultural forecast for given GPS coordinates.
+ * Retrieves real-time weather and agricultural forecast (1-7 days + hourly) for GPS coordinates.
  */
 export async function getLiveWeatherForecast(
   lat: number,
@@ -347,8 +460,7 @@ export async function getLiveWeatherForecast(
   const forecastDays = data.forecast?.forecastday || []
 
   const formattedForecast: ForecastDayItem[] = forecastDays.map((fd: any, idx: number) => {
-    const d = new Date(fd.date)
-    const dayOfWeek = d.getDay()
+    const dayOfWeek = getSafeDayOfWeek(fd.date || "")
     const dayNameEn = idx === 0 ? "Today" : DAYS_EN[dayOfWeek]
     const dayNameKn = idx === 0 ? "ಇಂದು" : DAYS_KN[dayOfWeek]
     const condText = fd.day?.condition?.text || "Clear"
@@ -373,6 +485,31 @@ export async function getLiveWeatherForecast(
     }
   })
 
+  // Extract upcoming 2-hour slots across today & tomorrow
+  const allHours: any[] = []
+  forecastDays.slice(0, 2).forEach((fd: any) => {
+    if (Array.isArray(fd.hour)) allHours.push(...fd.hour)
+  })
+  const curEpoch = Number(location.localtime_epoch || 0)
+  let hStartIdx = allHours.findIndex((h) => Number(h.time_epoch || 0) >= curEpoch - 1800)
+  if (hStartIdx < 0) hStartIdx = 0
+  const hourly: HourlyWeatherItem[] = []
+  for (let i = hStartIdx; i < allHours.length && hourly.length < 8; i += 2) {
+    const h = allHours[i]
+    const hCond = h.condition?.text || "Clear"
+    hourly.push({
+      time: h.time || "",
+      label: formatHourLabel(h.time || ""),
+      tempC: Math.round(h.temp_c ?? 0),
+      conditionTextEn: hCond,
+      conditionTextKn: translateCondition(hCond),
+      chanceOfRain: Number(h.chance_of_rain ?? 0),
+      windKph: Math.round(h.wind_kph ?? 0),
+      humidity: Math.round(h.humidity ?? 0),
+    })
+  }
+
+  const day0Astro = forecastDays[0]?.astro || {}
   const advisory = generateFarmingAdvisory(current, forecastDays[0])
   const condText = current.condition?.text || "Clear"
 
@@ -403,6 +540,11 @@ export async function getLiveWeatherForecast(
       pressureMb: current.pressure_mb || 1013,
       airQualityIndex: current.air_quality?.["us-epa-index"] || null,
     },
+    astro: {
+      sunrise: day0Astro.sunrise || "06:15 AM",
+      sunset: day0Astro.sunset || "05:55 PM",
+    },
+    hourly,
     forecast: formattedForecast,
     advisory,
     source: "WeatherAPI.com (Real-Time GPS Location)",

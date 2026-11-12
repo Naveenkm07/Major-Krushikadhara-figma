@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react"
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native"
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native"
 import { useNav } from "../nav"
 import { useProfile } from "../profile"
 import { useLang } from "../i18n"
 import { Cpu, AlertTriangle } from "lucide-react-native"
 import { diagnoseCropImage, type PestDetectionResult, type ScanMode } from "../api/scan"
 import { addScanToHistory } from "../storage/scanHistory"
+import { AnimatedProgressFill, FadeSlideIn, PulseHalo, ScalePressable } from "./Motion"
 
 const STEPS_EN = [
   "Uploading crop image securely...",
@@ -39,6 +40,7 @@ export default function ScanProcessingScreen() {
 
   useEffect(() => {
     let isMounted = true
+    let navTimer: ReturnType<typeof setTimeout> | null = null
 
     const interval = setInterval(() => {
       setStepIdx((prev) => (prev < STEPS.length - 1 ? prev + 1 : prev))
@@ -76,7 +78,8 @@ export default function ScanProcessingScreen() {
 
         // Route non-plant images or very uncertain results to dedicated LowConfidence guidance screen
         if (result.is_plant === false || (result.low_confidence && !result.healthy)) {
-          setTimeout(() => {
+          navTimer = setTimeout(() => {
+            if (!isMounted) return
             back()
             open("lowConfidence", {
               diagnosis: result,
@@ -92,7 +95,8 @@ export default function ScanProcessingScreen() {
         addScanToHistory(result, finalUri, resolvedCrop)
         refreshProfile(profile.mobile).catch(() => {})
 
-        setTimeout(() => {
+        navTimer = setTimeout(() => {
+          if (!isMounted) return
           back()
           open("scanResult", {
             diagnosis: result,
@@ -120,6 +124,7 @@ export default function ScanProcessingScreen() {
     return () => {
       isMounted = false
       clearInterval(interval)
+      if (navTimer) clearTimeout(navTimer)
     }
   }, [imageUri])
 
@@ -127,20 +132,28 @@ export default function ScanProcessingScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.centerBox}>
-        <View style={styles.circleWrap}>
-          {errorMsg ? (
-            <AlertTriangle size={56} color="#ef4444" />
-          ) : (
+      <FadeSlideIn delay={40} style={styles.centerBox}>
+        <View style={styles.circleStage}>
+          {!errorMsg && (
             <>
-              <Cpu size={56} color="#4ade80" />
-              <ActivityIndicator
-                size="large"
-                color="#4ade80"
-                style={styles.spinner}
-              />
+              <PulseHalo size={126} color="#4ade80" active delay={0} />
+              <PulseHalo size={126} color="#86efac" active delay={750} />
             </>
           )}
+          <View style={styles.circleWrap}>
+            {errorMsg ? (
+              <AlertTriangle size={56} color="#ef4444" />
+            ) : (
+              <>
+                <Cpu size={56} color="#4ade80" />
+                <ActivityIndicator
+                  size="large"
+                  color="#4ade80"
+                  style={styles.spinner}
+                />
+              </>
+            )}
+          </View>
         </View>
 
         {errorMsg ? (
@@ -149,11 +162,11 @@ export default function ScanProcessingScreen() {
               {isKn ? "ರೋಗನಿರ್ಣಯ ವಿಫಲವಾಗಿದೆ" : "Diagnosis Failed"}
             </Text>
             <Text style={styles.stepText}>{errorMsg}</Text>
-            <TouchableOpacity onPress={() => back()} style={styles.retryBtn}>
+            <ScalePressable onPress={() => back()} style={styles.retryBtn}>
               <Text style={styles.retryBtnText}>
                 {isKn ? "ಹಿಂದೆ ಹೋಗಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ" : "Go Back & Try Again"}
               </Text>
-            </TouchableOpacity>
+            </ScalePressable>
           </>
         ) : (
           <>
@@ -178,11 +191,11 @@ export default function ScanProcessingScreen() {
             <Text style={styles.stepText}>{STEPS[stepIdx]}</Text>
 
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${progress}%` }]} />
+              <AnimatedProgressFill pct={progress} color="#4ade80" duration={520} />
             </View>
           </>
         )}
-      </View>
+      </FadeSlideIn>
     </View>
   )
 }
@@ -203,6 +216,12 @@ const styles = StyleSheet.create({
   centerBox: {
     alignItems: "center",
     width: "100%",
+  },
+  circleStage: {
+    width: 140,
+    height: 140,
+    alignItems: "center",
+    justifyContent: "center",
   },
   circleWrap: {
     width: 120,

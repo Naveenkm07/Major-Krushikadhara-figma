@@ -13,6 +13,7 @@ import { useLang } from "../i18n"
 import { useNav } from "../nav"
 import { useProfile } from "../profile"
 import { checkScanHealth, type ScanMode } from "../api/scan"
+import { FadeSlideIn, ScalePressable, ScanLaserSweep } from "./Motion"
 import {
   ScanLine,
   Camera,
@@ -334,23 +335,27 @@ export default function ScanScreen() {
         </View>
 
         {/* Viewfinder Preview */}
-        <View style={styles.viewfinderContainer}>
-          <View style={styles.viewfinderCard}>
-            {previewUri ? (
-              <Image source={{ uri: previewUri }} style={styles.previewImage} />
-            ) : (
-              <View style={styles.emptyViewfinder}>
-                <Camera size={48} color="#9ca3af" />
-                <Text style={styles.emptyText}>{t.scan.hint}</Text>
-                <Text style={styles.emptySubtext}>
-                  {isKn
-                    ? "ಕೆಳಗಿನ ಕ್ಯಾಮೆರಾ ಅಥವಾ ಗ್ಯಾಲರಿ ಒತ್ತಿ"
-                    : "Tap Camera or Gallery below"}
-                </Text>
-              </View>
-            )}
+        <FadeSlideIn delay={100}>
+          <View style={styles.viewfinderContainer}>
+            <View style={styles.viewfinderCard}>
+              {previewUri ? (
+                <Image source={{ uri: previewUri }} style={styles.previewImage} />
+              ) : (
+                <View style={styles.emptyViewfinder}>
+                  <Camera size={48} color="#9ca3af" />
+                  <Text style={styles.emptyText}>{t.scan.hint}</Text>
+                  <Text style={styles.emptySubtext}>
+                    {isKn
+                      ? "ಕೆಳಗಿನ ಕ್ಯಾಮೆರಾ ಅಥವಾ ಗ್ಯಾಲರಿ ಒತ್ತಿ"
+                      : "Tap Camera or Gallery below"}
+                  </Text>
+                </View>
+              )}
 
-            {/* Corner Bracket Guides */}
+              {/* Animated Scanning Laser Sweep */}
+              <ScanLaserSweep height={240} color={previewUri ? "#4ade80" : "#22c55e"} />
+
+              {/* Corner Bracket Guides */}
             <View style={[styles.cornerGuide, styles.topLeft]} />
             <View style={[styles.cornerGuide, styles.topRight]} />
             <View style={[styles.cornerGuide, styles.bottomLeft]} />
@@ -399,18 +404,16 @@ export default function ScanScreen() {
 
           {/* Action Buttons — Camera + Gallery */}
           <View style={styles.actionButtonsRow}>
-            <TouchableOpacity
+            <ScalePressable
               onPress={openGallery}
-              activeOpacity={0.8}
               style={styles.galleryBtn}
             >
               <ImageUp size={20} color="#256428" />
               <Text style={styles.galleryBtnText}>{t.scan.gallery}</Text>
-            </TouchableOpacity>
+            </ScalePressable>
 
-            <TouchableOpacity
+            <ScalePressable
               onPress={openCamera}
-              activeOpacity={0.85}
               style={styles.scanNowBtn}
             >
               <Camera size={20} color="#ffffff" />
@@ -423,25 +426,27 @@ export default function ScanScreen() {
                   ? "ಕ್ಯಾಮೆರಾ"
                   : "Camera"}
               </Text>
-            </TouchableOpacity>
+            </ScalePressable>
           </View>
 
           {/* Primary Diagnose CTA */}
           {previewUri && (
-            <TouchableOpacity
-              onPress={startScan}
-              activeOpacity={0.85}
-              style={styles.analyzeBtn}
-            >
-              <Cpu size={20} color="#ffffff" />
-              <Text style={styles.analyzeBtnText}>
-                {isKn
-                  ? "🔬 ಈಗ AI ರೋಗನಿರ್ಣಯ ಆರಂಭಿಸಿ"
-                  : "🔬 Analyze Crop Now"}
-              </Text>
-            </TouchableOpacity>
+            <FadeSlideIn delay={20}>
+              <ScalePressable
+                onPress={startScan}
+                style={styles.analyzeBtn}
+              >
+                <Cpu size={20} color="#ffffff" />
+                <Text style={styles.analyzeBtnText}>
+                  {isKn
+                    ? "🔬 ಈಗ AI ರೋಗನಿರ್ಣಯ ಆರಂಭಿಸಿ"
+                    : "🔬 Analyze Crop Now"}
+                </Text>
+              </ScalePressable>
+            </FadeSlideIn>
           )}
         </View>
+        </FadeSlideIn>
 
         {/* Features Links */}
         <View style={styles.infoLinksSection}>
@@ -522,7 +527,9 @@ export default function ScanScreen() {
                       </View>
                     )}
                     <View style={styles.recentInfo}>
-                      <Text style={styles.recentCrop}>{item.crop}</Text>
+                      <Text style={styles.recentCrop}>
+                        {cropMap[item.crop] || item.crop}
+                      </Text>
                       <Text
                         style={[
                           styles.recentResult,

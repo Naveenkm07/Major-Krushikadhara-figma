@@ -1,31 +1,56 @@
 import { useEffect, useRef } from "react"
-import { View, Text, StyleSheet, Animated } from "react-native"
+import { View, Text, StyleSheet, Animated, Easing } from "react-native"
 import Svg, { Path, G } from "react-native-svg"
 import { useLang } from "../i18n"
+import { FadeSlideIn, PulseDotWave, PulseHalo } from "./Motion"
 
 export default function SplashScreen() {
   const { t } = useLang()
-  const scaleAnim = useRef(new Animated.Value(0.8)).current
+  const scaleAnim = useRef(new Animated.Value(0.75)).current
   const opacityAnim = useRef(new Animated.Value(0)).current
+  const floatAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1,
         friction: 6,
-        tension: 40,
+        tension: 44,
         useNativeDriver: true,
       }),
       Animated.timing(opacityAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start()
+
+    const floatLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -5,
+          duration: 1100,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 1100,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    )
+    floatLoop.start()
+    return () => floatLoop.stop()
   }, [])
 
   return (
     <View style={styles.container}>
+      <View style={styles.topGlow} />
+      <View style={styles.bottomGlow} />
+
       <Animated.View
         style={[
           styles.content,
@@ -35,26 +60,35 @@ export default function SplashScreen() {
           },
         ]}
       >
-        {/* Logo badge */}
-        <View style={styles.logoBadge}>
-          <WheatMark size={64} />
+        {/* Logo badge with subtle radar pulse */}
+        <View style={styles.badgeStage}>
+          <PulseHalo size={136} color="rgba(246, 239, 216, 0.45)" active delay={0} />
+          <Animated.View
+            style={[
+              styles.logoBadge,
+              { transform: [{ translateY: floatAnim }] },
+            ]}
+          >
+            <WheatMark size={64} />
+          </Animated.View>
         </View>
 
-        {/* Wordmark */}
-        <Text style={styles.title}>KrushikaDhara</Text>
+        <FadeSlideIn delay={150} distance={12}>
+          <Text style={styles.title}>KrushikaDhara</Text>
+        </FadeSlideIn>
 
-        {/* Kannada */}
-        <Text style={styles.kannadaTitle}>ಕೃಷಿಕಧಾರಾ</Text>
+        <FadeSlideIn delay={230} distance={10}>
+          <Text style={styles.kannadaTitle}>ಕೃಷಿಕಧಾರಾ</Text>
+        </FadeSlideIn>
 
-        {/* Tagline */}
-        <Text style={styles.tagline}>{t.x.info.splash.tagline}</Text>
+        <FadeSlideIn delay={310} distance={10}>
+          <Text style={styles.tagline}>{t.x.info.splash.tagline}</Text>
+        </FadeSlideIn>
       </Animated.View>
 
-      {/* Loading indicator dots */}
+      {/* Animated loading dots */}
       <View style={styles.dotsContainer}>
-        {[0, 1, 2].map((i) => (
-          <View key={i} style={styles.dot} />
-        ))}
+        <PulseDotWave color="#f6efd8" size={9} gap={9} />
       </View>
     </View>
   )
@@ -97,15 +131,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 32,
+    overflow: "hidden",
+  },
+  topGlow: {
+    position: "absolute",
+    top: -90,
+    right: -60,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: "rgba(124, 193, 66, 0.14)",
+  },
+  bottomGlow: {
+    position: "absolute",
+    bottom: -110,
+    left: -70,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "rgba(244, 180, 0, 0.08)",
   },
   content: {
     alignItems: "center",
   },
+  badgeStage: {
+    width: 140,
+    height: 140,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   logoBadge: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    width: 126,
+    height: 126,
+    borderRadius: 63,
+    backgroundColor: "rgba(255, 255, 255, 0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.28)",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -115,7 +176,7 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   title: {
-    marginTop: 28,
+    marginTop: 24,
     fontSize: 34,
     fontWeight: "bold",
     letterSpacing: -0.5,
@@ -125,27 +186,17 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 28,
     fontWeight: "bold",
-    color: "#ffffff",
+    color: "#fef08a",
   },
   tagline: {
     marginTop: 14,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "500",
-    color: "rgba(246, 239, 216, 0.9)",
+    color: "rgba(246, 239, 216, 0.92)",
     textAlign: "center",
   },
   dotsContainer: {
     position: "absolute",
     bottom: 50,
-    flexDirection: "row",
-    gap: 8,
-  },
-  dot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: "#f6efd8",
-    opacity: 0.8,
   },
 })
-

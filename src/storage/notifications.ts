@@ -45,7 +45,7 @@ function buildInitialNotifications(
       agoEn: "5h ago",
       agoKn: "5 ಗಂಟೆ ಹಿಂದೆ",
       read: false,
-      route: "scan",
+      route: "scanHistory",
     },
     {
       id: "notif_irrigation",
@@ -57,7 +57,7 @@ function buildInitialNotifications(
       agoEn: "8h ago",
       agoKn: "8 ಗಂಟೆ ಹಿಂದೆ",
       read: false,
-      route: "cropCalendar",
+      route: "calendar",
     },
     {
       id: "notif_market",

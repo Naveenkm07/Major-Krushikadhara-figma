@@ -1,30 +1,80 @@
 {
   "expo": {
-    "name": "Krushikadhara",
+    "name": "KrushikaDhara",
     "slug": "krushikadhara",
+    "scheme": "krushikadhara",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "backgroundColor": "#15803d"
-    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.krushikadhara.app"
     },
     "android": {
+      "package": "com.krushikadhara.app",
+      "versionCode": 1,
+      "predictiveBackGestureEnabled": false,
       "adaptiveIcon": {
-        "backgroundColor": "#15803d",
-        "foregroundImage": "./assets/icon.png"
+        "backgroundColor": "#165922",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.krushikadhara.app"
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-audio",
-      "expo-web-browser"
-    ]
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#165922"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow KrushikaDhara to access your microphone so you can ask farming questions by voice in Kannada or English.",
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow KrushikaDhara to select crop leaf photos from your gallery for AI pest and disease diagnosis.",
+          "cameraPermission": "Allow KrushikaDhara to use your camera to scan crop leaves for AI pest and disease diagnosis."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow KrushikaDhara to use your location to discover APMC Mandis within 50 km, hyperlocal weather advisories, and nearby rental machinery.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ],
+      "expo-web-browser",
+      "expo-asset",
+      "expo-status-bar"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "111f09b8-55e3-444b-b84b-3cb19eded525"
+      }
+    },
+    "owner": "naveenkm07"
   }
 }

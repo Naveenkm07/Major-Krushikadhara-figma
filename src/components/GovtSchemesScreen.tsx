@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLang } from "../i18n"
 import { useNav } from "../nav"
 import { useProfile } from "../profile"
+import { FadeSlideIn } from "./Motion"
 import {
   getCachedSchemes,
   openOfficialPortalUrl,
@@ -23,6 +24,7 @@ import {
 import {
   Search,
   Landmark,
+  ChevronLeft,
   ChevronRight,
   Bookmark,
   Sprout,
@@ -68,11 +70,12 @@ function renderSchemeIcon(iconName: EnrichedScheme["iconName"]) {
 
 export default function GovtSchemesScreen() {
   const { t, lang } = useLang()
-  const { open } = useNav()
+  const { current, open, back } = useNav()
   const { profile } = useProfile()
   const insets = useSafeAreaInsets()
   const isKn = lang === "kn"
   const x = t.x.coreB.schemes
+  const isOverlay = current?.name === "schemes"
 
   const [schemes, setSchemes] = useState<EnrichedScheme[]>(() => getCachedSchemes())
   const [query, setQuery] = useState("")
@@ -175,7 +178,7 @@ export default function GovtSchemesScreen() {
   ]
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isOverlay && styles.overlayContainer]}>
       {/* Header */}
       <View
         style={[
@@ -187,6 +190,16 @@ export default function GovtSchemesScreen() {
       >
         <View style={styles.headerTopRow}>
           <View style={styles.headerTitleRow}>
+            {isOverlay ? (
+              <TouchableOpacity
+                onPress={back}
+                style={styles.backBtn}
+                accessibilityLabel={t.x.coreA.common.back || "Back"}
+                activeOpacity={0.7}
+              >
+                <ChevronLeft size={20} color="#ffffff" />
+              </TouchableOpacity>
+            ) : null}
             <Landmark size={24} color="#ffffff" />
             <Text style={styles.headerTitle}>
               {isKn ? "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು" : "Government Schemes"}
@@ -306,7 +319,7 @@ export default function GovtSchemesScreen() {
           </View>
         ) : (
           <View style={styles.schemesList}>
-            {filtered.map((s) => {
+            {filtered.map((s, idx) => {
               const Icon = renderSchemeIcon(s.iconName)
               const isSaved = s.progress.bookmarked
               const checkedCount = s.progress.checkedDocs.length
@@ -314,7 +327,8 @@ export default function GovtSchemesScreen() {
               const status = s.progress.status
 
               return (
-                <View key={s.id} style={styles.schemeCard}>
+                <FadeSlideIn key={s.id} delay={Math.min(idx * 45, 220)}>
+                <View style={styles.schemeCard}>
                   <View style={styles.cardTop}>
                     <TouchableOpacity
                       onPress={() => open("schemeDetail", { id: s.id, scheme: s })}
@@ -470,6 +484,7 @@ export default function GovtSchemesScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
+                </FadeSlideIn>
               )
             })}
           </View>
@@ -483,6 +498,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f7f8ec",
+  },
+  overlayContainer: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+  },
+  backBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 2,
   },
   header: {
     backgroundColor: "#256428",

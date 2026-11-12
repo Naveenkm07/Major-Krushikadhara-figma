@@ -12,6 +12,7 @@ import {
 } from "react-native"
 import {
   useAudioRecorder,
+  createAudioPlayer,
   RecordingPresets,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
@@ -20,9 +21,9 @@ import { useLang } from "../i18n"
 import { useProfile } from "../profile"
 import { useNav } from "../nav"
 import DetailShell from "./DetailShell"
+import { FadeSlideIn, PulseHalo, ScalePressable, WaveformBars } from "./Motion"
 import {
   Mic,
-  MicOff,
   Volume2,
   Sparkles,
   Send,
@@ -36,7 +37,11 @@ import {
   submitTextObservation,
   type ActiveCropStageResponse,
 } from "../api/cropStage"
-import { streamAgriChat, streamVoiceAudio } from "../api/aiAdvisor"
+import {
+  streamAgriChat,
+  streamVoiceAudio,
+  synthesizeSpeechAudio,
+} from "../api/aiAdvisor"
 
 type ChatEntry = {
   role: "user" | "assistant"
@@ -59,10 +64,104 @@ export default function VoiceAssistantScreen() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [voiceStatusText, setVoiceStatusText] = useState<string | null>(null)
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null)
+  const [loadingAudioIdx, setLoadingAudioIdx] = useState<number | null>(null)
 
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
   const mediaRecorderRef = useRef<any>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const nativePlayerRef = useRef<any>(null)
+  const webAudioRef = useRef<any>(null)
+
+  const stopSpeechPlayback = () => {
+    try {
+      if (nativePlayerRef.current) {
+        nativePlayerRef.current.pause?.()
+        nativePlayerRef.current.remove?.()
+        nativePlayerRef.current = null
+      }
+    } catch {}
+    try {
+      if (webAudioRef.current) {
+        webAudioRef.current.pause?.()
+        webAudioRef.current = null
+      }
+      if (Platform.OS === "web" && typeof window !== "undefined" && (window as any).speechSynthesis) {
+        ;(window as any).speechSynthesis.cancel()
+      }
+    } catch {}
+    setSpeakingIdx(null)
+    setLoadingAudioIdx(null)
+  }
+
+  useEffect(() => {
+    return () => {
+      stopSpeechPlayback()
+    }
+  }, [])
+
+  const handleSpeakToggle = async (idx: number, text: string) => {
+    if (!text.trim()) return
+    if (speakingIdx === idx || loadingAudioIdx === idx) {
+      stopSpeechPlayback()
+      return
+    }
+    stopSpeechPlayback()
+    setLoadingAudioIdx(idx)
+
+    const langCode = isKn ? "kn-IN" : "en-IN"
+    const res = await synthesizeSpeechAudio(text, langCode)
+    setLoadingAudioIdx(null)
+
+    if (res.ok && res.dataUri) {
+      if (Platform.OS === "web" && typeof Audio !== "undefined") {
+        try {
+          const audio = new Audio(res.dataUri)
+          webAudioRef.current = audio
+          setSpeakingIdx(idx)
+          audio.onended = () => setSpeakingIdx(null)
+          audio.onerror = () => setSpeakingIdx(null)
+          await audio.play()
+          return
+        } catch {}
+      } else {
+        try {
+          await setAudioModeAsync({
+            allowsRecording: false,
+            playsInSilentMode: true,
+          }).catch(() => {})
+          const player = createAudioPlayer(res.dataUri)
+          nativePlayerRef.current = player
+          setSpeakingIdx(idx)
+          player.addListener?.("playbackStatusUpdate", (st: any) => {
+            if (st?.didJustFinish) {
+              setSpeakingIdx(null)
+            }
+          })
+          player.play()
+          return
+        } catch {}
+      }
+    }
+
+    if (Platform.OS === "web" && typeof window !== "undefined" && (window as any).speechSynthesis) {
+      try {
+        const utter = new (window as any).SpeechSynthesisUtterance(text.slice(0, 480))
+        utter.lang = langCode
+        setSpeakingIdx(idx)
+        utter.onend = () => setSpeakingIdx(null)
+        utter.onerror = () => setSpeakingIdx(null)
+        ;(window as any).speechSynthesis.speak(utter)
+        return
+      } catch {}
+    }
+
+    setSpeakingIdx(null)
+    Alert.alert(
+      isKn ? "ಧ್ವನಿ ಪ್ಲೇಬ್ಯಾಕ್" : "Audio Unavailable",
+      res.error || (isKn ? "ಈ ಸಂದೇಶವನ್ನು ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ." : "Could not play audio for this message.")
+    )
+  }
 
   const [chat, setChat] = useState<ChatEntry[]>([
     {
@@ -81,17 +180,17 @@ export default function VoiceAssistantScreen() {
       .finally(() => setLoadingStage(false))
   }, [profile.mobile])
 
-  // Auto-submit pre-populated scan follow-up query when opened from ScanResultScreen
+  // Auto-submit pre-populated scan follow-up query when opened from ScanResultScreen (wait until active crop stage finishes loading)
   useEffect(() => {
     const initialPrompt = typeof params?.initialPrompt === "string" ? params.initialPrompt.trim() : ""
-    if (initialPrompt && !seededPromptSentRef.current) {
+    if (initialPrompt && !loadingStage && !seededPromptSentRef.current) {
       seededPromptSentRef.current = true
       const timer = setTimeout(() => {
         void handleSendText(initialPrompt)
-      }, 250)
+      }, 150)
       return () => clearTimeout(timer)
     }
-  }, [params?.initialPrompt])
+  }, [params?.initialPrompt, loadingStage])
 
   const crop = stageData?.cropField
   const stageName = isKn ? crop?.currentStageNameKn : crop?.currentStageNameEn
@@ -126,7 +225,6 @@ export default function VoiceAssistantScreen() {
     setIsProcessing(true)
 
     // Placeholder for progressive streamed response
-    const assistantIndex = chat.length + 1
     const initialAssistantMsg: ChatEntry = {
       role: "assistant",
       text: "",
@@ -416,7 +514,7 @@ export default function VoiceAssistantScreen() {
 
   return (
     <DetailShell
-      title={isKn ? "ಧ್ವನಿ ಕೃಷಿ ಸಹಾಯಕ " : "AI Voice Agronomist "}
+      title={isKn ? "ಧ್ವನಿ ಕೃಷಿ ಸಹಾಯಕ" : "AI Voice Agronomist"}
       subtitle={
         isKn
           ? "ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ ಅಥವಾ ಟೈಪ್ ಮಾಡಿ ಸಲಹೆ ಪಡೆಯಿರಿ"
@@ -500,10 +598,21 @@ export default function VoiceAssistantScreen() {
                   <Text style={[styles.timeText, isUser ? styles.userTimeText : styles.assistantTimeText]}>
                     {msg.timestamp}
                   </Text>
-                  {!isUser && (
-                    <View style={styles.audioIconBtn}>
-                      <Volume2 size={13} color="#15803d" />
-                    </View>
+                  {!isUser && Boolean(msg.text.trim()) && (
+                    <TouchableOpacity
+                      onPress={() => handleSpeakToggle(idx, msg.text)}
+                      accessibilityLabel={isKn ? "ಸಂದೇಶವನ್ನು ಕೇಳಿ" : "Listen to response"}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={styles.audioIconBtn}
+                    >
+                      {loadingAudioIdx === idx ? (
+                        <ActivityIndicator size={12} color="#15803d" />
+                      ) : speakingIdx === idx ? (
+                        <WaveformBars active color="#dc2626" barCount={4} maxHeight={13} />
+                      ) : (
+                        <Volume2 size={14} color="#15803d" />
+                      )}
+                    </TouchableOpacity>
                   )}
                 </View>
               </View>
@@ -548,25 +657,31 @@ export default function VoiceAssistantScreen() {
           )}
         </View>
 
-        <TouchableOpacity
-          onPress={handleMicToggle}
-          activeOpacity={0.8}
-          style={[styles.micBtn, isListening && styles.micBtnActive]}
-        >
-          {isListening ? (
-            <MicOff size={24} color="#ffffff" />
-          ) : (
-            <Mic size={24} color="#ffffff" />
-          )}
-        </TouchableOpacity>
+        <View style={styles.micStage}>
+          <PulseHalo size={54} color="#ef4444" active={isListening} delay={0} />
+          <ScalePressable
+            onPress={handleMicToggle}
+            scaleTo={0.9}
+            style={[styles.micBtn, isListening && styles.micBtnActive]}
+          >
+            {isListening ? (
+              <WaveformBars active color="#ffffff" barCount={5} maxHeight={20} />
+            ) : (
+              <Mic size={24} color="#ffffff" />
+            )}
+          </ScalePressable>
+        </View>
       </View>
 
       {isListening && (
-        <View style={styles.listeningNotice}>
-          <Text style={styles.listeningText}>
-            🎙️ {voiceStatusText || (isKn ? "ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ... (ಸರ್ವಮ್ STT ಕೇಳುತ್ತಿದೆ)" : "Listening in Kannada/English (Sarvam STT)...")}
-          </Text>
-        </View>
+        <FadeSlideIn delay={20}>
+          <View style={styles.listeningNotice}>
+            <WaveformBars active color="#dc2626" barCount={7} maxHeight={16} />
+            <Text style={styles.listeningText}>
+              {voiceStatusText || (isKn ? "ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ... (ಸರ್ವಮ್ STT ಕೇಳುತ್ತಿದೆ)" : "Listening in Kannada/English (Sarvam STT)...")}
+            </Text>
+          </View>
+        </FadeSlideIn>
       )}
 
       {voiceStatusText && !isListening && (
@@ -778,6 +893,12 @@ const styles = StyleSheet.create({
   sendIconBtn: {
     padding: 4,
   },
+  micStage: {
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   micBtn: {
     width: 48,
     height: 48,
@@ -795,6 +916,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#dc2626",
   },
   listeningNotice: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 10,
     backgroundColor: "#fee2e2",
     borderRadius: 12,
     padding: 10,

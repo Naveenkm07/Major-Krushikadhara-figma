@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react"
 import type { PestDetectionResult } from "../api/scan"
+import {
+  deleteSavedTipOnBackend,
+  fetchSavedTipsFromBackend,
+  upsertSavedTipOnBackend,
+} from "../api/profile"
 
 export interface SavedTipItem {
   id: string
@@ -59,12 +64,32 @@ const DEFAULT_TIPS: SavedTipItem[] = [
   },
 ]
 
+let currentMobile = "9591502209"
 let savedTipsStore: SavedTipItem[] = [...DEFAULT_TIPS]
 const listeners = new Set<(items: SavedTipItem[]) => void>()
 
 function emit() {
   const snapshot = [...savedTipsStore]
   listeners.forEach((cb) => cb(snapshot))
+}
+
+export async function syncSavedTipsFromBackend(mobile: string): Promise<SavedTipItem[]> {
+  if (mobile) currentMobile = mobile
+  const remote = await fetchSavedTipsFromBackend(currentMobile)
+  if (remote) {
+    savedTipsStore = remote.map((r) => ({
+      id: r.tipKey || r.id,
+      categoryEn: r.categoryEn,
+      categoryKn: r.categoryKn,
+      titleEn: r.titleEn,
+      titleKn: r.titleKn,
+      bodyEn: r.bodyEn,
+      bodyKn: r.bodyKn,
+      isUserSaved: r.isUserSaved,
+    }))
+    emit()
+  }
+  return savedTipsStore
 }
 
 export function isScanBookmarked(pestOrCropKey: string): boolean {
@@ -74,8 +99,10 @@ export function isScanBookmarked(pestOrCropKey: string): boolean {
 
 export function toggleBookmarkScanResult(
   diagnosis: PestDetectionResult,
-  cropName: string
+  cropName: string,
+  mobileOverride?: string
 ): boolean {
+  const mobile = mobileOverride || currentMobile
   const label = diagnosis.healthy
     ? `${cropName} Healthy Check`
     : diagnosis.pest_name || `${cropName} Diagnosis`
@@ -85,6 +112,7 @@ export function toggleBookmarkScanResult(
   if (exists) {
     savedTipsStore = savedTipsStore.filter((item) => item.id !== id)
     emit()
+    deleteSavedTipOnBackend(mobile, id).catch(() => {})
     return false
   }
 
@@ -126,12 +154,48 @@ export function toggleBookmarkScanResult(
 
   savedTipsStore = [newTip, ...savedTipsStore]
   emit()
+  upsertSavedTipOnBackend(mobile, {
+    ...newTip,
+    isUserSaved: true,
+  }).catch(() => {})
   return true
 }
 
-export function removeSavedTip(id: string) {
+export function addCustomSavedTip(
+  input: {
+    title: string
+    body: string
+    categoryEn?: string
+    categoryKn?: string
+  },
+  mobileOverride?: string
+): SavedTipItem {
+  const mobile = mobileOverride || currentMobile
+  const id = `custom_tip_${Date.now()}`
+  const item: SavedTipItem = {
+    id,
+    categoryEn: input.categoryEn || "Farm Note",
+    categoryKn: input.categoryKn || "ಜಮೀನು ಟಿಪ್ಪಣಿ",
+    titleEn: input.title.trim(),
+    titleKn: input.title.trim(),
+    bodyEn: input.body.trim(),
+    bodyKn: input.body.trim(),
+    isUserSaved: true,
+  }
+  savedTipsStore = [item, ...savedTipsStore]
+  emit()
+  upsertSavedTipOnBackend(mobile, {
+    ...item,
+    isUserSaved: true,
+  }).catch(() => {})
+  return item
+}
+
+export function removeSavedTip(id: string, mobileOverride?: string) {
+  const mobile = mobileOverride || currentMobile
   savedTipsStore = savedTipsStore.filter((item) => item.id !== id)
   emit()
+  deleteSavedTipOnBackend(mobile, id).catch(() => {})
 }
 
 export function useSavedTips() {
@@ -148,8 +212,8 @@ export function useSavedTips() {
   return {
     tips,
     removeTip: removeSavedTip,
+    addCustomTip: addCustomSavedTip,
     toggleBookmarkScanResult,
     isScanBookmarked,
   }
 }
-

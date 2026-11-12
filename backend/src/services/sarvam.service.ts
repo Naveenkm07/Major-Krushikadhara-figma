@@ -160,3 +160,72 @@ function getMimeType(filename: string): string {
       return "application/octet-stream"
   }
 }
+
+export interface SarvamTtsResult {
+  success: boolean
+  audioBase64?: string
+  mimeType?: string
+  error?: string
+}
+
+/**
+ * Synthesizes Kannada or English speech via Sarvam AI Bulbul v3 TTS.
+ */
+export async function synthesizeSpeechWithSarvam(
+  text: string,
+  languageCode: string = "kn-IN"
+): Promise<SarvamTtsResult> {
+  const apiKey = process.env.SARVAM_API_KEY
+  if (!apiKey) {
+    return { success: false, error: "SARVAM_API_KEY not configured" }
+  }
+
+  const cleanText = String(text || "")
+    .replace(/[*_`#>]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 480)
+  if (!cleanText) {
+    return { success: false, error: "Text is empty" }
+  }
+
+  const targetLang = languageCode.toLowerCase().startsWith("en") ? "en-IN" : "kn-IN"
+
+  try {
+    const res = await fetch("https://api.sarvam.ai/text-to-speech", {
+      method: "POST",
+      headers: {
+        "api-subscription-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: cleanText,
+        target_language_code: targetLang,
+        model: "bulbul:v3",
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "")
+      return { success: false, error: `Sarvam TTS HTTP ${res.status}: ${errText.slice(0, 140)}` }
+    }
+
+    const json = (await res.json()) as { audios?: string[] }
+    const audioBase64 = Array.isArray(json.audios) ? json.audios[0] : undefined
+    if (!audioBase64) {
+      return { success: false, error: "No audio returned by Sarvam TTS" }
+    }
+
+    return {
+      success: true,
+      audioBase64,
+      mimeType: "audio/wav",
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || "Sarvam TTS request failed",
+    }
+  }
+}

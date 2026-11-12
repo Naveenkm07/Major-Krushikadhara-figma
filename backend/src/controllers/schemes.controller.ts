@@ -4,6 +4,13 @@ import {
   SCHEMES_CATALOG,
   type SchemeCatalogItem,
 } from "../data/schemesCatalog.js"
+import {
+  getFallbackSchemeProgress,
+  getFallbackSchemeProgressMap,
+  getOrCreateFallbackFarmer,
+  setFallbackSchemeProgress,
+  upsertFallbackSchemeProgress,
+} from "../services/farmerFallback.service.js"
 
 export type SchemeApplicationStatus =
   | "NOT_APPLIED"
@@ -152,6 +159,11 @@ function evaluateEligibility(
   }
 }
 
+function normalizeSchemeMobile(raw: unknown, fallback: string = ""): string {
+  const digits = String(raw || "").replace(/\D/g, "")
+  return digits.length >= 10 ? digits.slice(-10) : fallback
+}
+
 async function ensureFarmerByMobile(params: {
   mobile: string
   name?: string
@@ -159,7 +171,7 @@ async function ensureFarmerByMobile(params: {
   district?: string
   farmSize?: unknown
 }) {
-  const cleanMobile = params.mobile.trim()
+  const cleanMobile = normalizeSchemeMobile(params.mobile, params.mobile.trim())
   let farmer = await prisma.farmer.findUnique({ where: { mobile: cleanMobile } })
   if (!farmer) {
     const parsedSize = parseFarmAcres(params.farmSize)
@@ -182,7 +194,7 @@ async function ensureFarmerByMobile(params: {
  */
 export async function listSchemes(req: Request, res: Response) {
   try {
-    const mobile = typeof req.query.mobile === "string" ? req.query.mobile.trim() : ""
+    const mobile = normalizeSchemeMobile(req.query.mobile)
     const category = typeof req.query.category === "string" ? req.query.category.trim().toLowerCase() : "all"
     const level = typeof req.query.level === "string" ? req.query.level.trim().toLowerCase() : "all"
     const search = typeof req.query.search === "string" ? req.query.search.trim().toLowerCase() : ""
@@ -207,11 +219,42 @@ export async function listSchemes(req: Request, res: Response) {
           dbState = farmer.state
           dbFarmSize = farmer.farmSize
           for (const row of farmer.schemeProgress) {
-            progressByScheme.set(row.schemeId, formatProgress(row))
+            const formatted = formatProgress(row)
+            progressByScheme.set(row.schemeId, formatted)
+            setFallbackSchemeProgress(mobile, row.schemeId, formatted)
           }
+        } else {
+          const fb = getOrCreateFallbackFarmer(mobile)
+          dbState = fb.state
+          dbFarmSize = fb.farmSize
+          const fbMap = getFallbackSchemeProgressMap(mobile)
+          fbMap.forEach((p, sId) =>
+            progressByScheme.set(sId, {
+              bookmarked: Boolean(p.bookmarked),
+              status: normalizeStatus(p.status),
+              checkedDocs: normalizeCheckedDocs(p.checkedDocs),
+              appliedAt: p.appliedAt || null,
+              notes: p.notes ?? null,
+              updatedAt: p.updatedAt || null,
+            })
+          )
         }
       } catch (dbErr: any) {
-        console.warn("⚠️ [Schemes DB Read Warning]:", dbErr?.message || dbErr)
+        console.warn("⚠️ [Schemes DB Read Fallback]:", dbErr?.message || dbErr)
+        const fb = getOrCreateFallbackFarmer(mobile)
+        dbState = fb.state
+        dbFarmSize = fb.farmSize
+        const fbMap = getFallbackSchemeProgressMap(mobile)
+        fbMap.forEach((p, sId) =>
+          progressByScheme.set(sId, {
+            bookmarked: Boolean(p.bookmarked),
+            status: normalizeStatus(p.status),
+            checkedDocs: normalizeCheckedDocs(p.checkedDocs),
+            appliedAt: p.appliedAt || null,
+            notes: p.notes ?? null,
+            updatedAt: p.updatedAt || null,
+          })
+        )
       }
     }
 
@@ -301,7 +344,7 @@ export async function getSchemeById(req: Request, res: Response) {
       })
     }
 
-    const mobile = typeof req.query.mobile === "string" ? req.query.mobile.trim() : ""
+    const mobile = normalizeSchemeMobile(req.query.mobile)
     const stateParam = typeof req.query.state === "string" ? req.query.state.trim() : ""
     const farmSizeParam = parseFarmAcres(req.query.farmSize)
 
@@ -331,9 +374,39 @@ export async function getSchemeById(req: Request, res: Response) {
             "getSchemeById.findProgress"
           )
           progress = formatProgress(row)
+          setFallbackSchemeProgress(mobile, id, progress)
+        } else {
+          const fb = getOrCreateFallbackFarmer(mobile)
+          dbState = fb.state
+          dbFarmSize = fb.farmSize
+          const fbProg = getFallbackSchemeProgress(mobile, id)
+          if (fbProg) {
+            progress = {
+              bookmarked: Boolean(fbProg.bookmarked),
+              status: normalizeStatus(fbProg.status),
+              checkedDocs: normalizeCheckedDocs(fbProg.checkedDocs),
+              appliedAt: fbProg.appliedAt || null,
+              notes: fbProg.notes ?? null,
+              updatedAt: fbProg.updatedAt || null,
+            }
+          }
         }
       } catch (dbErr: any) {
-        console.warn("⚠️ [Scheme Detail DB Read Warning]:", dbErr?.message || dbErr)
+        console.warn("⚠️ [Scheme Detail DB Read Fallback]:", dbErr?.message || dbErr)
+        const fb = getOrCreateFallbackFarmer(mobile)
+        dbState = fb.state
+        dbFarmSize = fb.farmSize
+        const fbProg = getFallbackSchemeProgress(mobile, id)
+        if (fbProg) {
+          progress = {
+            bookmarked: Boolean(fbProg.bookmarked),
+            status: normalizeStatus(fbProg.status),
+            checkedDocs: normalizeCheckedDocs(fbProg.checkedDocs),
+            appliedAt: fbProg.appliedAt || null,
+            notes: fbProg.notes ?? null,
+            updatedAt: fbProg.updatedAt || null,
+          }
+        }
       }
     }
 
@@ -362,23 +435,23 @@ export async function getSchemeById(req: Request, res: Response) {
 
 /**
  * POST /api/schemes/:id/bookmark
- * Toggles or sets bookmark status for a farmer + scheme in Neon PostgreSQL.
+ * Toggles or sets bookmark status for a farmer + scheme in Neon PostgreSQL or resilient local store.
  */
 export async function toggleSchemeBookmark(req: Request, res: Response) {
+  const id = String(req.params.id || "").trim()
+  const scheme = SCHEMES_CATALOG.find((s) => s.id === id)
+  if (!scheme) {
+    return res.status(404).json({
+      success: false,
+      message: `Scheme '${id}' not found.`,
+    })
+  }
+
+  const mobile = normalizeSchemeMobile(req.body?.mobile || req.query?.mobile, "9591502209")
+  const explicitBookmarked =
+    typeof req.body?.bookmarked === "boolean" ? req.body.bookmarked : undefined
+
   try {
-    const id = String(req.params.id || "").trim()
-    const scheme = SCHEMES_CATALOG.find((s) => s.id === id)
-    if (!scheme) {
-      return res.status(404).json({
-        success: false,
-        message: `Scheme '${id}' not found.`,
-      })
-    }
-
-    const mobile = String(req.body?.mobile || req.query?.mobile || "9591502209").trim()
-    const explicitBookmarked =
-      typeof req.body?.bookmarked === "boolean" ? req.body.bookmarked : undefined
-
     const savedRow = await withDbRetry(async () => {
       const farmer = await ensureFarmerByMobile({
         mobile,
@@ -422,16 +495,32 @@ export async function toggleSchemeBookmark(req: Request, res: Response) {
       })
     }, "toggleSchemeBookmark")
 
+    const progress = formatProgress(savedRow)
+    setFallbackSchemeProgress(mobile, id, progress)
     return res.json({
       success: true,
       schemeId: id,
-      progress: formatProgress(savedRow),
+      progress,
     })
   } catch (error: any) {
-    console.error("❌ [Bookmark Scheme Error]:", error)
-    return res.status(500).json({
-      success: false,
-      message: error?.message || "Failed to update scheme bookmark",
+    console.warn("⚠️ [Bookmark Scheme Fallback]:", error?.message || error)
+    const saved = upsertFallbackSchemeProgress(mobile, id, (prev) => ({
+      ...prev,
+      bookmarked:
+        explicitBookmarked !== undefined ? explicitBookmarked : !prev.bookmarked,
+    }))
+    return res.json({
+      success: true,
+      source: "Resilient Local Store",
+      schemeId: id,
+      progress: {
+        bookmarked: Boolean(saved.bookmarked),
+        status: normalizeStatus(saved.status),
+        checkedDocs: normalizeCheckedDocs(saved.checkedDocs),
+        appliedAt: saved.appliedAt,
+        notes: saved.notes,
+        updatedAt: saved.updatedAt,
+      },
     })
   }
 }
@@ -441,37 +530,37 @@ export async function toggleSchemeBookmark(req: Request, res: Response) {
  * Persists checked documents, application status, and notes for a farmer + scheme.
  */
 export async function updateSchemeProgress(req: Request, res: Response) {
+  const id = String(req.params.id || "").trim()
+  const scheme = SCHEMES_CATALOG.find((s) => s.id === id)
+  if (!scheme) {
+    return res.status(404).json({
+      success: false,
+      message: `Scheme '${id}' not found.`,
+    })
+  }
+
+  const mobile = normalizeSchemeMobile(req.body?.mobile || req.query?.mobile, "9591502209")
+  const hasStatus = typeof req.body?.status === "string"
+  const requestedStatus = hasStatus ? normalizeStatus(req.body.status) : undefined
+  if (hasStatus && !VALID_STATUSES.has(req.body.status as SchemeApplicationStatus)) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid status '${req.body.status}'. Allowed: NOT_APPLIED, CHECKLIST_READY, APPLIED, APPROVED.`,
+    })
+  }
+
+  const hasCheckedDocs = Array.isArray(req.body?.checkedDocs)
+  const allowedDocKeys = new Set(scheme.documents.map((d) => d.key))
+  const sanitizedDocs = hasCheckedDocs
+    ? normalizeCheckedDocs(req.body.checkedDocs).filter(
+        (key) => allowedDocKeys.size === 0 || allowedDocKeys.has(key)
+      )
+    : undefined
+
+  const hasBookmarked = typeof req.body?.bookmarked === "boolean"
+  const hasNotes = typeof req.body?.notes === "string" || req.body?.notes === null
+
   try {
-    const id = String(req.params.id || "").trim()
-    const scheme = SCHEMES_CATALOG.find((s) => s.id === id)
-    if (!scheme) {
-      return res.status(404).json({
-        success: false,
-        message: `Scheme '${id}' not found.`,
-      })
-    }
-
-    const mobile = String(req.body?.mobile || req.query?.mobile || "9591502209").trim()
-    const hasStatus = typeof req.body?.status === "string"
-    const requestedStatus = hasStatus ? normalizeStatus(req.body.status) : undefined
-    if (hasStatus && !VALID_STATUSES.has(req.body.status as SchemeApplicationStatus)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid status '${req.body.status}'. Allowed: NOT_APPLIED, CHECKLIST_READY, APPLIED, APPROVED.`,
-      })
-    }
-
-    const hasCheckedDocs = Array.isArray(req.body?.checkedDocs)
-    const allowedDocKeys = new Set(scheme.documents.map((d) => d.key))
-    const sanitizedDocs = hasCheckedDocs
-      ? normalizeCheckedDocs(req.body.checkedDocs).filter(
-          (key) => allowedDocKeys.size === 0 || allowedDocKeys.has(key)
-        )
-      : undefined
-
-    const hasBookmarked = typeof req.body?.bookmarked === "boolean"
-    const hasNotes = typeof req.body?.notes === "string" || req.body?.notes === null
-
     const savedRow = await withDbRetry(async () => {
       const farmer = await ensureFarmerByMobile({
         mobile,
@@ -540,16 +629,61 @@ export async function updateSchemeProgress(req: Request, res: Response) {
       })
     }, "updateSchemeProgress")
 
+    const progress = formatProgress(savedRow)
+    setFallbackSchemeProgress(mobile, id, progress)
     return res.json({
       success: true,
       schemeId: id,
-      progress: formatProgress(savedRow),
+      progress,
     })
   } catch (error: any) {
-    console.error("❌ [Update Scheme Progress Error]:", error)
-    return res.status(500).json({
-      success: false,
-      message: error?.message || "Failed to save scheme progress",
+    console.warn("⚠️ [Update Scheme Progress Fallback]:", error?.message || error)
+    const saved = upsertFallbackSchemeProgress(mobile, id, (prev) => {
+      const nextCheckedDocs =
+        sanitizedDocs !== undefined
+          ? sanitizedDocs
+          : normalizeCheckedDocs(prev.checkedDocs)
+      const existingStatus = normalizeStatus(prev.status)
+      let nextStatus: SchemeApplicationStatus = requestedStatus ?? existingStatus
+
+      if (!hasStatus && sanitizedDocs !== undefined) {
+        if (existingStatus === "NOT_APPLIED" || existingStatus === "CHECKLIST_READY") {
+          nextStatus =
+            scheme.documents.length > 0 && nextCheckedDocs.length >= scheme.documents.length
+              ? "CHECKLIST_READY"
+              : "NOT_APPLIED"
+        }
+      }
+
+      let nextAppliedAt = prev.appliedAt ?? null
+      if (nextStatus === "APPLIED" || nextStatus === "APPROVED") {
+        nextAppliedAt = prev.appliedAt ?? new Date().toISOString()
+      } else if (hasStatus && (nextStatus === "NOT_APPLIED" || nextStatus === "CHECKLIST_READY")) {
+        nextAppliedAt = null
+      }
+
+      return {
+        bookmarked: hasBookmarked ? req.body.bookmarked : Boolean(prev.bookmarked),
+        status: nextStatus,
+        checkedDocs: nextCheckedDocs,
+        appliedAt: nextAppliedAt,
+        notes: hasNotes ? req.body.notes : prev.notes,
+        updatedAt: new Date().toISOString(),
+      }
+    })
+
+    return res.json({
+      success: true,
+      source: "Resilient Local Store",
+      schemeId: id,
+      progress: {
+        bookmarked: Boolean(saved.bookmarked),
+        status: normalizeStatus(saved.status),
+        checkedDocs: normalizeCheckedDocs(saved.checkedDocs),
+        appliedAt: saved.appliedAt,
+        notes: saved.notes,
+        updatedAt: saved.updatedAt,
+      },
     })
   }
 }

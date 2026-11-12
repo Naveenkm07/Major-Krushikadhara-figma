@@ -44,6 +44,7 @@ export default function ScanResultScreen() {
   const [tab, setTab] = useState<TabType>("treatment")
   const [showBoxes, setShowBoxes] = useState(true)
   const [imgLayout, setImgLayout] = useState({ width: 0, height: 0 })
+  const [imgNatSize, setImgNatSize] = useState({ width: 0, height: 0 })
   const [feedbackSent, setFeedbackSent] = useState<"up" | "down" | null>(null)
 
   const diagnosis: PestDetectionResult | undefined = params?.diagnosis
@@ -144,7 +145,7 @@ export default function ScanResultScreen() {
 
   function handleToggleSave() {
     if (!diagnosis) return
-    const nowSaved = toggleBookmarkScanResult(diagnosis, cropName)
+    const nowSaved = toggleBookmarkScanResult(diagnosis, cropName, profile.mobile)
     setSaved(nowSaved)
     Alert.alert(
       isKn ? "ಉಳಿಸಿದ ಸಲಹೆಗಳು" : "Saved Tips",
@@ -242,18 +243,40 @@ export default function ScanResultScreen() {
             }
           }}
         >
-          <Image source={{ uri: imageUri }} style={styles.leafImg} />
+          <Image
+            source={{ uri: imageUri }}
+            style={styles.leafImg}
+            onLoad={(e) => {
+              const src = e.nativeEvent?.source
+              if (src?.width && src?.height) {
+                setImgNatSize({ width: src.width, height: src.height })
+              }
+            }}
+          />
 
-          {/* Bounding boxes from YOLO11s */}
+          {/* Bounding boxes from YOLO11s aligned to rendered 'contain' image rect */}
           {showBoxes &&
             imgLayout.width > 0 &&
             imgLayout.height > 0 &&
             bboxDetections.map((det, idx) => {
+              const cw = imgLayout.width
+              const ch = imgLayout.height
+              let dispW = cw
+              let dispH = ch
+              let offX = 0
+              let offY = 0
+              if (imgNatSize.width > 0 && imgNatSize.height > 0) {
+                const scale = Math.min(cw / imgNatSize.width, ch / imgNatSize.height)
+                dispW = imgNatSize.width * scale
+                dispH = imgNatSize.height * scale
+                offX = (cw - dispW) / 2
+                offY = (ch - dispH) / 2
+              }
               const [x1, y1, x2, y2] = det.bbox!
-              const left = x1 * imgLayout.width
-              const top = y1 * imgLayout.height
-              const boxW = Math.max(24, (x2 - x1) * imgLayout.width)
-              const boxH = Math.max(24, (y2 - y1) * imgLayout.height)
+              const left = offX + x1 * dispW
+              const top = offY + y1 * dispH
+              const boxW = Math.max(24, (x2 - x1) * dispW)
+              const boxH = Math.max(24, (y2 - y1) * dispH)
               return (
                 <View
                   key={`${det.class_name}_${idx}`}
@@ -492,6 +515,16 @@ export default function ScanResultScreen() {
         {/* Tab Content */}
         {tab === "treatment" && (
           <View style={styles.sectionWrap}>
+            {organic.length === 0 && chemical.length === 0 && (
+              <View style={styles.remedyCard}>
+                <Text style={styles.listText}>
+                  {isKn
+                    ? "ಪ್ರಸ್ತುತ ಯಾವುದೇ ಹೆಚ್ಚುವರಿ ಚಿಕಿತ್ಸೆಯ ಅಗತ್ಯವಿಲ್ಲ. ನಿಯಮಿತ ನೀರಾವರಿ ಮತ್ತು ಸಮತೋಲಿತ ಪೋಷಕಾಂಶಗಳನ್ನು ಮುಂದುವರಿಸಿ."
+                    : "No special treatment required right now. Continue regular field monitoring and balanced irrigation."}
+                </Text>
+              </View>
+            )}
+
             {organic.length > 0 && (
               <View style={styles.remedyCard}>
                 <View style={styles.remedyHeader}>
@@ -544,12 +577,20 @@ export default function ScanResultScreen() {
               <Text style={[styles.remedyTitle, { marginBottom: 10 }]}>
                 {isKn ? "ಗುರುತಿಸಲಾದ ಲಕ್ಷಣಗಳು" : "Identified Symptoms & Signs"}
               </Text>
-              {symptoms.map((item, idx) => (
-                <View key={idx} style={styles.listItem}>
-                  <Text style={styles.bullet}>•</Text>
-                  <Text style={styles.listText}>{item}</Text>
-                </View>
-              ))}
+              {symptoms.length === 0 ? (
+                <Text style={styles.listText}>
+                  {isKn
+                    ? "ಎಲೆಗಳ ಮೇಲೆ ಗೋಚರ ರೋಗ ಅಥವಾ ಕೀಟ ಹಾನಿಯ ಲಕ್ಷಣಗಳು ಕಂಡುಬಂದಿಲ್ಲ."
+                    : "No active pest damage or lesion symptoms were flagged on this sample."}
+                </Text>
+              ) : (
+                symptoms.map((item, idx) => (
+                  <View key={idx} style={styles.listItem}>
+                    <Text style={styles.bullet}>•</Text>
+                    <Text style={styles.listText}>{item}</Text>
+                  </View>
+                ))
+              )}
             </View>
           </View>
         )}
@@ -560,12 +601,20 @@ export default function ScanResultScreen() {
               <Text style={[styles.remedyTitle, { marginBottom: 10 }]}>
                 {isKn ? "ದೀರ್ಘಕಾಲೀನ ತಡೆಗಟ್ಟುವಿಕೆ" : "Long-term Prevention Guidelines"}
               </Text>
-              {prevention.map((item, idx) => (
-                <View key={idx} style={styles.listItem}>
-                  <Text style={styles.bullet}>✓</Text>
-                  <Text style={styles.listText}>{item}</Text>
-                </View>
-              ))}
+              {prevention.length === 0 ? (
+                <Text style={styles.listText}>
+                  {isKn
+                    ? "ಬೆಳೆ ಪರಿವರ್ತನೆ, ಶುದ್ಧ ಬೀಜಗಳ ಬಳಕೆ ಮತ್ತು ಹೊಲದ ನೈರ್ಮಲ್ಯವನ್ನು ಕಾಪಾಡಿಕೊಳ್ಳಿ."
+                    : "Maintain clean field bunds, practice seasonal crop rotation, and inspect leaves weekly."}
+                </Text>
+              ) : (
+                prevention.map((item, idx) => (
+                  <View key={idx} style={styles.listItem}>
+                    <Text style={styles.bullet}>✓</Text>
+                    <Text style={styles.listText}>{item}</Text>
+                  </View>
+                ))
+              )}
             </View>
           </View>
         )}
@@ -668,13 +717,13 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     overflow: "hidden",
     position: "relative",
-    backgroundColor: "#e5e7eb",
+    backgroundColor: "#0f172a",
     marginBottom: 14,
   },
   leafImg: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
+    resizeMode: "contain",
   },
   bboxRect: {
     position: "absolute",
