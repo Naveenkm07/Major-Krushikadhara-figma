@@ -11,7 +11,9 @@ import {
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Sprout, Phone, Check, ArrowLeft, ShieldCheck } from "lucide-react-native"
-import { useLang } from "../i18n"
+import { useLang, fmt } from "../i18n"
+import { useProfile } from "../profile"
+import { syncScanHistoryFromBackend } from "../storage/scanHistory"
 import {
   DEV_TEST_PHONE,
   DEV_TEST_OTP,
@@ -22,8 +24,10 @@ import {
 } from "../auth"
 
 export default function AuthScreen({ onDone }: { onDone: () => void }) {
-  const { t } = useLang()
+  const { t, lang } = useLang()
+  const { updateProfile, refreshProfile } = useProfile()
   const L = t.x.login
+  const isKn = lang === "kn"
   const insets = useSafeAreaInsets()
 
   const [step, setStep] = useState<"phone" | "otp">("phone")
@@ -82,6 +86,9 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
     try {
       const ok = await verifyOtp(phone, code)
       if (ok) {
+        updateProfile({ mobile: phone })
+        await refreshProfile(phone)
+        syncScanHistoryFromBackend(phone).catch(() => {})
         onDone()
       } else {
         setOtpError(L.invalidCode)
@@ -135,15 +142,21 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
               <View style={styles.sproutBox}>
                 <Sprout size={36} color="#ffffff" />
               </View>
-              <Text style={styles.brandTitle}>Welcome to KrushikaDhara</Text>
+              <Text style={styles.brandTitle}>
+                {isKn ? "ಕೃಷಿಕಧಾರಾಗೆ ಸ್ವಾಗತ" : "Welcome to KrushikaDhara"}
+              </Text>
               <Text style={styles.brandSubtitle}>
-                Sign in with your phone number to access AI crop doctor & services
+                {isKn
+                  ? "AI ಬೆಳೆ ವೈದ್ಯ ಮತ್ತು ಕೃಷಿ ಸೇವೆಗಳನ್ನು ಪಡೆಯಲು ನಿಮ್ಮ ಫೋನ್ ಸಂಖ್ಯೆಯೊಂದಿಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ"
+                  : "Sign in with your phone number to access AI crop doctor & services"}
               </Text>
             </View>
 
             {/* Input Card */}
             <View style={styles.card}>
-              <Text style={styles.inputLabel}>Mobile Number</Text>
+              <Text style={styles.inputLabel}>
+                {isKn ? "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ" : "Mobile Number"}
+              </Text>
               <View style={styles.phoneInputRow}>
                 <View style={styles.countryCodeBadge}>
                   <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
@@ -169,7 +182,7 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
                   style={styles.demoFillBtn}
                 >
                   <Text style={styles.demoFillText}>
-                    Use demo number: {DEV_TEST_PHONE}
+                    {fmt(L.devPhone, { phone: DEV_TEST_PHONE })}
                   </Text>
                 </TouchableOpacity>
               ) : null}
@@ -191,7 +204,7 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
                   {consent && <Check size={14} color="#ffffff" />}
                 </View>
                 <Text style={styles.consentText}>
-                  I agree to the Terms of Service & Privacy Policy
+                  {fmt(L.consent, { terms: L.termsLink, privacy: L.privacyLink })}
                 </Text>
               </TouchableOpacity>
 
@@ -210,7 +223,9 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
                 ) : (
                   <>
                     <Phone size={18} color="#ffffff" />
-                    <Text style={styles.submitBtnText}>Get OTP</Text>
+                    <Text style={styles.submitBtnText}>
+                      {isKn ? "OTP ಪಡೆಯಿರಿ" : "Get OTP"}
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -227,7 +242,7 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
               style={styles.backBtn}
             >
               <ArrowLeft size={20} color="#256428" />
-              <Text style={styles.backBtnText}>Edit Phone</Text>
+              <Text style={styles.backBtnText}>{L.editPhone}</Text>
             </TouchableOpacity>
 
             <View style={styles.otpHeader}>
@@ -236,7 +251,7 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
               </View>
               <Text style={styles.brandTitle}>{L.verifyTitle}</Text>
               <Text style={styles.otpSubtitle}>
-                Verification code sent to +91 {phone}
+                {fmt(L.verifyFor, { phone: `+91 ${phone}` })}
               </Text>
             </View>
 
@@ -267,7 +282,7 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
                   style={styles.demoFillBtn}
                 >
                   <Text style={styles.demoFillText}>
-                    Auto-fill demo OTP: {DEV_TEST_OTP}
+                    {fmt(L.devCode, { code: DEV_TEST_OTP })}
                   </Text>
                 </TouchableOpacity>
               ) : null}
@@ -298,8 +313,8 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
               >
                 <Text style={styles.resendText}>
                   {cooldown > 0
-                    ? `Resend OTP in ${cooldown}s`
-                    : L.resend || "Resend OTP"}
+                    ? fmt(L.resendIn, { s: cooldown })
+                    : L.resend}
                 </Text>
               </TouchableOpacity>
             </View>

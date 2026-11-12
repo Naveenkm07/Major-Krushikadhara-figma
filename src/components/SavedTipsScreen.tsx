@@ -1,72 +1,106 @@
-import { View, Text, StyleSheet } from "react-native"
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import { useLang } from "../i18n"
+import { useSavedTips } from "../storage/savedTips"
 import DetailShell from "./DetailShell"
 import { Bookmark, Leaf, Droplets, Sun, Bug } from "lucide-react-native"
 
-const SAVED = [
-  {
-    icon: Droplets,
-    title: "Irrigation Reminder",
-    body: "Check soil moisture before irrigating. Over-watering damages root aeration and triggers fungal root rot.",
-    date: "Saved Sep 20",
-    bg: "#dbeafe",
-    color: "#2563eb",
-  },
-  {
-    icon: Sun,
-    title: "Favorable Spray Window",
-    body: "Clear skies for 3 days — good time for foliar spraying operations without rain wash-off risks.",
-    date: "Saved Sep 18",
-    bg: "#fef3c7",
-    color: "#d97706",
-  },
-  {
-    icon: Bug,
-    title: "Pest Management Tip",
-    body: "Yellow stem borer activity reported. Install pheromone traps at 5 per acre for monitoring and mass trapping.",
-    date: "Saved Sep 15",
-    bg: "#fee2e2",
-    color: "#dc2626",
-  },
-  {
-    icon: Leaf,
-    title: "Nutrient Deficiencies",
-    body: "Yellowing of older lower leaves indicates Nitrogen deficiency. Apply urea top-dressing after light irrigation.",
-    date: "Saved Sep 10",
-    bg: "#dcfce7",
-    color: "#16a34a",
-  },
-]
-
 export default function SavedTipsScreen() {
-  const { t } = useLang()
+  const { t, lang } = useLang()
+  const { tips, removeTip } = useSavedTips()
+  const isKn = lang === "kn"
+
   return (
     <DetailShell
-      title={t.profile?.rows?.saved || "Saved Tips"}
-      subtitle="Your bookmarked farming guides & agronomy advice"
+      title={t.profile?.rows?.saved || (isKn ? "ಉಳಿಸಿದ ಸಲಹೆಗಳು" : "Saved Tips")}
+      subtitle={
+        isKn
+          ? "ನಿಮ್ಮ ಬುಕ್‌ಮಾರ್ಕ್ ಮಾಡಿದ ಕೃಷಿ ಮಾರ್ಗದರ್ಶಿಗಳು"
+          : "Your bookmarked farming guides & scan remedies"
+      }
     >
-      <View style={styles.list}>
-        {SAVED.map((tip, idx) => (
-          <View key={idx} style={styles.card}>
-            <View style={[styles.iconWrap, { backgroundColor: tip.bg }]}>
-              <tip.icon size={20} color={tip.color} />
-            </View>
-            <View style={styles.contentWrap}>
-              <View style={styles.titleRow}>
-                <Text style={styles.title}>{tip.title}</Text>
-                <Bookmark size={16} color="#256428" fill="#256428" />
+      {tips.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Bookmark size={36} color="#9ca3af" />
+          <Text style={styles.emptyTitle}>
+            {isKn ? "ಯಾವುದೇ ಸಲಹೆಗಳನ್ನು ಉಳಿಸಿಲ್ಲ" : "No saved tips yet"}
+          </Text>
+          <Text style={styles.emptySub}>
+            {isKn
+              ? "ಬೆಳೆ ಸ್ಕ್ಯಾನ್ ಫಲಿತಾಂಶದ ಮೇಲಿನ ಬುಕ್‌ಮಾರ್ಕ್ ಒತ್ತಿ ಇಲ್ಲಿ ಉಳಿಸಿ."
+              : "Tap the bookmark icon on any Crop Scan report to save it here."}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.list}>
+          {tips.map((tip) => {
+            const cat = (isKn ? tip.categoryKn : tip.categoryEn).toLowerCase()
+            const Icon = cat.includes("irrigat") || cat.includes("ನೀರಾವರಿ")
+              ? Droplets
+              : cat.includes("pest") || cat.includes("ರೋಗ") || cat.includes("ಕೀಟ")
+              ? Bug
+              : cat.includes("sun")
+              ? Sun
+              : Leaf
+            const bg = tip.isUserSaved
+              ? "#dcfce7"
+              : cat.includes("irrigat") || cat.includes("ನೀರಾವರಿ")
+              ? "#dbeafe"
+              : "#fef3c7"
+            const color = tip.isUserSaved ? "#15803d" : "#256428"
+
+            return (
+              <View key={tip.id} style={styles.card}>
+                <View style={[styles.iconWrap, { backgroundColor: bg }]}>
+                  <Icon size={20} color={color} />
+                </View>
+                <View style={styles.contentWrap}>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.title}>
+                      {isKn ? tip.titleKn : tip.titleEn}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => removeTip(tip.id)}
+                      style={styles.bookmarkBtn}
+                    >
+                      <Bookmark size={16} color="#256428" fill="#256428" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.categoryPill}>
+                    {isKn ? tip.categoryKn : tip.categoryEn}
+                  </Text>
+                  <Text style={styles.body}>
+                    {isKn ? tip.bodyKn : tip.bodyEn}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.body}>{tip.body}</Text>
-              <Text style={styles.date}>{tip.date}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
+            )
+          })}
+        </View>
+      )}
     </DetailShell>
   )
 }
 
 const styles = StyleSheet.create({
+  emptyCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    padding: 30,
+    alignItems: "center",
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#374151",
+    marginTop: 6,
+  },
+  emptySub: {
+    fontSize: 13,
+    color: "#6b7280",
+    textAlign: "center",
+    lineHeight: 19,
+  },
   list: {
     gap: 12,
     paddingBottom: 30,
@@ -97,22 +131,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 8,
   },
   title: {
     fontSize: 15,
     fontWeight: "bold",
     color: "#111827",
+    flex: 1,
+  },
+  bookmarkBtn: {
+    padding: 4,
+  },
+  categoryPill: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#15803d",
+    marginTop: 2,
   },
   body: {
     fontSize: 13,
     color: "#4b5563",
     lineHeight: 19,
-    marginTop: 4,
-  },
-  date: {
-    fontSize: 11,
-    color: "#9ca3af",
-    marginTop: 8,
+    marginTop: 6,
   },
 })
-

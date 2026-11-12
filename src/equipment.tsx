@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react"
 import { useLang, fmt } from "./i18n"
+import { useProfile } from "./profile"
 
 export type Availability = "available" | "booked"
 export type RentalStatus =
@@ -223,6 +224,7 @@ type Ctx = {
 const EquipmentContext = createContext<Ctx | null>(null)
 
 export function EquipmentProvider({ children }: { children: ReactNode }) {
+  const { profile } = useProfile()
   const [equipment, setEquipment] = useState<Equipment[]>(seedEquipment)
   const [mine, setMine] = useState<Equipment[]>(seedMine)
   const [rentals, setRentals] = useState<Rental[]>(seedRentals)
@@ -314,9 +316,9 @@ export function EquipmentProvider({ children }: { children: ReactNode }) {
     const id = nid()
     const eq: Equipment = {
       id, name: draft.name || "New Equipment", type: draft.type || "Other",
-      owner: "Naveen Kumar km", location: draft.location || "Mandya", distanceKm: 0,
+      owner: profile.name || "Farmer", location: draft.location || profile.district || "Mandya", distanceKm: 0,
       pricePerDay: draft.pricePerDay || 0, availability: draft.availability || "available",
-      rating: 0, reviews: 0, image: draft.image || IMG.tractor, hp: draft.hp || "—",
+      rating: 5.0, reviews: 0, image: draft.image || IMG.tractor, hp: draft.hp || "—",
       fuel: draft.fuel || "—", crops: draft.crops || "—", condition: draft.condition || "Good",
       minDuration: draft.minDuration || "1 day", mine: true, requestCount: 0,
     }

@@ -3,15 +3,28 @@
 // Uses official cloudinary v2 SDK for robust signing & upload
 // ==============================================================================
 
+import "../config/env.js"
 import { v2 as cloudinary } from "cloudinary"
-import dotenv from "dotenv"
-dotenv.config()
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "ian5c0mv",
-  api_key: process.env.CLOUDINARY_API_KEY || "853581742453468",
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
+function getCloudinaryCredentials() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim() || ""
+  const apiKey = process.env.CLOUDINARY_API_KEY?.trim() || ""
+  const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim() || ""
+  return { cloudName, apiKey, apiSecret }
+}
+
+function detectImageMimeType(imageBuffer: Buffer, filename: string): string {
+  if (imageBuffer.length >= 8 && imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50 && imageBuffer[2] === 0x4e && imageBuffer[3] === 0x47) {
+    return "image/png"
+  }
+  if (imageBuffer.length >= 12 && imageBuffer.subarray(0, 4).toString("ascii") === "RIFF" && imageBuffer.subarray(8, 12).toString("ascii") === "WEBP") {
+    return "image/webp"
+  }
+  const ext = filename.split(".").pop()?.toLowerCase()
+  if (ext === "png") return "image/png"
+  if (ext === "webp") return "image/webp"
+  return "image/jpeg"
+}
 
 export interface CloudinaryUploadResult {
   success: boolean
@@ -28,19 +41,26 @@ export async function uploadImageToCloudinary(
   folder: string = "krushikadhara/scans",
   _filename: string = "leaf_scan.jpg"
 ): Promise<CloudinaryUploadResult> {
-  const apiSecret = process.env.CLOUDINARY_API_SECRET
+  const { cloudName, apiKey, apiSecret } = getCloudinaryCredentials()
 
-  if (!apiSecret || apiSecret.includes("*") || apiSecret.trim() === "") {
-    console.warn("⚠️ [Cloudinary] Valid CLOUDINARY_API_SECRET is missing; skipping remote upload.")
+  if (!cloudName || !apiKey || !apiSecret || apiSecret.includes("*")) {
+    console.warn("⚠️ [Cloudinary] Incomplete Cloudinary credentials in backend/.env; skipping remote upload.")
     return {
       success: false,
       secureUrl: "",
-      error: "CLOUDINARY_API_SECRET missing or invalid",
+      error: "Cloudinary credentials missing or invalid",
     }
   }
 
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+  })
+
   try {
-    const base64Data = `data:image/jpeg;base64,${imageBuffer.toString("base64")}`
+    const mimeType = detectImageMimeType(imageBuffer, _filename)
+    const base64Data = `data:${mimeType};base64,${imageBuffer.toString("base64")}`
     console.log(`☁️ [Cloudinary] Uploading scan image to folder: ${folder}...`)
 
     const result = await cloudinary.uploader.upload(base64Data, {

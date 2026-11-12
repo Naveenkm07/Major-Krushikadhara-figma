@@ -1,5 +1,6 @@
 import { createContext, Fragment, useContext, useMemo, useState, type ReactNode } from "react"
 import { Text } from "react-native"
+import { useProfile } from "./profile"
 
 /** Look up a translated label for a stored internal value; falls back to the raw value. */
 export function tr(map: Record<string, string>, key: string): string {
@@ -170,6 +171,7 @@ const CLAIM_STEPS: ClaimStatus[] = [
 ]
 
 export function InsuranceProvider({ children }: { children: ReactNode }) {
+  const { profile } = useProfile()
   const [applications, setApplications] = useState<InsuranceApplication[]>([])
   const [policies, setPolicies] = useState<InsurancePolicy[]>([])
   const [claims, setClaims] = useState<InsuranceClaim[]>([])
@@ -187,20 +189,21 @@ export function InsuranceProvider({ children }: { children: ReactNode }) {
 
   function submitApplication(data: Partial<InsuranceApplication>): string {
     const id = nid()
-    const coverage = 120000 // DEMO DATA
-    const premium = 2400   // DEMO DATA
+    const acres = parseFloat(String(data.area ?? profile.farmSize)) || 2.0
+    const coverage = Math.round(acres * 45000)
+    const premium = Math.round(coverage * 0.02)
     const today = new Date().toLocaleDateString("en-IN")
     const app: InsuranceApplication = {
       id,
-      crop: data.crop ?? "Rice",
+      crop: data.crop ?? profile.crops[0] ?? "Rice",
       season: data.season ?? "Kharif",
-      district: data.district ?? "Mandya",
-      taluk: data.taluk ?? "Mandya",
-      area: data.area ?? "2.0",
+      district: data.district ?? profile.district ?? "Mandya",
+      taluk: data.taluk ?? profile.taluk ?? "Pandavapura",
+      area: data.area ?? profile.farmSize ?? "2.0",
       status: "submitted",
       submittedDate: today,
-      farmerName: data.farmerName ?? "Naveen Kumar km",
-      mobile: data.mobile ?? "9876543210",
+      farmerName: data.farmerName ?? profile.name ?? "Farmer",
+      mobile: data.mobile ?? profile.mobile ?? "9591502209",
       coverage,
       premium,
       surveyNumber: data.surveyNumber ?? "SY-001",

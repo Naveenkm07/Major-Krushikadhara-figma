@@ -33,6 +33,7 @@ model Farmer {
   rentalsRequested  RentalBooking[]      @relation("RenterBookings")
   scans             CropScan[]
   interactions      FarmerInteraction[]
+  schemeProgress    FarmerSchemeProgress[]
 
   @@index([mobile])
   @@index([district, taluk])
@@ -233,5 +234,25 @@ model MandiPrice {
 
   @@index([commodity, district])
   @@index([marketName])
+}
+
+// ==============================================================================
+// 6. Government Schemes Bookmarks, Document Checklist & Application Tracker
+// ==============================================================================
+model FarmerSchemeProgress {
+  id          String    @id @default(uuid())
+  farmerId    String
+  farmer      Farmer    @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  schemeId    String
+  bookmarked  Boolean   @default(false)
+  status      String    @default("NOT_APPLIED") // "NOT_APPLIED" | "CHECKLIST_READY" | "APPLIED" | "APPROVED"
+  checkedDocs Json?     // Array of checked document keys
+  appliedAt   DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([farmerId, schemeId])
+  @@index([farmerId])
 }
 

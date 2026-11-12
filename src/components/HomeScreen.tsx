@@ -12,9 +12,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLang } from "../i18n"
 import { useProfile } from "../profile"
 import { useNav, type Route } from "../nav"
-import { fetchLiveGovtMandiRates } from "../api/mandi"
+import { fetchNearbyMandis } from "../api/mandi"
 import { fetchActiveCropStage, type ActiveCropStageResponse } from "../api/cropStage"
 import { fetchLiveWeather, type LiveWeatherData } from "../api/weather"
+import { getCurrentLocation } from "../utils/location"
+import { useNotifications } from "../storage/notifications"
+import {
+  getScanHistory,
+  subscribeScanHistory,
+  syncScanHistoryFromBackend,
+  type ScanHistoryItem,
+} from "../storage/scanHistory"
 import {
   Languages,
   Bell,
@@ -57,95 +65,102 @@ const RECENT_SCANS = [
   { crop: "Tomato", disease: "earlyBlight", confidence: 85, status: "disease" as const, day: 23, month: "Sep" },
 ] as const
 
-const marketPrices = [
-  { key: "tomato", price: 28, change: 4 },
-  { key: "ragi", price: 42, change: 2 },
-  { key: "onion", price: 19, change: -1 },
-]
-
 export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
-  const { t, toggle } = useLang()
+  const { t, lang, toggle } = useLang()
   const { profile } = useProfile()
   const { open } = useNav()
   const insets = useSafeAreaInsets()
+  const isKn = lang === "kn"
   const h = t.x.coreA.home
   const cropMap = (t.x.coreA.crops as Record<string, string>) || {}
-  const cropName = (c: string) => cropMap[c] ?? c
+  const { unreadCount } = useNotifications(profile.district, profile.crops)
 
-  const [livePrices, setLivePrices] = useState<Array<{ key: string; name: string; price: number; change: number }>>(() => {
+  const [livePrices, setLivePrices] = useState<Array<{ key: string; name: string; price: number | null; change: number }>>(() => {
     const crops = Array.from(new Set(profile.crops || ["Rice", "Ragi"]))
-    return crops.map((c) => ({
+    return crops.slice(0, 3).map((c) => ({
       key: c.toLowerCase(),
       name: c,
-      price: 32,
+      price: null,
       change: 0,
     }))
   })
 
   const [stageData, setStageData] = useState<ActiveCropStageResponse | null>(null)
   const [liveWeather, setLiveWeather] = useState<LiveWeatherData | null>(null)
+  const [recentScans, setRecentScans] = useState<ScanHistoryItem[]>(getScanHistory())
 
   useEffect(() => {
-    // Attempt dynamic GPS or fallback to Mandya coordinates (12.5244, 76.8958)
-    if (typeof navigator !== "undefined" && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          fetchLiveWeather(pos.coords.latitude, pos.coords.longitude, 1)
-            .then(setLiveWeather)
-            .catch(() => {})
-        },
-        () => {
-          fetchLiveWeather(12.5244, 76.8958, 1)
-            .then(setLiveWeather)
-            .catch(() => {})
-        },
-        { timeout: 8000 }
-      )
-    } else {
-      fetchLiveWeather(12.5244, 76.8958, 1)
-        .then(setLiveWeather)
+    syncScanHistoryFromBackend(profile.mobile).catch(() => {})
+    return subscribeScanHistory((items) => setRecentScans(items))
+  }, [profile.mobile])
+
+  useEffect(() => {
+    let active = true
+    getCurrentLocation(8000).then((loc) => {
+      if (!active) return
+      const lat = loc.ok ? loc.lat : 12.5244
+      const lng = loc.ok ? loc.lng : 76.8958
+
+      fetchLiveWeather(lat, lng, 1)
+        .then((w) => {
+          if (active) setLiveWeather(w)
+        })
         .catch(() => {})
+
+      const baseCrops =
+        profile.crops && profile.crops.length > 0
+          ? profile.crops
+          : ["Tomato", "Rice", "Ragi"]
+      const candidateCrops = Array.from(new Set([...baseCrops, "Tomato", "Onion"])).slice(0, 3)
+
+      Promise.allSettled(
+        candidateCrops.map((crop) =>
+          fetchNearbyMandis({ lat, lng, crop, radiusKm: 100, limit: 5 })
+        )
+      )
+        .then((responses) => {
+          if (!active) return
+          const mapped: Array<{ key: string; name: string; price: number; change: number }> = []
+          const seen = new Set<string>()
+
+          responses.forEach((resp, idx) => {
+            if (resp.status !== "fulfilled" || !resp.value.success) return
+            const data = resp.value
+            const priced = data.results.find((r) => r.hasPrice && (r.modalPriceKg || 0) > 0) ||
+              (data.nearestActiveMarket && (data.nearestActiveMarket.modalPriceKg || 0) > 0
+                ? data.nearestActiveMarket
+                : null)
+            if (priced) {
+              const displayCrop = candidateCrops[idx]
+              const k = displayCrop.toLowerCase()
+              if (!seen.has(k)) {
+                seen.add(k)
+                mapped.push({
+                  key: k,
+                  name: displayCrop,
+                  price: priced.modalPriceKg || 0,
+                  change: 2,
+                })
+              }
+            }
+          })
+
+          if (mapped.length > 0) {
+            setLivePrices(mapped.slice(0, 3))
+          }
+        })
+        .catch(() => {})
+    })
+    return () => {
+      active = false
     }
-  }, [])
+  }, [profile.crops])
 
   useEffect(() => {
     fetchActiveCropStage(profile.mobile)
       .then((res) => setStageData(res))
       .catch(() => {})
   }, [profile.mobile])
-
-  useEffect(() => {
-    fetchLiveGovtMandiRates({
-      district: profile.district,
-      commodity: profile.crops && profile.crops.length > 0 ? profile.crops[0] : undefined,
-      limit: 6,
-    })
-      .then((res) => {
-        if (res.data && res.data.length > 0) {
-          const seen = new Set<string>()
-          const mapped: Array<{ key: string; name: string; price: number; change: number }> = []
-
-          for (const r of res.data) {
-            const k = r.commodity.toLowerCase()
-            if (!seen.has(k)) {
-              seen.add(k)
-              mapped.push({
-                key: k,
-                name: r.commodity,
-                price: r.modalPriceKg || 30,
-                change: 2,
-              })
-            }
-            if (mapped.length >= 3) break
-          }
-
-          if (mapped.length > 0) {
-            setLivePrices(mapped)
-          }
-        }
-      })
-      .catch(() => {})
-  }, [profile.crops, profile.district])
 
   return (
     <View style={styles.container}>
@@ -165,7 +180,9 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
           <View style={styles.headerTop}>
             <View style={styles.profileInfo}>
               <Text style={styles.greetingText}>{t.greeting} 🙏</Text>
-              <Text style={styles.nameText}>{profile.name}</Text>
+              <Text style={styles.nameText}>
+                {isKn ? profile.nameKn || profile.name : profile.name}
+              </Text>
               <View style={styles.locationRow}>
                 <MapPin size={13} color="rgba(255,255,255,0.7)" />
                 <Text style={styles.locationText}>
@@ -191,7 +208,7 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                 style={styles.headerIconBtn}
               >
                 <Bell size={18} color="#ffffff" />
-                <View style={styles.unreadBadge} />
+                {unreadCount > 0 ? <View style={styles.unreadBadge} /> : null}
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -233,8 +250,8 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                 </Text>
                 <Text style={styles.weatherCondition}>
                   {liveWeather
-                    ? `${liveWeather.current.conditionTextEn} · ${liveWeather.current.tempC}°C`
-                    : `${t.weather.condition} · 29°C`}
+                    ? `${isKn && liveWeather.current.conditionTextKn ? liveWeather.current.conditionTextKn : liveWeather.current.conditionTextEn} · ${liveWeather.current.tempC}°C`
+                    : `${t.weather.condition} · --°C`}
                 </Text>
               </View>
             </View>
@@ -248,7 +265,9 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                     : t.weather.humidity}
                 </Text>
               </View>
-              <Text style={styles.weatherTapHint}>View Forecast →</Text>
+              <Text style={styles.weatherTapHint}>
+                {isKn ? "ಮುನ್ಸೂಚನೆ ನೋಡಿ →" : "View Forecast →"}
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -256,75 +275,101 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
         {/* Core App Feature: Active Crop Present Growth Stage Card */}
         {stageData?.cropField && (
           <View style={styles.stageSection}>
-            <TouchableOpacity
-              onPress={() => open("voiceAssistant")}
-              activeOpacity={0.9}
-              style={styles.stageCard}
-            >
-              <View style={styles.stageCardHeader}>
-                <View style={styles.stageTitleLeft}>
-                  <View style={styles.stageSproutBox}>
-                    <Sprout size={18} color="#15803d" />
+            <View style={styles.stageCard}>
+              <TouchableOpacity
+                onPress={() => open("calendar")}
+                activeOpacity={0.9}
+              >
+                <View style={styles.stageCardHeader}>
+                  <View style={styles.stageTitleLeft}>
+                    <View style={styles.stageSproutBox}>
+                      <Sprout size={18} color="#15803d" />
+                    </View>
+                    <View>
+                      <Text style={styles.stageCropTitle}>
+                        {stageData.cropField.cropName}
+                      </Text>
+                      <Text style={styles.stageVarietySub}>
+                        {stageData.cropField.variety ||
+                          (isKn ? "ಸಕ್ರಿಯ ಜಮೀನು ಘಟಕ" : "Active Field Plot")}
+                      </Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text style={styles.stageCropTitle}>
-                      {stageData.cropField.cropName}
-                    </Text>
-                    <Text style={styles.stageVarietySub}>
-                      {stageData.cropField.variety || "Active Field Plot"}
+
+                  <View style={styles.stageDayPill}>
+                    <Text style={styles.stageDayPillText}>
+                      {isKn ? "ದಿನ" : "Day"} {stageData.cropField.daysSinceSowing}
                     </Text>
                   </View>
                 </View>
 
-                <View style={styles.stageDayPill}>
-                  <Text style={styles.stageDayPillText}>
-                    Day {stageData.cropField.daysSinceSowing}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Growth Stage Progress Indicator */}
-              <View style={styles.stageProgressWrap}>
-                <View style={styles.stageProgressHeader}>
-                  <Text style={styles.stageCurrentLabel}>
-                    Current Stage:{" "}
-                    <Text style={styles.stageCurrentHighlight}>
-                      {stageData.cropField.currentStageNameEn}
+                {/* Growth Stage Progress Indicator */}
+                <View style={styles.stageProgressWrap}>
+                  <View style={styles.stageProgressHeader}>
+                    <Text style={styles.stageCurrentLabel}>
+                      {isKn ? "ಪ್ರಸ್ತುತ ಹಂತ:" : "Current Stage:"}{" "}
+                      <Text style={styles.stageCurrentHighlight}>
+                        {isKn
+                          ? stageData.cropField.currentStageNameKn
+                          : stageData.cropField.currentStageNameEn}
+                      </Text>
                     </Text>
-                  </Text>
-                  <Text style={styles.stageKanName}>
-                    {stageData.cropField.currentStageNameKn}
-                  </Text>
+                    <Text style={styles.stageKanName}>
+                      {isKn
+                        ? stageData.cropField.currentStageNameEn
+                        : stageData.cropField.currentStageNameKn}
+                    </Text>
+                  </View>
+
+                  <View style={styles.stageProgressBarTrack}>
+                    <View
+                      style={[
+                        styles.stageProgressBarFill,
+                        {
+                          width: `${Math.min(
+                            100,
+                            Math.max(10, Math.round((stageData.cropField.daysSinceSowing / 120) * 100))
+                          )}%`,
+                        },
+                      ]}
+                    />
+                  </View>
                 </View>
 
-                <View style={styles.stageProgressBarTrack}>
-                  <View style={styles.stageProgressBarFill} />
-                </View>
-              </View>
-
-              {/* Today's Tailored Stage Advisory */}
-              {stageData.dailyAdvisories && stageData.dailyAdvisories[0] && (
-                <View style={styles.stageAdviceBox}>
-                  <Text style={styles.stageAdviceTitle}>
-                    💡 Today's Action ({stageData.dailyAdvisories[0].category}):
-                  </Text>
-                  <Text style={styles.stageAdviceBody}>
-                    {stageData.dailyAdvisories[0].bodyEn}
-                  </Text>
-                </View>
-              )}
+                {/* Today's Tailored Stage Advisory */}
+                {stageData.dailyAdvisories && stageData.dailyAdvisories[0] && (
+                  <View style={styles.stageAdviceBox}>
+                    <Text style={styles.stageAdviceTitle}>
+                      💡 {isKn ? "ಇಂದಿನ ಕ್ರಮ" : "Today's Action"} ({stageData.dailyAdvisories[0].category}):
+                    </Text>
+                    <Text style={styles.stageAdviceBody}>
+                      {isKn
+                        ? stageData.dailyAdvisories[0].bodyKn
+                        : stageData.dailyAdvisories[0].bodyEn}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
               {/* Voice Ask Callout */}
-              <View style={styles.stageVoiceActionRow}>
+              <TouchableOpacity
+                onPress={() => open("voiceAssistant")}
+                activeOpacity={0.8}
+                style={styles.stageVoiceActionRow}
+              >
                 <View style={styles.stageVoiceHint}>
                   <Mic size={14} color="#166534" />
                   <Text style={styles.stageVoiceHintText}>
-                    Ask Sarvam AI about this stage
+                    {isKn
+                      ? "ಈ ಹಂತದ ಬಗ್ಗೆ ಸರ್ವಂ AI ಕೇಳಿ"
+                      : "Ask Sarvam AI about this stage"}
                   </Text>
                 </View>
-                <Text style={styles.stageVoiceTap}>Speak Now →</Text>
-              </View>
-            </TouchableOpacity>
+                <Text style={styles.stageVoiceTap}>
+                  {isKn ? "ಈಗ ಮಾತನಾಡಿ →" : "Speak Now →"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -404,35 +449,76 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
             </TouchableOpacity>
           </View>
           <View style={styles.scansList}>
-            {RECENT_SCANS.map((scan, i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => open("scanResult", { crop: scan.crop })}
-                activeOpacity={0.8}
-                style={styles.scanItemCard}
-              >
-                <View style={styles.scanDateBox}>
-                  <Text style={styles.scanDay}>{scan.day}</Text>
-                  <Text style={styles.scanMonth}>{scan.month}</Text>
-                </View>
-                <View style={styles.scanInfo}>
-                  <Text style={styles.scanCrop}>{scan.crop}</Text>
-                  <Text
-                    style={[
-                      styles.scanDisease,
-                      scan.status === "healthy"
-                        ? styles.scanHealthy
-                        : styles.scanInfected,
-                    ]}
+            {recentScans.length > 0
+              ? recentScans.slice(0, 3).map((scan) => {
+                  const isHealthy = scan.status === "healthy"
+                  return (
+                    <TouchableOpacity
+                      key={scan.id}
+                      onPress={() =>
+                        open("scanResult", {
+                          diagnosis: scan.diagnosis,
+                          imageUri: scan.imageUrl,
+                          cropName: scan.crop,
+                        })
+                      }
+                      activeOpacity={0.8}
+                      style={styles.scanItemCard}
+                    >
+                      <View style={styles.scanDateBox}>
+                        <Text style={styles.scanDay}>{scan.day}</Text>
+                        <Text style={styles.scanMonth}>{scan.month}</Text>
+                      </View>
+                      <View style={styles.scanInfo}>
+                        <Text style={styles.scanCrop}>{scan.crop}</Text>
+                        <Text
+                          style={[
+                            styles.scanDisease,
+                            isHealthy ? styles.scanHealthy : styles.scanInfected,
+                          ]}
+                        >
+                          {isKn && scan.pestKn ? scan.pestKn : scan.pest}
+                        </Text>
+                      </View>
+                      <View style={styles.confidenceBadge}>
+                        <Text style={styles.confidenceText}>{scan.confidence}%</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )
+                })
+              : RECENT_SCANS.map((scan, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => onNavigate("scan")}
+                    activeOpacity={0.8}
+                    style={styles.scanItemCard}
                   >
-                    {scan.status === "healthy" ? "Healthy Crop" : "Early Blight"}
-                  </Text>
-                </View>
-                <View style={styles.confidenceBadge}>
-                  <Text style={styles.confidenceText}>{scan.confidence}%</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                    <View style={styles.scanDateBox}>
+                      <Text style={styles.scanDay}>{scan.day}</Text>
+                      <Text style={styles.scanMonth}>{scan.month}</Text>
+                    </View>
+                    <View style={styles.scanInfo}>
+                      <Text style={styles.scanCrop}>{scan.crop}</Text>
+                      <Text
+                        style={[
+                          styles.scanDisease,
+                          scan.status === "healthy"
+                            ? styles.scanHealthy
+                            : styles.scanInfected,
+                        ]}
+                      >
+                        {scan.status === "healthy"
+                          ? h.scanDiseases.healthy
+                          : isKn
+                          ? "ಬೆಳೆ ಸ್ಕ್ಯಾನ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ"
+                          : "Tap to Scan Crop"}
+                      </Text>
+                    </View>
+                    <View style={styles.confidenceBadge}>
+                      <Text style={styles.confidenceText}>{scan.confidence}%</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
           </View>
         </View>
 
@@ -453,9 +539,14 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                 style={styles.marketCard}
               >
                 <Text style={styles.marketCropName}>
-                  {t.market.crops[item.key as keyof typeof t.market.crops] || item.name || item.key}
+                  {t.market.crops[item.key as keyof typeof t.market.crops] ||
+                    cropMap[item.name] ||
+                    item.name ||
+                    item.key}
                 </Text>
-                <Text style={styles.marketPrice}>₹{item.price}{t.market.perKg}</Text>
+                <Text style={styles.marketPrice}>
+                  {item.price !== null ? `₹${item.price}${t.market.perKg}` : "..."}
+                </Text>
                 <View style={styles.changeRow}>
                   {item.change >= 0 ? (
                     <TrendingUp size={13} color="#16a34a" />

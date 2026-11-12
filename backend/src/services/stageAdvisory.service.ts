@@ -334,19 +334,27 @@ export const CROP_STAGE_DEFINITIONS: Record<string, GrowthStageDef[]> = {
 }
 
 /**
+ * Returns the growth stages defined for a given crop.
+ */
+export function getStagesForCrop(cropName: string): GrowthStageDef[] {
+  const norm = cropName.toLowerCase()
+  if (norm.includes("ragi") || norm.includes("finger millet")) {
+    return CROP_STAGE_DEFINITIONS.ragi
+  }
+  if (norm.includes("tomato")) {
+    return CROP_STAGE_DEFINITIONS.tomato
+  }
+  if (norm.includes("rice") || norm.includes("paddy")) {
+    return CROP_STAGE_DEFINITIONS.rice
+  }
+  return CROP_STAGE_DEFINITIONS.rice
+}
+
+/**
  * Gets or calculates the current growth stage for a crop field
  */
 export function getCropGrowthStage(cropName: string, daysSinceSowing: number): GrowthStageDef {
-  const norm = cropName.toLowerCase()
-  let stages: GrowthStageDef[] = CROP_STAGE_DEFINITIONS.rice
-
-  if (norm.includes("ragi") || norm.includes("finger millet")) {
-    stages = CROP_STAGE_DEFINITIONS.ragi
-  } else if (norm.includes("tomato")) {
-    stages = CROP_STAGE_DEFINITIONS.tomato
-  } else if (norm.includes("rice") || norm.includes("paddy")) {
-    stages = CROP_STAGE_DEFINITIONS.rice
-  }
+  const stages = getStagesForCrop(cropName)
 
   // Find stage matching daysSinceSowing
   for (const s of stages) {

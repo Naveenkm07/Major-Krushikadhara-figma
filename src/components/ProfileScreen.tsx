@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   View,
   Text,
@@ -12,6 +12,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLang, fmt } from "../i18n"
 import { useProfile } from "../profile"
 import { useNav } from "../nav"
+import {
+  getScanHistory,
+  subscribeScanHistory,
+} from "../storage/scanHistory"
+import { useAppSettings } from "../storage/appSettings"
 import {
   Pencil,
   MapPin,
@@ -46,18 +51,27 @@ type Row = {
 
 export default function ProfileScreen({ onLogout }: { onLogout: () => void }) {
   const { t, lang } = useLang()
-  const { profile } = useProfile()
+  const { profile, scansCount } = useProfile()
   const { open } = useNav()
   const insets = useSafeAreaInsets()
-  const [notificationsOn, setNotificationsOn] = useState(true)
+  const { settings, updateSettings } = useAppSettings()
+  const [historyLen, setHistoryLen] = useState(() => getScanHistory().length)
+
+  useEffect(() => {
+    setHistoryLen(getScanHistory().length)
+    return subscribeScanHistory((items) => setHistoryLen(items.length))
+  }, [])
 
   const x = t.x.coreA
   const cropMap = (x.crops as Record<string, string>) || {}
   const cropName = (c: string) => cropMap[c] ?? c
   const location = profile.district ? `${profile.district}, ${profile.state}` : profile.state
+  const totalScans = Math.max(historyLen, scansCount)
+  const displayName =
+    lang === "kn" ? profile.nameKn || profile.name : profile.name
 
   const farmStats = [
-    { label: t.profile.stats.scans, value: "12", icon: ScanLine },
+    { label: t.profile.stats.scans, value: String(totalScans), icon: ScanLine },
     { label: t.profile.stats.crops, value: String(profile.crops.length), icon: Sprout },
     { label: t.profile.stats.years, value: String(profile.experience), icon: CalendarClock },
   ]
@@ -79,13 +93,13 @@ export default function ProfileScreen({ onLogout }: { onLogout: () => void }) {
       label: t.profile.rows.notifications,
       icon: Bell,
       isToggle: true,
-      toggleValue: notificationsOn,
-      onToggle: () => setNotificationsOn((v) => !v),
+      toggleValue: settings.notificationsOn,
+      onToggle: () => updateSettings({ notificationsOn: !settings.notificationsOn }),
     },
     { label: t.profile.rows.saved, icon: Bookmark, onClick: () => open("saved") },
-    { label: "Settings", icon: Settings, onClick: () => open("settings") },
-    { label: "Farmer Voice AI", icon: Mic, onClick: () => open("voiceAssistant") },
-    { label: "Offline Mode", icon: WifiOff, onClick: () => open("offlineMode") },
+    { label: x.home.settingsAria, icon: Settings, onClick: () => open("settings") },
+    { label: x.home.voiceAi, icon: Mic, onClick: () => open("voiceAssistant") },
+    { label: x.settings.offlineMode, icon: WifiOff, onClick: () => open("offlineMode") },
   ]
 
   const support: Row[] = [
@@ -126,7 +140,7 @@ export default function ProfileScreen({ onLogout }: { onLogout: () => void }) {
               <Image source={{ uri: profile.photoUrl }} style={styles.avatarImg} />
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.farmerName}>{profile.name}</Text>
+              <Text style={styles.farmerName}>{displayName}</Text>
               <View style={styles.locRow}>
                 <MapPin size={13} color="rgba(255,255,255,0.7)" />
                 <Text style={styles.locText}>{location}</Text>
@@ -152,7 +166,9 @@ export default function ProfileScreen({ onLogout }: { onLogout: () => void }) {
             <View style={styles.detailRow}>
               <Ruler size={16} color="#256428" />
               <Text style={styles.detailLabel}>{t.profile.farm.size}</Text>
-              <Text style={styles.detailValue}>{profile.farmSize} acres</Text>
+              <Text style={styles.detailValue}>
+                {fmt(x.common.acresValue, { size: profile.farmSize })}
+              </Text>
             </View>
             <View style={styles.detailRow}>
               <Sprout size={16} color="#256428" />

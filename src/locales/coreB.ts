@@ -70,6 +70,8 @@ export const en = {
     unsave: "Remove saved scheme",
     categories: {
       all: "All",
+      saved: "Saved",
+      karnataka: "Karnataka",
       income: "Income",
       insurance: "Insurance",
       credit: "Credit",
@@ -275,6 +277,8 @@ export const kn: typeof en = {
     unsave: "ಉಳಿಸಿದ ಯೋಜನೆ ತೆಗೆಯಿರಿ",
     categories: {
       all: "ಎಲ್ಲಾ",
+      saved: "ಉಳಿಸಿದ",
+      karnataka: "ಕರ್ನಾಟಕ",
       income: "ಆದಾಯ",
       insurance: "ವಿಮೆ",
       credit: "ಸಾಲ",

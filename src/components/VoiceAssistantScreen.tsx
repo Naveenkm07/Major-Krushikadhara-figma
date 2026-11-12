@@ -7,9 +7,18 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
+  Platform,
+  Alert,
 } from "react-native"
+import {
+  useAudioRecorder,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+} from "expo-audio"
 import { useLang } from "../i18n"
 import { useProfile } from "../profile"
+import { useNav } from "../nav"
 import DetailShell from "./DetailShell"
 import {
   Mic,
@@ -40,7 +49,9 @@ type ChatEntry = {
 export default function VoiceAssistantScreen() {
   const { lang } = useLang()
   const { profile } = useProfile()
+  const { params } = useNav()
   const isKn = lang === "kn"
+  const seededPromptSentRef = useRef(false)
 
   const [stageData, setStageData] = useState<ActiveCropStageResponse | null>(null)
   const [loadingStage, setLoadingStage] = useState(true)
@@ -49,6 +60,7 @@ export default function VoiceAssistantScreen() {
   const [isListening, setIsListening] = useState(false)
   const [voiceStatusText, setVoiceStatusText] = useState<string | null>(null)
 
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
   const mediaRecorderRef = useRef<any>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
@@ -68,6 +80,18 @@ export default function VoiceAssistantScreen() {
       .then((res) => setStageData(res))
       .finally(() => setLoadingStage(false))
   }, [profile.mobile])
+
+  // Auto-submit pre-populated scan follow-up query when opened from ScanResultScreen
+  useEffect(() => {
+    const initialPrompt = typeof params?.initialPrompt === "string" ? params.initialPrompt.trim() : ""
+    if (initialPrompt && !seededPromptSentRef.current) {
+      seededPromptSentRef.current = true
+      const timer = setTimeout(() => {
+        void handleSendText(initialPrompt)
+      }, 250)
+      return () => clearTimeout(timer)
+    }
+  }, [params?.initialPrompt])
 
   const crop = stageData?.cropField
   const stageName = isKn ? crop?.currentStageNameKn : crop?.currentStageNameEn
@@ -165,13 +189,139 @@ export default function VoiceAssistantScreen() {
         mobile: profile.mobile,
         cropName: crop?.cropName,
         district: profile.district,
+        language: isKn ? "kn" : "en",
       }
     )
   }
 
-  // Handle Voice / Mic Recording with Browser MediaRecorder -> Sarvam STT -> Gemini
+  const sendRecordedAudio = async (
+    audioInput: Blob | { uri: string; name?: string; type?: string },
+    filename: string
+  ) => {
+    setIsProcessing(true)
+    setVoiceStatusText(isKn ? "ಧ್ವನಿ ಪರಿವರ್ತಿಸಲಾಗುತ್ತಿದೆ..." : "Transcribing with Sarvam AI...")
+
+    let accumulatedText = ""
+    const assistantPlaceholder: ChatEntry = {
+      role: "assistant",
+      text: "",
+      stageContext: stageName || "Rice (Paddy)",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    }
+
+    await streamVoiceAudio(
+      audioInput,
+      filename,
+      {
+        onTranscript: (transcript: string) => {
+          const userMsg: ChatEntry = {
+            role: "user",
+            text: transcript,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          }
+          setChat((prev) => [...prev, userMsg, assistantPlaceholder])
+          setVoiceStatusText(null)
+        },
+        onChunk: (chunk: string) => {
+          accumulatedText += chunk
+          setChat((prev) => {
+            const next = [...prev]
+            if (next.length > 0 && next[next.length - 1].role === "assistant") {
+              next[next.length - 1] = {
+                ...next[next.length - 1],
+                text: accumulatedText,
+              }
+            }
+            return next
+          })
+        },
+        onDone: () => {
+          setIsProcessing(false)
+          setVoiceStatusText(null)
+        },
+        onError: (err) => {
+          console.error("Voice stream error:", err)
+          setIsProcessing(false)
+          setVoiceStatusText(null)
+          Alert.alert(
+            isKn ? "ಧ್ವನಿ ದೋಷ" : "Voice Error",
+            err || (isKn ? "ಧ್ವನಿಯನ್ನು ಗುರುತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಸ್ಪಷ್ಟವಾಗಿ ಮಾತನಾಡಿ." : "Could not transcribe audio. Please speak clearly.")
+          )
+        },
+      },
+      {
+        mobile: profile.mobile,
+        language: isKn ? "kn-IN" : "en-IN",
+        cropName: crop?.cropName,
+        district: profile.district,
+      }
+    )
+  }
+
+  // Handle Voice / Mic Recording using expo-audio on Mobile (Android/iOS) and MediaRecorder on Web
   const handleMicToggle = async () => {
-    // If currently recording, STOP recording and send real audio
+    if (isProcessing) return
+
+    // Native (Android / iOS Expo Go) path via expo-audio
+    if (Platform.OS !== "web") {
+      if (isListening) {
+        try {
+          setIsListening(false)
+          setVoiceStatusText(isKn ? "ಧ್ವನಿ ಉಳಿಸಲಾಗುತ್ತಿದೆ..." : "Finishing recording...")
+          await audioRecorder.stop()
+          await setAudioModeAsync({ allowsRecording: false }).catch(() => {})
+          const uri = audioRecorder.uri
+          if (!uri) {
+            setVoiceStatusText(null)
+            return
+          }
+          await sendRecordedAudio({ uri, name: "recording.m4a", type: "audio/m4a" }, "recording.m4a")
+        } catch (stopErr: any) {
+          console.warn("⚠️ Stop recording error:", stopErr)
+          setIsListening(false)
+          setIsProcessing(false)
+          setVoiceStatusText(null)
+        }
+        return
+      }
+
+      try {
+        const perm = await requestRecordingPermissionsAsync()
+        if (!perm.granted) {
+          Alert.alert(
+            isKn ? "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ" : "Microphone Permission",
+            isKn
+              ? "ಧ್ವನಿ ಸಹಾಯಕಕ್ಕೆ ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ಅಗತ್ಯವಿದೆ. ದಯವಿಟ್ಟು ಸೆಟ್ಟಿಂಗ್ಸ್‌ನಲ್ಲಿ ಅನುಮತಿ ನೀಡಿ."
+              : "Microphone permission is required for voice questions. Please allow access in Settings."
+          )
+          return
+        }
+
+        await setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: true,
+        })
+        await audioRecorder.prepareToRecordAsync()
+        audioRecorder.record()
+        setIsListening(true)
+        setVoiceStatusText(
+          isKn
+            ? "ಮಾತನಾಡಿ... ನಿಲ್ಲಿಸಲು ಮೈಕ್ ಮೇಲೆ ಮತ್ತೊಮ್ಮೆ ಒತ್ತಿ"
+            : "Listening... Tap mic again to stop & send"
+        )
+      } catch (recErr: any) {
+        console.warn("⚠️ Native audio recording error:", recErr)
+        setIsListening(false)
+        setVoiceStatusText(null)
+        Alert.alert(
+          isKn ? "ರೆಕಾರ್ಡಿಂಗ್ ದೋಷ" : "Recording Error",
+          recErr?.message || "Failed to start microphone recording"
+        )
+      }
+      return
+    }
+
+    // Web path: stop existing MediaRecorder
     if (isListening) {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
         mediaRecorderRef.current.stop()
@@ -180,9 +330,8 @@ export default function VoiceAssistantScreen() {
       return
     }
 
-    // Check if navigator.mediaDevices is available
+    // Web: check MediaRecorder support, fallback to Web Speech API
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      // If Web Speech API is supported
       if (typeof window !== "undefined" && ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition)) {
         const SpeechRec = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
         const recognition = new SpeechRec()
@@ -201,8 +350,7 @@ export default function VoiceAssistantScreen() {
           }
         }
 
-        recognition.onerror = (e: any) => {
-          console.warn("[SpeechRecognition Error]:", e)
+        recognition.onerror = () => {
           setIsListening(false)
           setVoiceStatusText(null)
         }
@@ -214,15 +362,17 @@ export default function VoiceAssistantScreen() {
 
         try {
           recognition.start()
-        } catch { }
+        } catch {}
         return
       }
 
-      alert(isKn ? "ಧ್ವನಿ ರೆಕಾರ್ಡಿಂಗ್ ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ" : "Microphone not supported on this browser")
+      Alert.alert(
+        isKn ? "ಲಭ್ಯವಿಲ್ಲ" : "Not Supported",
+        isKn ? "ಧ್ವನಿ ರೆಕಾರ್ಡಿಂಗ್ ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ" : "Microphone not supported on this browser"
+      )
       return
     }
 
-    // Standard HTML5 Audio Recording via MediaRecorder
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       audioChunksRef.current = []
@@ -237,69 +387,15 @@ export default function VoiceAssistantScreen() {
       }
 
       mediaRecorder.onstop = async () => {
-        // Stop all audio tracks to release mic
         stream.getTracks().forEach((track) => track.stop())
 
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" })
         if (audioBlob.size < 500) {
-          // Empty or silent recording
+          setVoiceStatusText(null)
           return
         }
 
-        setIsProcessing(true)
-        setVoiceStatusText(isKn ? " ಧ್ವನಿ ಪರಿವರ್ತಿಸಲಾಗುತ್ತಿದೆ..." : "Transcribing with Sarvam AI...")
-
-        // Placeholder assistant message
-        let accumulatedText = ""
-        const assistantPlaceholder: ChatEntry = {
-          role: "assistant",
-          text: "",
-          stageContext: stageName || "Rice (Paddy)",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        }
-
-        await streamVoiceAudio(
-          audioBlob,
-          "recording.webm",
-          {
-            onTranscript: (transcript: string) => {
-              // Add real transcribed query as user message
-              const userMsg: ChatEntry = {
-                role: "user",
-                text: transcript,
-                timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              }
-              setChat((prev) => [...prev, userMsg, assistantPlaceholder])
-              setVoiceStatusText(null)
-            },
-            onChunk: (chunk: string) => {
-              accumulatedText += chunk
-              setChat((prev) => {
-                const next = [...prev]
-                if (next.length > 0 && next[next.length - 1].role === "assistant") {
-                  next[next.length - 1] = {
-                    ...next[next.length - 1],
-                    text: accumulatedText,
-                  }
-                }
-                return next
-              })
-            },
-            onDone: () => {
-              setIsProcessing(false)
-              setVoiceStatusText(null)
-            },
-            onError: (err) => {
-              console.error("Voice stream error:", err)
-              setIsProcessing(false)
-              setVoiceStatusText(null)
-            },
-          },
-          {
-            mobile: profile.mobile,
-            language: isKn ? "kn-IN" : "en-IN",
-          }
-        )
+        await sendRecordedAudio(audioBlob, "recording.webm")
       }
 
       mediaRecorder.start()
@@ -309,7 +405,8 @@ export default function VoiceAssistantScreen() {
       console.warn("⚠️ Microphone access error:", micErr)
       setIsListening(false)
       setVoiceStatusText(null)
-      alert(
+      Alert.alert(
+        isKn ? "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ" : "Microphone Permission",
         isKn
           ? "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ಸಿಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಬ್ರೌಸರ್ ಸೆಟ್ಟಿಂಗ್ಸ್‌ನಲ್ಲಿ ಮೈಕ್ ಅನುಮತಿ ನೀಡಿ."
           : "Microphone permission denied. Please allow microphone access in your browser."

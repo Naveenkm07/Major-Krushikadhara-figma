@@ -4,12 +4,11 @@
 // Model: saaras:v4
 // ==============================================================================
 
-import dotenv from "dotenv"
+import "../config/env.js"
 import { SarvamAIClient } from "sarvamai"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-dotenv.config()
 
 export interface SarvamSttResult {
   success: boolean
@@ -44,11 +43,13 @@ export async function transcribeAudioWithSarvam(
   }
 
   // Write temporary file for the Sarvam SDK file stream
+  const safeName = path.basename(filename || "audio.m4a").replace(/[^a-zA-Z0-9._-]/g, "_") || "audio.m4a"
+  const finalName = path.extname(safeName) ? safeName : `${safeName}.m4a`
   const tempDir = os.tmpdir()
-  const tempFilePath = path.join(tempDir, `sarvam_${Date.now()}_${filename}`)
+  const tempFilePath = path.join(tempDir, `sarvam_${Date.now()}_${finalName}`)
 
   try {
-    console.log(`🎙️ [Sarvam STT] Transcribing ${audioBuffer.length} bytes (file: ${filename}, lang: ${languageCode})...`)
+    console.log(`🎙️ [Sarvam STT] Transcribing ${audioBuffer.length} bytes (file: ${finalName}, lang: ${languageCode})...`)
 
     fs.writeFileSync(tempFilePath, audioBuffer)
 
@@ -58,9 +59,10 @@ export async function transcribeAudioWithSarvam(
 
     const fileStream = fs.createReadStream(tempFilePath)
 
-    const response = await (client.speechToText.transcribe as any)(fileStream, {
+    const response = await client.speechToText.transcribe({
+      file: fileStream,
       model: "saaras:v4",
-      language_code: languageCode || "kn-IN",
+      language_code: (languageCode || "kn-IN") as any,
       mode: "transcribe",
     })
 
@@ -80,8 +82,8 @@ export async function transcribeAudioWithSarvam(
     // Direct REST API fallback
     try {
       const formData = new FormData()
-      const blob = new Blob([new Uint8Array(audioBuffer)], { type: getMimeType(filename) })
-      formData.append("file", blob, filename)
+      const blob = new Blob([new Uint8Array(audioBuffer)], { type: getMimeType(finalName) })
+      formData.append("file", blob, finalName)
       formData.append("model", "saaras:v4")
       formData.append("mode", "transcribe")
       if (languageCode) {
@@ -94,6 +96,7 @@ export async function transcribeAudioWithSarvam(
           "api-subscription-key": apiKey,
         },
         body: formData,
+        signal: AbortSignal.timeout(20000),
       })
 
       if (!res.ok) {
@@ -135,8 +138,20 @@ function getMimeType(filename: string): string {
       return "audio/mpeg"
     case "m4a":
       return "audio/m4a"
+    case "mp4":
+      return "audio/mp4"
     case "aac":
       return "audio/aac"
+    case "3gp":
+      return "audio/3gpp"
+    case "caf":
+      return "audio/x-caf"
+    case "amr":
+      return "audio/amr"
+    case "flac":
+      return "audio/flac"
+    case "opus":
+      return "audio/opus"
     case "ogg":
       return "audio/ogg"
     case "webm":

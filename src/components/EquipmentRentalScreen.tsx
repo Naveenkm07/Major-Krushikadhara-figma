@@ -16,19 +16,22 @@ import {
   Search,
   MapPin,
   Plus,
-  Tractor,
   Star,
   ChevronRight,
   ClipboardList,
+  Bell,
+  Check,
 } from "lucide-react-native"
 
-const types = ["All", "Tractor", "Rotavator", "Seed Drill", "Sprayer", "Harvester"]
+const TYPES = ["All", "Tractor", "Rotavator", "Seed Drill", "Sprayer", "Harvester"]
 
 export default function EquipmentRentalScreen() {
   const { open } = useNav()
-  const { t } = useLang()
-  const { equipment } = useEquipment()
+  const { t, lang } = useLang()
+  const isKn = lang === "kn"
+  const { equipment, toggleNotify } = useEquipment()
   const tx = useEquipText()
+  const eqText = t.x.equipmentA
   const [query, setQuery] = useState("")
   const [selectedType, setSelectedType] = useState("All")
 
@@ -45,8 +48,8 @@ export default function EquipmentRentalScreen() {
 
   return (
     <DetailShell
-      title="Equipment Rental"
-      subtitle="Rent tractors & farm machinery nearby"
+      title={eqText.rental.title}
+      subtitle={eqText.rental.subtitle}
       action={
         <TouchableOpacity
           onPress={() => open("myRentals")}
@@ -62,7 +65,7 @@ export default function EquipmentRentalScreen() {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search tractors, tillers, harvesters..."
+          placeholder={eqText.rental.searchPlaceholder}
           placeholderTextColor="#9ca3af"
           style={styles.searchInput}
         />
@@ -74,24 +77,18 @@ export default function EquipmentRentalScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.typeScroll}
       >
-        {types.map((tp) => {
+        {TYPES.map((tp) => {
           const active = selectedType === tp
+          const label =
+            tp === "All" ? (isKn ? "ಎಲ್ಲಾ" : "All") : tx.type(tp)
           return (
             <TouchableOpacity
               key={tp}
               onPress={() => setSelectedType(tp)}
-              style={[
-                styles.typePill,
-                active && styles.typePillActive,
-              ]}
+              style={[styles.typePill, active && styles.typePillActive]}
             >
-              <Text
-                style={[
-                  styles.typeText,
-                  active && styles.typeTextActive,
-                ]}
-              >
-                {tp}
+              <Text style={[styles.typeText, active && styles.typeTextActive]}>
+                {label}
               </Text>
             </TouchableOpacity>
           )
@@ -100,73 +97,119 @@ export default function EquipmentRentalScreen() {
 
       {/* Equipment List */}
       <View style={styles.equipmentList}>
-        {filtered.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            onPress={() => open("equipmentDetails", { equipmentId: item.id })}
-            activeOpacity={0.88}
-            style={styles.equipmentCard}
-          >
-            <Image source={{ uri: item.image }} style={styles.equipImage} />
+        {filtered.map((item) => {
+          const isAvailable = item.availability === "available"
+          return (
+            <View key={item.id} style={styles.equipmentCard}>
+              <TouchableOpacity
+                onPress={() => open("equipmentDetails", { equipmentId: item.id })}
+                activeOpacity={0.9}
+              >
+                <Image source={{ uri: item.image }} style={styles.equipImage} />
+                <View style={styles.cardHeaderWrap}>
+                  <View style={styles.cardHeaderRow}>
+                    <Text style={styles.equipName}>{tx.name(item.name)}</Text>
+                    <View
+                      style={[
+                        styles.availBadge,
+                        isAvailable ? styles.availGreen : styles.availBooked,
+                      ]}
+                    >
+                      <Text
+                        style={
+                          isAvailable
+                            ? styles.availGreenText
+                            : styles.availBookedText
+                        }
+                      >
+                        {isAvailable
+                          ? isKn
+                            ? "ಲಭ್ಯವಿದೆ"
+                            : "Available"
+                          : isKn
+                          ? "ಬುಕ್ ಆಗಿದೆ"
+                          : "Booked"}
+                      </Text>
+                    </View>
+                  </View>
 
-            <View style={styles.cardContent}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.equipName}>{tx.name(item.name)}</Text>
-                <View
-                  style={[
-                    styles.availBadge,
-                    item.availability === "available"
-                      ? styles.availGreen
-                      : styles.availBooked,
-                  ]}
-                >
-                  <Text
-                    style={
-                      item.availability === "available"
-                        ? styles.availGreenText
-                        : styles.availBookedText
-                    }
-                  >
-                    {item.availability === "available" ? "Available" : "Booked"}
-                  </Text>
+                  <View style={styles.metaRow}>
+                    <View style={styles.locationMeta}>
+                      <MapPin size={13} color="#6b7280" />
+                      <Text style={styles.metaText}>
+                        {item.location} · {item.distanceKm} {isKn ? "ಕಿ.ಮೀ ದೂರ" : "km away"}
+                      </Text>
+                    </View>
+                    <View style={styles.ratingMeta}>
+                      <Star size={13} color="#f59e0b" fill="#f59e0b" />
+                      <Text style={styles.ratingText}>
+                        {item.rating.toFixed(1)}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
-
-              <View style={styles.metaRow}>
-                <View style={styles.locationMeta}>
-                  <MapPin size={13} color="#6b7280" />
-                  <Text style={styles.metaText}>
-                    {item.location} · {item.distanceKm} km away
-                  </Text>
-                </View>
-                <View style={styles.ratingMeta}>
-                  <Star size={13} color="#f59e0b" fill="#f59e0b" />
-                  <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
-                </View>
-              </View>
+              </TouchableOpacity>
 
               {/* Price & Action Row */}
               <View style={styles.cardBottomRow}>
                 <View>
                   <Text style={styles.pricePerDay}>
                     ₹{item.pricePerDay}
-                    <Text style={styles.perDayUnit}> / day</Text>
+                    <Text style={styles.perDayUnit}>
+                      {" "}
+                      / {isKn ? "ದಿನ" : "day"}
+                    </Text>
                   </Text>
-                  <Text style={styles.specText}>{item.hp} HP · {item.fuel}</Text>
+                  <Text style={styles.specText}>
+                    {item.hp} · {tx.fuel(item.fuel)}
+                  </Text>
                 </View>
 
-                <TouchableOpacity
-                  onPress={() => open("requestRental", { equipmentId: item.id })}
-                  activeOpacity={0.8}
-                  style={styles.rentBtn}
-                >
-                  <Text style={styles.rentBtnText}>Book Now</Text>
-                  <ChevronRight size={15} color="#ffffff" />
-                </TouchableOpacity>
+                {isAvailable ? (
+                  <TouchableOpacity
+                    onPress={() => open("requestRental", { equipmentId: item.id })}
+                    activeOpacity={0.8}
+                    style={styles.rentBtn}
+                  >
+                    <Text style={styles.rentBtnText}>
+                      {isKn ? "ಬುಕ್ ಮಾಡಿ" : "Book Now"}
+                    </Text>
+                    <ChevronRight size={15} color="#ffffff" />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => toggleNotify(item.id)}
+                    activeOpacity={0.8}
+                    style={[
+                      styles.notifyBtn,
+                      item.notifyMe && styles.notifyBtnActive,
+                    ]}
+                  >
+                    {item.notifyMe ? (
+                      <Check size={14} color="#15803d" />
+                    ) : (
+                      <Bell size={14} color="#4b5563" />
+                    )}
+                    <Text
+                      style={[
+                        styles.notifyBtnText,
+                        item.notifyMe && styles.notifyBtnTextActive,
+                      ]}
+                    >
+                      {item.notifyMe
+                        ? isKn
+                          ? "ತಿಳಿಸಲಾಗುವುದು ✓"
+                          : "Notified ✓"
+                        : isKn
+                        ? "ಲಭ್ಯವಾದಾಗ ತಿಳಿಸಿ"
+                        : "Notify Me"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
-          </TouchableOpacity>
-        ))}
+          )
+        })}
       </View>
 
       {/* List My Equipment Bottom Button */}
@@ -176,7 +219,7 @@ export default function EquipmentRentalScreen() {
         style={styles.listOwnBtn}
       >
         <Plus size={18} color="#256428" />
-        <Text style={styles.listOwnBtnText}>List Your Machinery for Rent</Text>
+        <Text style={styles.listOwnBtnText}>{eqText.rental.listYours}</Text>
       </TouchableOpacity>
     </DetailShell>
   )
@@ -251,8 +294,9 @@ const styles = StyleSheet.create({
     height: 160,
     resizeMode: "cover",
   },
-  cardContent: {
-    padding: 16,
+  cardHeaderWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
   },
   cardHeaderRow: {
     flexDirection: "row",
@@ -284,7 +328,7 @@ const styles = StyleSheet.create({
   availBookedText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#9ca3af",
+    color: "#6b7280",
   },
   metaRow: {
     flexDirection: "row",
@@ -315,8 +359,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 14,
+    marginTop: 12,
+    paddingHorizontal: 16,
     paddingTop: 12,
+    paddingBottom: 16,
     borderTopWidth: 1,
     borderTopColor: "#f3f4f6",
   },
@@ -348,6 +394,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "bold",
     color: "#ffffff",
+  },
+  notifyBtn: {
+    backgroundColor: "#f3f4f6",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    gap: 6,
+  },
+  notifyBtnActive: {
+    backgroundColor: "#dcfce7",
+  },
+  notifyBtnText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#4b5563",
+  },
+  notifyBtnTextActive: {
+    color: "#15803d",
   },
   listOwnBtn: {
     flexDirection: "row",

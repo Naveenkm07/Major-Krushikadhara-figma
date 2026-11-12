@@ -29,6 +29,7 @@ import {
   ShieldAlert,
 } from "lucide-react-native"
 import { fetchLiveWeather, type LiveWeatherData } from "../api/weather"
+import { getCurrentLocation } from "../utils/location"
 
 // Preset fallback verified farming hubs for manual selection
 const MANUAL_LOCATION_HUBS = [
@@ -76,41 +77,33 @@ export default function WeatherScreen() {
   const [error, setError] = useState<string | null>(null)
 
   // 1. Detect dynamic GPS coordinates
-  const detectGps = useCallback(() => {
+  const detectGps = useCallback(async () => {
     setGpsStatus("detecting")
     setGpsErrorMsg(null)
 
-    if (typeof navigator !== "undefined" && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude
-          const lng = position.coords.longitude
-          setCoords({ lat, lng })
-          setGpsStatus("success")
-          setSelectedHubName(`${lat.toFixed(3)}°N, ${lng.toFixed(3)}°E`)
-        },
-        (err) => {
-          console.warn("[Weather GPS] Error:", err.message)
-          setGpsStatus("denied")
-          setGpsErrorMsg(
-            err.code === 1
-              ? isKn
-                ? "ಸ್ಥಳ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
-                : "Location permission denied. Please choose a nearby farming hub."
-              : isKn
-              ? "ಜಿಪಿಎಸ್ ಸಿಗ್ನಲ್ ಸಿಗುತ್ತಿಲ್ಲ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
-              : "GPS signal timed out. Please choose a nearby farming hub."
-          )
-          const fallback = MANUAL_LOCATION_HUBS[0]
-          setCoords({ lat: fallback.lat, lng: fallback.lng })
-          setSelectedHubName(fallback.label)
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-      )
-    } else {
+    const loc = await getCurrentLocation(9000)
+    if (loc.ok) {
+      setCoords({ lat: loc.lat, lng: loc.lng })
+      setGpsStatus("success")
+      setSelectedHubName(`${loc.lat.toFixed(3)}°N, ${loc.lng.toFixed(3)}°E`)
+    } else if (loc.reason === "unavailable") {
       const fallback = MANUAL_LOCATION_HUBS[0]
       setCoords({ lat: fallback.lat, lng: fallback.lng })
       setGpsStatus("manual")
+      setSelectedHubName(fallback.label)
+    } else {
+      setGpsStatus("denied")
+      setGpsErrorMsg(
+        loc.reason === "denied"
+          ? isKn
+            ? "ಸ್ಥಳ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+            : "Location permission denied. Please choose a nearby farming hub."
+          : isKn
+          ? "ಜಿಪಿಎಸ್ ಸಿಗ್ನಲ್ ಸಿಗುತ್ತಿಲ್ಲ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+          : "GPS signal timed out. Please choose a nearby farming hub."
+      )
+      const fallback = MANUAL_LOCATION_HUBS[0]
+      setCoords({ lat: fallback.lat, lng: fallback.lng })
       setSelectedHubName(fallback.label)
     }
   }, [isKn])

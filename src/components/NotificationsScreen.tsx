@@ -1,91 +1,108 @@
-import { View, Text, StyleSheet } from "react-native"
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import { useLang } from "../i18n"
+import { useProfile } from "../profile"
+import { useNav } from "../nav"
+import { useNotifications, type NotificationKind } from "../storage/notifications"
 import DetailShell from "./DetailShell"
-import { CloudRain, Bug, Droplets, TrendingUp, Landmark } from "lucide-react-native"
+import {
+  CloudRain,
+  Bug,
+  Droplets,
+  TrendingUp,
+  Landmark,
+  CheckCheck,
+} from "lucide-react-native"
 
-const NOTIFS = [
-  {
-    icon: CloudRain,
-    bg: "#dbeafe",
-    color: "#2563eb",
-    title: "Heavy Rain Expected",
-    desc: "Weather forecast predicts heavy rainfall in Mandya on Thursday. Ensure proper field drainage.",
-    time: "2 hours ago",
-    unread: true,
-  },
-  {
-    icon: Bug,
-    bg: "#fee2e2",
-    color: "#dc2626",
-    title: "Pest Warning in your Taluk",
-    desc: "Yellow stem borer attacks reported in nearby paddy fields. Monitor crops closely.",
-    time: "5 hours ago",
-    unread: true,
-  },
-  {
-    icon: Droplets,
-    bg: "#ccfbf1",
-    color: "#0d9488",
-    title: "Optimal Irrigation Window",
-    desc: "Soil moisture is at 42%. Schedule drip irrigation between 6:00 AM and 8:00 AM.",
-    time: "8 hours ago",
-    unread: false,
-  },
-  {
-    icon: TrendingUp,
-    bg: "#ffedd5",
-    color: "#ea580c",
-    title: "Mandi Price Surge",
-    desc: "Tomato rates in Mandya APMC increased by 4% to ₹28/kg.",
-    time: "Yesterday",
-    unread: false,
-  },
-  {
-    icon: Landmark,
-    bg: "#f3e8ff",
-    color: "#9333ea",
-    title: "PM-KISAN Installment Released",
-    desc: "17th installment of ₹2,000 has been credited to registered farmer bank accounts.",
-    time: "2 days ago",
-    unread: false,
-  },
-]
+const KIND_STYLES: Record<
+  NotificationKind,
+  { icon: typeof CloudRain; bg: string; color: string }
+> = {
+  weather: { icon: CloudRain, bg: "#dbeafe", color: "#2563eb" },
+  pest: { icon: Bug, bg: "#fee2e2", color: "#dc2626" },
+  irrigation: { icon: Droplets, bg: "#ccfbf1", color: "#0d9488" },
+  market: { icon: TrendingUp, bg: "#ffedd5", color: "#ea580c" },
+  scheme: { icon: Landmark, bg: "#f3e8ff", color: "#9333ea" },
+}
 
 export default function NotificationsScreen() {
-  const { t } = useLang()
+  const { t, lang } = useLang()
+  const { profile } = useProfile()
+  const { open } = useNav()
+  const isKn = lang === "kn"
+  const { items, unreadCount, markRead, markAllRead } = useNotifications(
+    profile.district,
+    profile.crops
+  )
+
   return (
     <DetailShell
-      title={t.profile?.rows?.notifications || "Notifications"}
-      subtitle="Farming alerts, weather updates & mandi rates"
+      title={t.profile?.rows?.notifications || (isKn ? "ಸೂಚನೆಗಳು" : "Notifications")}
+      subtitle={
+        isKn
+          ? `${profile.district} · ಕೃಷಿ, ಹವಾಮಾನ ಮತ್ತು ಮಂಡಿ ಎಚ್ಚರಿಕೆಗಳು`
+          : `${profile.district} · Farming alerts, weather & mandi updates`
+      }
+      action={
+        unreadCount > 0 ? (
+          <TouchableOpacity onPress={markAllRead} style={styles.markAllBtn}>
+            <CheckCheck size={14} color="#256428" />
+            <Text style={styles.markAllText}>
+              {isKn ? "ಎಲ್ಲಾ ಓದಿದೆ" : "Mark all"}
+            </Text>
+          </TouchableOpacity>
+        ) : undefined
+      }
     >
       <View style={styles.list}>
-        {NOTIFS.map((n, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.card,
-              n.unread && styles.cardUnread,
-            ]}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: n.bg }]}>
-              <n.icon size={20} color={n.color} />
-            </View>
-            <View style={styles.infoWrap}>
-              <View style={styles.topRow}>
-                <Text style={styles.title}>{n.title}</Text>
-                {n.unread && <View style={styles.dot} />}
+        {items.map((n) => {
+          const vis = KIND_STYLES[n.kind]
+          const Icon = vis.icon
+          return (
+            <TouchableOpacity
+              key={n.id}
+              activeOpacity={0.8}
+              onPress={() => {
+                markRead(n.id)
+                open(n.route as any)
+              }}
+              style={[styles.card, !n.read && styles.cardUnread]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: vis.bg }]}>
+                <Icon size={20} color={vis.color} />
               </View>
-              <Text style={styles.desc}>{n.desc}</Text>
-              <Text style={styles.time}>{n.time}</Text>
-            </View>
-          </View>
-        ))}
+              <View style={styles.infoWrap}>
+                <View style={styles.topRow}>
+                  <Text style={styles.title}>
+                    {isKn ? n.titleKn : n.titleEn}
+                  </Text>
+                  {!n.read ? <View style={styles.dot} /> : null}
+                </View>
+                <Text style={styles.desc}>{isKn ? n.bodyKn : n.bodyEn}</Text>
+                <Text style={styles.time}>{isKn ? n.agoKn : n.agoEn}</Text>
+              </View>
+            </TouchableOpacity>
+          )
+        })}
       </View>
     </DetailShell>
   )
 }
 
 const styles = StyleSheet.create({
+  markAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#dcfce7",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  markAllText: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#256428",
+  },
   list: {
     gap: 12,
     paddingBottom: 30,
@@ -145,4 +162,3 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 })
-

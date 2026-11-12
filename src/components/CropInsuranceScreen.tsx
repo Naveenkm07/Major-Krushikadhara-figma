@@ -15,45 +15,47 @@ import {
 } from "lucide-react-native"
 
 export default function CropInsuranceScreen() {
-  const { t } = useLang()
+  const { t, lang } = useLang()
+  const isKn = lang === "kn"
   const ins = t.ins
   const { policies, applications } = useInsurance()
   const { open } = useNav()
 
   const activePolicy = policies[0] ?? null
+  const latestApp = applications[0] ?? null
 
   const quickActions = [
     {
       icon: ShieldCheck,
-      label: ins.checkEligibility || "Check Eligibility",
+      label: ins.checkEligibility,
       route: "eligibilityCheck" as const,
       bg: "#dcfce7",
       color: "#16a34a",
     },
     {
       icon: FileText,
-      label: ins.documents || "Policy Documents",
+      label: ins.documents,
       route: "insuranceDocuments" as const,
       bg: "#dbeafe",
       color: "#2563eb",
     },
     {
       icon: CalendarDays,
-      label: ins.importantDates || "Important Dates",
+      label: ins.importantDates,
       route: "importantDates" as const,
       bg: "#fef3c7",
       color: "#d97706",
     },
     {
       icon: HelpCircle,
-      label: ins.help || "Insurance Help",
+      label: ins.help,
       route: "insuranceHelp" as const,
       bg: "#f3e8ff",
       color: "#9333ea",
     },
     {
       icon: LayoutDashboard,
-      label: ins.dashboard || "Dashboard",
+      label: ins.dashboard,
       route: "insuranceDashboard" as const,
       bg: "#e0e7ff",
       color: "#4f46e5",
@@ -72,45 +74,68 @@ export default function CropInsuranceScreen() {
           <View style={styles.policyCardTop}>
             <View style={styles.policyBadge}>
               <CheckCircle2 size={14} color="#ffffff" />
-              <Text style={styles.policyBadgeText}>Active Policy</Text>
+              <Text style={styles.policyBadgeText}>
+                {isKn ? "ಸಕ್ರಿಯ ಪಾಲಿಸಿ" : "Active Policy"}
+              </Text>
             </View>
             <Text style={styles.policyNo}>{activePolicy.policyNumber}</Text>
           </View>
 
-          <Text style={styles.policyScheme}>PMFBY Kharif Crop Insurance</Text>
+          <Text style={styles.policyScheme}>
+            {isKn ? "PMFBY ಮುಂಗಾರು ಬೆಳೆ ವಿಮೆ" : "PMFBY Kharif Crop Insurance"}
+          </Text>
           <Text style={styles.policyCrop}>
             {activePolicy.crop} · {activePolicy.season}
           </Text>
 
           <View style={styles.policyMetrics}>
             <View style={styles.metricItem}>
-              <Text style={styles.metricLabel}>Coverage</Text>
+              <Text style={styles.metricLabel}>
+                {isKn ? "ವಿಮಾ ರಕ್ಷಣೆ" : "Coverage"}
+              </Text>
               <Text style={styles.metricValue}>
-                ₹{activePolicy.coverage.toLocaleString()}
+                ₹{activePolicy.coverage.toLocaleString("en-IN")}
               </Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
-              <Text style={styles.metricLabel}>Farmer Premium</Text>
+              <Text style={styles.metricLabel}>
+                {isKn ? "ರೈತರ ಕಂತು" : "Farmer Premium"}
+              </Text>
               <Text style={styles.metricValue}>
-                ₹{activePolicy.premium.toLocaleString()}
+                ₹{activePolicy.premium.toLocaleString("en-IN")}
               </Text>
             </View>
           </View>
 
           <View style={styles.viewPolicyRow}>
-            <Text style={styles.viewPolicyText}>View Policy Details</Text>
+            <Text style={styles.viewPolicyText}>{ins.viewPolicy}</Text>
             <ChevronRight size={16} color="#ffffff" />
+          </View>
+        </TouchableOpacity>
+      ) : latestApp ? (
+        <TouchableOpacity
+          onPress={() => open("applicationStatus")}
+          activeOpacity={0.88}
+          style={styles.emptyPolicyCard}
+        >
+          <Text style={styles.emptyTitle}>
+            {isKn
+              ? `ಅರ್ಜಿ ಸಲ್ಲಿಸಲಾಗಿದೆ (${latestApp.crop})`
+              : `Application Submitted (${latestApp.crop})`}
+          </Text>
+          <View style={styles.applyNowBtn}>
+            <Text style={styles.applyNowText}>{ins.trackApp}</Text>
           </View>
         </TouchableOpacity>
       ) : (
         <View style={styles.emptyPolicyCard}>
-          <Text style={styles.emptyTitle}>No active crop insurance</Text>
+          <Text style={styles.emptyTitle}>{ins.noPolicies}</Text>
           <TouchableOpacity
             onPress={() => open("insurancePlan")}
             style={styles.applyNowBtn}
           >
-            <Text style={styles.applyNowText}>Apply for PMFBY Insurance</Text>
+            <Text style={styles.applyNowText}>{ins.applyNow}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -125,20 +150,24 @@ export default function CropInsuranceScreen() {
           <AlertTriangle size={22} color="#dc2626" />
         </View>
         <View style={styles.lossTextWrap}>
-          <Text style={styles.lossTitle}>Report Crop Damage / Loss</Text>
+          <Text style={styles.lossTitle}>{ins.reportLoss}</Text>
           <Text style={styles.lossSubtitle}>
-            Report within 72 hrs of natural calamity for immediate claim survey
+            {isKn
+              ? "ತಕ್ಷಣದ ಸಮೀಕ್ಷೆಗಾಗಿ ನೈಸರ್ಗಿಕ ವಿಕೋಪದ 72 ಗಂಟೆಗಳೊಳಗೆ ವರದಿ ಮಾಡಿ"
+              : "Report within 72 hrs of natural calamity for immediate claim survey"}
           </Text>
         </View>
         <ChevronRight size={18} color="#dc2626" />
       </TouchableOpacity>
 
       {/* Quick Action Cards */}
-      <Text style={styles.sectionHeader}>Insurance Services</Text>
+      <Text style={styles.sectionHeader}>
+        {isKn ? "ವಿಮಾ ಸೇವೆಗಳು" : "Insurance Services"}
+      </Text>
       <View style={styles.servicesGrid}>
         {quickActions.map((act) => (
           <TouchableOpacity
-            key={act.label}
+            key={act.route}
             onPress={() => open(act.route)}
             activeOpacity={0.8}
             style={styles.serviceCard}
@@ -250,6 +279,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#374151",
     marginBottom: 14,
+    textAlign: "center",
   },
   applyNowBtn: {
     backgroundColor: "#256428",

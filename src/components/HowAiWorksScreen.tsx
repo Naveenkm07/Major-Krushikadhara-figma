@@ -1,20 +1,34 @@
 import { View, Text, StyleSheet } from "react-native"
+import { useLang } from "../i18n"
 import DetailShell from "./DetailShell"
-import { Cpu, Eye, Sparkles, Database } from "lucide-react-native"
+import { Cpu } from "lucide-react-native"
 
 export default function HowAiWorksScreen() {
+  const { lang, t } = useLang()
+  const isKn = lang === "kn"
+
   return (
     <DetailShell
-      title="How AI Works"
-      subtitle="Computer Vision & Agronomy Deep Learning"
+      title={t.x.coreA.settings.howAi}
+      subtitle={
+        isKn
+          ? "YOLO11s TFLite + Gemini ಕೃಷಿ ತಜ್ಞ"
+          : "Computer Vision & Agronomy AI Pipeline"
+      }
     >
       <View style={styles.card}>
         <View style={styles.iconCircle}>
           <Cpu size={32} color="#ffffff" />
         </View>
-        <Text style={styles.title}>Plant Pathology Neural Network</Text>
+        <Text style={styles.title}>
+          {isKn
+            ? "YOLO11s ಕೀಟ ಪತ್ತೆ ನರಮಂಡಲ (Neural Network)"
+            : "YOLO11s Pest Pathology Pipeline"}
+        </Text>
         <Text style={styles.desc}>
-          KrushikaDhara utilizes Convolutional Neural Networks (CNN) fine-tuned on ICAR and agricultural university datasets to classify leaf lesions, chlorosis, fungal spore patterns, and pest bites.
+          {isKn
+            ? "ಕೃಷಿಕಧಾರಾ 102 ಕೃಷಿ ಕೀಟ ವರ್ಗಗಳ ಮೇಲೆ ತರಬೇತಿ ಪಡೆದ YOLO11s TensorFlow Lite ಮಾದರಿಯನ್ನು ಬಳಸುತ್ತದೆ. EXIF ಓರಿಯಂಟೇಶನ್ ಸರಿಪಡಿಸಿ ಮತ್ತು ಆಸ್ಪೆಕ್ಟ್ ಅನುಪಾತ ಲೆಟರ್‌ಬಾಕ್ಸಿಂಗ್ ಮೂಲಕ ನಿಖರವಾಗಿ ಕೀಟಗಳನ್ನು ಗುರುತಿಸುತ್ತದೆ."
+            : "KrushikaDhara runs a quantized YOLO11s TensorFlow Lite model trained across 102 pest species with EXIF orientation normalization and aspect-preserving letterboxing for high field accuracy."}
         </Text>
       </View>
 
@@ -22,24 +36,42 @@ export default function HowAiWorksScreen() {
         <View style={styles.step}>
           <View style={styles.stepNum}><Text style={styles.stepNumText}>1</Text></View>
           <View style={styles.stepInfo}>
-            <Text style={styles.stepTitle}>Leaf Region Extraction</Text>
-            <Text style={styles.stepDesc}>Segments healthy leaf tissue from background soil/debris.</Text>
+            <Text style={styles.stepTitle}>
+              {isKn ? "ಚಿತ್ರದ ಪ್ರಮಾಣೀಕರಣ (EXIF & Letterbox)" : "Image Normalization (EXIF & Letterbox)"}
+            </Text>
+            <Text style={styles.stepDesc}>
+              {isKn
+                ? "ಫೋನ್ ಕ್ಯಾಮೆರಾ ದಿಕ್ಕನ್ನು ಸರಿಪಡಿಸಿ 640×640 RGB ಇನ್‌ಪುಟ್ ತಯಾರಿಸುತ್ತದೆ."
+                : "Corrects mobile camera rotation metadata and pads leaves to 640×640 without distortion."}
+            </Text>
           </View>
         </View>
 
         <View style={styles.step}>
           <View style={styles.stepNum}><Text style={styles.stepNumText}>2</Text></View>
           <View style={styles.stepInfo}>
-            <Text style={styles.stepTitle}>Feature Classification</Text>
-            <Text style={styles.stepDesc}>Extracts lesion patterns, halo coloration, and necrotic spots.</Text>
+            <Text style={styles.stepTitle}>
+              {isKn ? "102-ವರ್ಗ ಕೀಟ ಪತ್ತೆ (TFLite NMS)" : "102-Class Inference & NMS"}
+            </Text>
+            <Text style={styles.stepDesc}>
+              {isKn
+                ? "ವಿಶ್ವಾಸಾರ್ಹತೆಯೊಂದಿಗೆ ಕೀಟದ ಹೆಸರು, ಸಂಖ್ಯೆ ಮತ್ತು ತೀವ್ರತೆಯನ್ನು ಲೆಕ್ಕಾಚಾರ ಮಾಡುತ್ತದೆ."
+                : "Identifies insect species, bounding detections, confidence score, and infestation severity."}
+            </Text>
           </View>
         </View>
 
         <View style={styles.step}>
           <View style={styles.stepNum}><Text style={styles.stepNumText}>3</Text></View>
           <View style={styles.stepInfo}>
-            <Text style={styles.stepTitle}>Remedy Generation</Text>
-            <Text style={styles.stepDesc}>Provides dosage recommendations from agricultural handbooks.</Text>
+            <Text style={styles.stepTitle}>
+              {isKn ? "Gemini ಕೃಷಿ ಚಿಕಿತ್ಸಾ ಸಲಹೆ" : "Remedy & Dosage Generation"}
+            </Text>
+            <Text style={styles.stepDesc}>
+              {isKn
+                ? "ಪ್ರತಿ ಲೀಟರ್ ಪ್ರಮಾಣದೊಂದಿಗೆ ಸಾವಯವ ಮತ್ತು ರಾಸಾಯನಿಕ ಸಿಂಪಡಣೆಗಳನ್ನು ನೀಡುತ್ತದೆ."
+                : "Generates organic and chemical sprays with exact ml/L or g/L field dosages and offline fallback."}
+            </Text>
           </View>
         </View>
       </View>
@@ -123,4 +155,3 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 })
-

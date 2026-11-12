@@ -31,6 +31,7 @@ import {
   fetchNearbyMandis,
   type NearbyMandiItem,
 } from "../api/mandi"
+import { getCurrentLocation } from "../utils/location"
 
 // Preset fallback verified farming hubs for manual selection
 const MANUAL_LOCATION_HUBS = [
@@ -86,43 +87,33 @@ export default function MarketPricesScreen() {
   const [rateLimitError, setRateLimitError] = useState<string | null>(null)
 
   // 1. Detect farmer's current GPS location dynamically
-  const requestGpsLocation = useCallback(() => {
+  const requestGpsLocation = useCallback(async () => {
     setGpsStatus("detecting")
     setGpsErrorMsg(null)
 
-    if (typeof navigator !== "undefined" && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude
-          const lng = position.coords.longitude
-          setFarmerCoords({ lat, lng })
-          setGpsStatus("success")
-          setSelectedHubName(`${lat.toFixed(3)}°N, ${lng.toFixed(3)}°E`)
-        },
-        (error) => {
-          console.warn("[GPS] Location error:", error.message)
-          setGpsStatus("denied")
-          setGpsErrorMsg(
-            error.code === 1
-              ? isKn
-                ? "ಸ್ಥಳ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ಹತ್ತಿರದ ಮಾರುಕಟ್ಟೆಗಳನ್ನು ನೋಡಲು ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
-                : "Location permission denied. Please select your nearest farming hub below."
-              : isKn
-              ? "ಜಿಪಿಎಸ್ ಸಿಗ್ನಲ್ ಸಿಗುತ್ತಿಲ್ಲ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
-              : "GPS signal timed out. Please choose a nearby hub below."
-          )
-          // Fallback to default district coordinates if permission denied
-          const fallbackHub = MANUAL_LOCATION_HUBS[0]
-          setFarmerCoords({ lat: fallbackHub.lat, lng: fallbackHub.lng })
-          setSelectedHubName(fallbackHub.label)
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-      )
-    } else {
-      // Platform without navigator.geolocation
+    const loc = await getCurrentLocation(9000)
+    if (loc.ok) {
+      setFarmerCoords({ lat: loc.lat, lng: loc.lng })
+      setGpsStatus("success")
+      setSelectedHubName(`${loc.lat.toFixed(3)}°N, ${loc.lng.toFixed(3)}°E`)
+    } else if (loc.reason === "unavailable") {
       const fallbackHub = MANUAL_LOCATION_HUBS[0]
       setFarmerCoords({ lat: fallbackHub.lat, lng: fallbackHub.lng })
       setGpsStatus("manual")
+      setSelectedHubName(fallbackHub.label)
+    } else {
+      setGpsStatus("denied")
+      setGpsErrorMsg(
+        loc.reason === "denied"
+          ? isKn
+            ? "ಸ್ಥಳ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ. ಹತ್ತಿರದ ಮಾರುಕಟ್ಟೆಗಳನ್ನು ನೋಡಲು ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+            : "Location permission denied. Please select your nearest farming hub below."
+          : isKn
+          ? "ಜಿಪಿಎಸ್ ಸಿಗ್ನಲ್ ಸಿಗುತ್ತಿಲ್ಲ. ಕೆಳಗಿನಿಂದ ನಗರವನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+          : "GPS signal timed out. Please choose a nearby hub below."
+      )
+      const fallbackHub = MANUAL_LOCATION_HUBS[0]
+      setFarmerCoords({ lat: fallbackHub.lat, lng: fallbackHub.lng })
       setSelectedHubName(fallbackHub.label)
     }
   }, [isKn])

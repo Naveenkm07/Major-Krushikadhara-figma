@@ -3,7 +3,9 @@
 // Connects mobile frontend to Neon PostgreSQL & Sarvam STT engine
 // ==============================================================================
 
+import { Platform } from "react-native"
 import { API_BASE } from "./config"
+import { postMultipartFormData } from "./multipart"
 
 export interface GrowthStageItem {
   key: string
@@ -114,9 +116,9 @@ const FALLBACK_CROP_STAGE: ActiveCropStageResponse = {
 export async function fetchActiveCropStage(mobile: string = "9591502209"): Promise<ActiveCropStageResponse> {
   try {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 3500)
+    const timer = setTimeout(() => controller.abort(), 8000)
 
-    const res = await fetch(`${API_BASE}/crop-stage/active?mobile=${mobile}`, {
+    const res = await fetch(`${API_BASE}/crop-stage/active?mobile=${encodeURIComponent(mobile)}`, {
       signal: controller.signal,
     })
     clearTimeout(timer)
@@ -144,32 +146,43 @@ export async function submitVoiceObservation(
 ): Promise<VoiceObservationResult> {
   try {
     const formData = new FormData()
-    formData.append("audio", {
-      uri: audioUri,
-      name: "farmer_voice.m4a",
-      type: "audio/m4a",
-    } as any)
+    const rawName = audioUri.split("?")[0].split("/").pop() || "farmer_voice.m4a"
+    const hasAudioExt = /\.(m4a|mp3|wav|ogg|webm|3gp|aac)$/i.test(rawName)
+    const filename = hasAudioExt ? rawName : "farmer_voice.m4a"
+    const ext = filename.split(".").pop()?.toLowerCase() || "m4a"
+    const mimeType =
+      ext === "wav"
+        ? "audio/wav"
+        : ext === "mp3"
+        ? "audio/mpeg"
+        : ext === "webm"
+        ? "audio/webm"
+        : ext === "ogg"
+        ? "audio/ogg"
+        : "audio/m4a"
+
+    if (Platform.OS === "web") {
+      const audioRes = await fetch(audioUri)
+      const blob = await audioRes.blob()
+      formData.append("audio", blob, filename)
+    } else {
+      formData.append("audio", {
+        uri: audioUri,
+        name: filename,
+        type: mimeType,
+      } as any)
+    }
+
     formData.append("mobile", mobile)
     formData.append("language", language)
 
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 18000)
-
-    const res = await fetch(`${API_BASE}/crop-stage/voice-input`, {
-      method: "POST",
-      body: formData,
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-      },
-    })
-    clearTimeout(timer)
-
-    if (res.ok) {
-      const json = await res.json()
-      if (json.success) {
-        return json
-      }
+    const json = await postMultipartFormData<VoiceObservationResult>(
+      `${API_BASE}/crop-stage/voice-input`,
+      formData,
+      30000
+    )
+    if (json?.success) {
+      return json
     }
   } catch (err) {
     console.error("❌ [Voice Observation Error]:", err)
@@ -199,7 +212,7 @@ export async function submitTextObservation(
 ): Promise<VoiceObservationResult> {
   try {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 8000)
+    const timer = setTimeout(() => controller.abort(), 20000)
 
     const res = await fetch(`${API_BASE}/crop-stage/text-input`, {
       method: "POST",

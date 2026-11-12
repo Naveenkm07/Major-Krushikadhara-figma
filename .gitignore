@@ -30,6 +30,8 @@ ios/
 uploads/
 backend/uploads/
 *.log
+__pycache__/
+*.pyc
 
 # Large machine learning models (optional: uncomment if model exceeds GitHub 100MB limit)
 # backend/models/*.tflite

@@ -6,27 +6,20 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
-  ScrollView,
+  Alert,
 } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useNav } from "../nav"
 import { useEquipment, useEquipText } from "../equipment"
+import { useProfile } from "../profile"
 import { useLang } from "../i18n"
 import DetailShell from "./DetailShell"
 import {
-  MapPin,
-  Star,
   CheckCircle2,
-  Calendar,
-  Clock,
-  ChevronRight,
   ShieldCheck,
   Fuel,
   Gauge,
-  Phone,
   Plus,
-  Check,
-  X,
-  AlertCircle,
   Bell,
 } from "lucide-react-native"
 
@@ -34,35 +27,71 @@ import {
 /* 1. Equipment Details Screen                        */
 /* -------------------------------------------------- */
 export function EquipmentDetailsScreen() {
-  const { params, open, back } = useNav()
-  const { equipment } = useEquipment()
+  const { params, open } = useNav()
+  const { equipment, toggleNotify } = useEquipment()
+  const { lang } = useLang()
+  const isKn = lang === "kn"
   const tx = useEquipText()
+  const insets = useSafeAreaInsets()
+
   const eqId = String(params.equipmentId || params.id || equipment[0]?.id)
   const eq = equipment.find((e) => e.id === eqId) || equipment[0]
 
   if (!eq) {
     return (
-      <DetailShell title="Equipment Details">
-        <Text style={{ textAlign: "center", padding: 20 }}>Equipment not found.</Text>
+      <DetailShell title={isKn ? "ಯಂತ್ರ ವಿವರ" : "Equipment Details"}>
+        <Text style={{ textAlign: "center", padding: 20 }}>
+          {isKn ? "ಯಂತ್ರ ಲಭ್ಯವಿಲ್ಲ." : "Equipment not found."}
+        </Text>
       </DetailShell>
     )
   }
 
+  const isAvailable = eq.availability === "available"
+
   return (
     <DetailShell
       title={tx.name(eq.name)}
-      subtitle={`${eq.location} · ${eq.distanceKm} km away`}
+      subtitle={`${eq.location} · ${eq.distanceKm} ${isKn ? "ಕಿ.ಮೀ ದೂರ" : "km away"}`}
       footer={
-        <View style={styles.footerWrap}>
-          <TouchableOpacity
-            onPress={() => open("requestRental", { equipmentId: eq.id })}
-            activeOpacity={0.85}
-            style={styles.primaryActionBtn}
-          >
-            <Text style={styles.primaryActionText}>
-              Request to Rent (₹{eq.pricePerDay}/day)
-            </Text>
-          </TouchableOpacity>
+        <View
+          style={[
+            styles.footerWrap,
+            { paddingBottom: Math.max(insets.bottom + 12, 18) },
+          ]}
+        >
+          {isAvailable ? (
+            <TouchableOpacity
+              onPress={() => open("requestRental", { equipmentId: eq.id })}
+              activeOpacity={0.85}
+              style={styles.primaryActionBtn}
+            >
+              <Text style={styles.primaryActionText}>
+                {isKn
+                  ? `ಬಾಡಿಗೆಗೆ ಕೇಳಿ (₹${eq.pricePerDay}/ದಿನ)`
+                  : `Request to Rent (₹${eq.pricePerDay}/day)`}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={() => toggleNotify(eq.id)}
+              activeOpacity={0.85}
+              style={[
+                styles.primaryActionBtn,
+                { backgroundColor: eq.notifyMe ? "#15803d" : "#4b5563" },
+              ]}
+            >
+              <Text style={styles.primaryActionText}>
+                {eq.notifyMe
+                  ? isKn
+                    ? "ಲಭ್ಯವಾದಾಗ ನಿಮಗೆ ತಿಳಿಸಲಾಗುವುದು ✓"
+                    : "Notification Enabled ✓"
+                  : isKn
+                  ? "ಲಭ್ಯವಾದಾಗ ನನಗೆ ತಿಳಿಸಿ"
+                  : "Notify Me When Available"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       }
     >
@@ -73,34 +102,42 @@ export function EquipmentDetailsScreen() {
       <View style={styles.card}>
         <View style={styles.rowBetween}>
           <Text style={styles.cardTitle}>{tx.name(eq.name)}</Text>
-          <Text style={styles.priceHighlight}>₹{eq.pricePerDay}/day</Text>
+          <Text style={styles.priceHighlight}>
+            ₹{eq.pricePerDay}/{isKn ? "ದಿನ" : "day"}
+          </Text>
         </View>
-        <Text style={styles.ownerText}>Owner: {eq.owner}</Text>
+        <Text style={styles.ownerText}>
+          {isKn ? "ಮಾಲೀಕರು" : "Owner"}: {eq.owner}
+        </Text>
 
         <View style={styles.specsGrid}>
           <View style={styles.specBox}>
             <Gauge size={16} color="#256428" />
-            <Text style={styles.specVal}>{eq.hp} HP</Text>
-            <Text style={styles.specLbl}>Power</Text>
+            <Text style={styles.specVal}>{eq.hp}</Text>
+            <Text style={styles.specLbl}>{isKn ? "ಶಕ್ತಿ" : "Power"}</Text>
           </View>
           <View style={styles.specBox}>
             <Fuel size={16} color="#d97706" />
-            <Text style={styles.specVal}>{eq.fuel}</Text>
-            <Text style={styles.specLbl}>Fuel</Text>
+            <Text style={styles.specVal}>{tx.fuel(eq.fuel)}</Text>
+            <Text style={styles.specLbl}>{isKn ? "ಇಂಧನ" : "Fuel"}</Text>
           </View>
           <View style={styles.specBox}>
             <ShieldCheck size={16} color="#2563eb" />
-            <Text style={styles.specVal}>{eq.condition}</Text>
-            <Text style={styles.specLbl}>Condition</Text>
+            <Text style={styles.specVal}>{tx.condition(eq.condition)}</Text>
+            <Text style={styles.specLbl}>{isKn ? "ಸ್ಥಿತಿ" : "Condition"}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionHeading}>Suitable Crops</Text>
-        <Text style={styles.bodyText}>{eq.crops}</Text>
-        <Text style={[styles.sectionHeading, { marginTop: 12 }]}>Minimum Duration</Text>
-        <Text style={styles.bodyText}>{eq.minDuration}</Text>
+        <Text style={styles.sectionHeading}>
+          {isKn ? "ಸೂಕ್ತ ಬೆಳೆಗಳು" : "Suitable Crops"}
+        </Text>
+        <Text style={styles.bodyText}>{tx.crops(eq.crops)}</Text>
+        <Text style={[styles.sectionHeading, { marginTop: 12 }]}>
+          {isKn ? "ಕನಿಷ್ಠ ಬಾಡಿಗೆ ಅವಧಿ" : "Minimum Duration"}
+        </Text>
+        <Text style={styles.bodyText}>{tx.duration(eq.minDuration)}</Text>
       </View>
     </DetailShell>
   )
@@ -110,20 +147,24 @@ export function EquipmentDetailsScreen() {
 /* 2. Request Rental Screen                           */
 /* -------------------------------------------------- */
 export function RequestRentalScreen() {
-  const { params, open, back } = useNav()
+  const { params, open } = useNav()
   const { equipment, requestRental } = useEquipment()
+  const { lang } = useLang()
+  const isKn = lang === "kn"
   const tx = useEquipText()
+  const insets = useSafeAreaInsets()
+
   const eqId = String(params.equipmentId || params.id || equipment[0]?.id)
   const eq = equipment.find((e) => e.id === eqId) || equipment[0]
 
   const [days, setDays] = useState(2)
 
   function handleConfirm() {
-    requestRental(eq.id, {
-      start: "2026-10-01",
-      end: "2026-10-03",
-      days,
-    })
+    const startObj = new Date()
+    const endObj = new Date(Date.now() + days * 86400000)
+    const start = startObj.toISOString().slice(0, 10)
+    const end = endObj.toISOString().slice(0, 10)
+    requestRental(eq.id, { start, end, days })
     open("requestSent", { equipmentId: eq.id, days })
   }
 
@@ -131,24 +172,33 @@ export function RequestRentalScreen() {
 
   return (
     <DetailShell
-      title="Book Machinery"
-      subtitle={`Booking ${tx.name(eq.name)}`}
+      title={isKn ? "ಯಂತ್ರ ಬುಕ್ ಮಾಡಿ" : "Book Machinery"}
+      subtitle={`${isKn ? "ಬುಕಿಂಗ್:" : "Booking"} ${tx.name(eq.name)}`}
       footer={
-        <View style={styles.footerWrap}>
+        <View
+          style={[
+            styles.footerWrap,
+            { paddingBottom: Math.max(insets.bottom + 12, 18) },
+          ]}
+        >
           <TouchableOpacity
             onPress={handleConfirm}
             activeOpacity={0.85}
             style={styles.primaryActionBtn}
           >
             <Text style={styles.primaryActionText}>
-              Confirm & Send Request (₹{total})
+              {isKn
+                ? `ವಿನಂತಿ ದೃಢೀಕರಿಸಿ (₹${total})`
+                : `Confirm & Send Request (₹${total})`}
             </Text>
           </TouchableOpacity>
         </View>
       }
     >
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Rental Duration</Text>
+        <Text style={styles.cardTitle}>
+          {isKn ? "ಬಾಡಿಗೆ ಅವಧಿ" : "Rental Duration"}
+        </Text>
         <View style={styles.counterRow}>
           <TouchableOpacity
             onPress={() => setDays(Math.max(1, days - 1))}
@@ -156,7 +206,7 @@ export function RequestRentalScreen() {
           >
             <Text style={styles.counterBtnText}>-</Text>
           </TouchableOpacity>
-          <Text style={styles.counterVal}>{days} Days</Text>
+          <Text style={styles.counterVal}>{tx.days(days)}</Text>
           <TouchableOpacity
             onPress={() => setDays(days + 1)}
             style={styles.counterBtn}
@@ -167,13 +217,31 @@ export function RequestRentalScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Cost Breakdown</Text>
+        <Text style={styles.cardTitle}>
+          {isKn ? "ವೆಚ್ಚದ ವಿವರ" : "Cost Breakdown"}
+        </Text>
         <View style={styles.rowBetween}>
-          <Text style={styles.bodyText}>Daily Rental Rate</Text>
-          <Text style={styles.boldText}>₹{eq.pricePerDay} × {days} days</Text>
+          <Text style={styles.bodyText}>
+            {isKn ? "ದೈನಂದಿನ ಬಾಡಿಗೆ ದರ" : "Daily Rental Rate"}
+          </Text>
+          <Text style={styles.boldText}>
+            ₹{eq.pricePerDay} × {tx.days(days)}
+          </Text>
         </View>
-        <View style={[styles.rowBetween, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#f3f4f6" }]}>
-          <Text style={styles.cardTitle}>Estimated Total</Text>
+        <View
+          style={[
+            styles.rowBetween,
+            {
+              marginTop: 8,
+              paddingTop: 8,
+              borderTopWidth: 1,
+              borderTopColor: "#f3f4f6",
+            },
+          ]}
+        >
+          <Text style={styles.cardTitle}>
+            {isKn ? "ಅಂದಾಜು ಒಟ್ಟು" : "Estimated Total"}
+          </Text>
           <Text style={styles.priceHighlight}>₹{total}</Text>
         </View>
       </View>
@@ -185,17 +253,23 @@ export function RequestRentalScreen() {
 /* 3. Request Sent Screen                             */
 /* -------------------------------------------------- */
 export function RequestSentScreen() {
-  const { open, reset } = useNav()
+  const { open } = useNav()
+  const { lang } = useLang()
+  const isKn = lang === "kn"
 
   return (
-    <DetailShell title="Request Sent">
+    <DetailShell title={isKn ? "ವಿನಂತಿ ಕಳುಹಿಸಲಾಗಿದೆ" : "Request Sent"}>
       <View style={styles.centerCard}>
         <View style={styles.successIconCircle}>
           <CheckCircle2 size={48} color="#16a34a" />
         </View>
-        <Text style={styles.successTitle}>Booking Request Submitted!</Text>
+        <Text style={styles.successTitle}>
+          {isKn ? "ಬುಕಿಂಗ್ ವಿನಂತಿ ಸಲ್ಲಿಸಲಾಗಿದೆ!" : "Booking Request Submitted!"}
+        </Text>
         <Text style={styles.successDesc}>
-          The equipment owner has been notified via SMS. They typically respond within 2 hours.
+          {isKn
+            ? "ಯಂತ್ರದ ಮಾಲೀಕರಿಗೆ ಸೂಚನೆ ನೀಡಲಾಗಿದೆ. ಸಾಮಾನ್ಯವಾಗಿ 2 ಗಂಟೆಯೊಳಗೆ ಪ್ರತಿಕ್ರಿಯಿಸುತ್ತಾರೆ."
+            : "The equipment owner has been notified. They typically respond within 2 hours."}
         </Text>
 
         <TouchableOpacity
@@ -203,7 +277,9 @@ export function RequestSentScreen() {
           activeOpacity={0.85}
           style={[styles.primaryActionBtn, { width: "100%", marginTop: 24 }]}
         >
-          <Text style={styles.primaryActionText}>View My Rentals</Text>
+          <Text style={styles.primaryActionText}>
+            {isKn ? "ನನ್ನ ಬಾಡಿಗೆಗಳನ್ನು ನೋಡಿ" : "View My Rentals"}
+          </Text>
         </TouchableOpacity>
       </View>
     </DetailShell>
@@ -215,22 +291,30 @@ export function RequestSentScreen() {
 /* -------------------------------------------------- */
 export function MyRentalsScreen() {
   const { rentals, cancelRental } = useEquipment()
-  const { open } = useNav()
+  const { lang } = useLang()
+  const tx = useEquipText()
+  const isKn = lang === "kn"
 
   return (
-    <DetailShell title="My Rentals" subtitle="Active and pending bookings">
+    <DetailShell
+      title={isKn ? "ನನ್ನ ಬಾಡಿಗೆಗಳು" : "My Rentals"}
+      subtitle={isKn ? "ಸಕ್ರಿಯ ಮತ್ತು ಬಾಕಿ ಬುಕಿಂಗ್‌ಗಳು" : "Active and pending bookings"}
+    >
       <View style={styles.listWrap}>
         {rentals.map((r) => (
           <View key={r.id} style={styles.card}>
             <View style={styles.rowBetween}>
-              <Text style={styles.cardTitle}>{r.equipmentName}</Text>
+              <Text style={styles.cardTitle}>{tx.name(r.equipmentName)}</Text>
               <View style={styles.statusPill}>
                 <Text style={styles.statusText}>{r.status.toUpperCase()}</Text>
               </View>
             </View>
-            <Text style={styles.ownerText}>Owner: {r.owner} · {r.location}</Text>
+            <Text style={styles.ownerText}>
+              {isKn ? "ಮಾಲೀಕರು" : "Owner"}: {r.owner} · {r.location}
+            </Text>
             <Text style={styles.bodyText}>
-              Duration: {r.days} days · Total: ₹{r.total}
+              {isKn ? "ಅವಧಿ" : "Duration"}: {tx.days(r.days)} ·{" "}
+              {isKn ? "ಒಟ್ಟು" : "Total"}: ₹{r.total}
             </Text>
 
             {r.status === "pending" && (
@@ -238,7 +322,9 @@ export function MyRentalsScreen() {
                 onPress={() => cancelRental(r.id)}
                 style={styles.cancelBtn}
               >
-                <Text style={styles.cancelBtnText}>Cancel Booking</Text>
+                <Text style={styles.cancelBtnText}>
+                  {isKn ? "ಬುಕಿಂಗ್ ರದ್ದುಗೊಳಿಸಿ" : "Cancel Booking"}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -252,12 +338,27 @@ export function MyRentalsScreen() {
 /* 5. Rental Details Screen                           */
 /* -------------------------------------------------- */
 export function RentalDetailsScreen() {
+  const { lang } = useLang()
+  const { profile } = useProfile()
+  const isKn = lang === "kn"
+
   return (
-    <DetailShell title="Rental Details" subtitle="Receipt & Booking Information">
+    <DetailShell
+      title={isKn ? "ಬಾಡಿಗೆ ವಿವರಗಳು" : "Rental Details"}
+      subtitle={isKn ? "ರಸೀದಿ ಮತ್ತು ಬುಕಿಂಗ್ ಮಾಹಿತಿ" : "Receipt & Booking Information"}
+    >
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Booking Summary</Text>
-        <Text style={styles.bodyText}>Status: Approved & Confirmed</Text>
-        <Text style={styles.bodyText}>Pickup location: Mandya APMC Yard</Text>
+        <Text style={styles.cardTitle}>
+          {isKn ? "ಬುಕಿಂಗ್ ಸಾರಾಂಶ" : "Booking Summary"}
+        </Text>
+        <Text style={styles.bodyText}>
+          {isKn ? "ಸ್ಥಿತಿ: ಅನುಮೋದಿತ" : "Status: Approved & Confirmed"}
+        </Text>
+        <Text style={styles.bodyText}>
+          {isKn
+            ? `ಪಡೆಯುವ ಸ್ಥಳ: ${profile.district} APMC ಯಾರ್ಡ್`
+            : `Pickup location: ${profile.district} APMC Yard`}
+        </Text>
       </View>
     </DetailShell>
   )
@@ -266,51 +367,110 @@ export function RentalDetailsScreen() {
 /* -------------------------------------------------- */
 /* 6. List Equipment Screen                           */
 /* -------------------------------------------------- */
+const EQUIP_TYPES = ["Tractor", "Rotavator", "Seed Drill", "Sprayer", "Harvester"]
+
 export function ListEquipmentScreen() {
   const { listEquipment } = useEquipment()
+  const { profile } = useProfile()
   const { back } = useNav()
+  const { lang } = useLang()
+  const tx = useEquipText()
+  const isKn = lang === "kn"
+  const insets = useSafeAreaInsets()
+
   const [name, setName] = useState("")
   const [type, setType] = useState("Tractor")
   const [price, setPrice] = useState("1200")
 
   function handleSubmit() {
+    const cleanPrice = Number(price)
+    if (!name.trim()) {
+      Alert.alert(
+        isKn ? "ದೋಷ" : "Missing Name",
+        isKn ? "ದಯವಿಟ್ಟು ಯಂತ್ರದ ಹೆಸರು ನಮೂದಿಸಿ" : "Please enter equipment name or model."
+      )
+      return
+    }
+    if (!Number.isFinite(cleanPrice) || cleanPrice <= 0) {
+      Alert.alert(
+        isKn ? "ದೋಷ" : "Invalid Price",
+        isKn ? "ದಯವಿಟ್ಟು ಸರಿಯಾದ ದಿನದ ದರ ನಮೂದಿಸಿ" : "Please enter a valid daily rental rate."
+      )
+      return
+    }
     listEquipment({
-      name: name || "Mahindra 575 DI Tractor",
+      name: name.trim(),
       type,
-      pricePerDay: Number(price) || 1200,
+      location: profile.district || "Mandya",
+      pricePerDay: cleanPrice,
     })
     back()
   }
 
   return (
     <DetailShell
-      title="List Machinery"
-      subtitle="Earn rental income from your farm equipment"
+      title={isKn ? "ಯಂತ್ರವನ್ನು ಪಟ್ಟಿ ಮಾಡಿ" : "List Machinery"}
+      subtitle={
+        isKn
+          ? "ನಿಮ್ಮ ಕೃಷಿ ಯಂತ್ರೋಪಕರಣಗಳಿಂದ ಬಾಡಿಗೆ ಆದಾಯ ಗಳಿಸಿ"
+          : "Earn rental income from your farm equipment"
+      }
       footer={
-        <View style={styles.footerWrap}>
+        <View
+          style={[
+            styles.footerWrap,
+            { paddingBottom: Math.max(insets.bottom + 12, 18) },
+          ]}
+        >
           <TouchableOpacity
             onPress={handleSubmit}
             activeOpacity={0.85}
             style={styles.primaryActionBtn}
           >
-            <Text style={styles.primaryActionText}>Publish Listing</Text>
+            <Text style={styles.primaryActionText}>
+              {isKn ? "ಪಟ್ಟಿಯನ್ನು ಪ್ರಕಟಿಸಿ" : "Publish Listing"}
+            </Text>
           </TouchableOpacity>
         </View>
       }
     >
       <View style={styles.card}>
-        <Text style={styles.label}>Equipment Name / Model</Text>
+        <Text style={styles.label}>
+          {isKn ? "ಯಂತ್ರದ ಹೆಸರು / ಮಾದರಿ" : "Equipment Name / Model"}
+        </Text>
         <TextInput
           value={name}
           onChangeText={setName}
-          placeholder="e.g. John Deere 5050 D"
+          placeholder="e.g. Mahindra 575 DI Tractor"
           style={styles.input}
         />
 
-        <Text style={[styles.label, { marginTop: 12 }]}>Daily Rental Rate (₹/day)</Text>
+        <Text style={[styles.label, { marginTop: 12 }]}>
+          {isKn ? "ಯಂತ್ರದ ವಿಧ" : "Equipment Category"}
+        </Text>
+        <View style={styles.typeChipRow}>
+          {EQUIP_TYPES.map((tp) => {
+            const active = type === tp
+            return (
+              <TouchableOpacity
+                key={tp}
+                onPress={() => setType(tp)}
+                style={[styles.chip, active && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  {tx.type(tp)}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+
+        <Text style={[styles.label, { marginTop: 12 }]}>
+          {isKn ? "ದಿನದ ಬಾಡಿಗೆ ದರ (₹/ದಿನ)" : "Daily Rental Rate (₹/day)"}
+        </Text>
         <TextInput
           value={price}
-          onChangeText={setPrice}
+          onChangeText={(v) => setPrice(v.replace(/\D/g, ""))}
           keyboardType="numeric"
           placeholder="1200"
           style={styles.input}
@@ -324,10 +484,14 @@ export function ListEquipmentScreen() {
 /* 7. Listing Preview Screen                          */
 /* -------------------------------------------------- */
 export function ListingPreviewScreen() {
+  const { lang } = useLang()
+  const isKn = lang === "kn"
   return (
-    <DetailShell title="Listing Preview">
+    <DetailShell title={isKn ? "ಪಟ್ಟಿ ಮುನ್ನೋಟ" : "Listing Preview"}>
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Preview Ready</Text>
+        <Text style={styles.cardTitle}>
+          {isKn ? "ಪ್ರಕಟಿಸಲು ಸಿದ್ಧವಾಗಿದೆ" : "Preview Ready"}
+        </Text>
       </View>
     </DetailShell>
   )
@@ -339,11 +503,14 @@ export function ListingPreviewScreen() {
 export function MyEquipmentScreen() {
   const { mine } = useEquipment()
   const { open } = useNav()
+  const { lang } = useLang()
+  const tx = useEquipText()
+  const isKn = lang === "kn"
 
   return (
     <DetailShell
-      title="My Equipment"
-      subtitle="Machinery listed under your farmer account"
+      title={isKn ? "ನನ್ನ ಯಂತ್ರೋಪಕರಣಗಳು" : "My Equipment"}
+      subtitle={isKn ? "ನಿಮ್ಮ ಖಾತೆಯ ಅಡಿಯಲ್ಲಿ ಪಟ್ಟಿ ಮಾಡಿದ ಯಂತ್ರಗಳು" : "Machinery listed under your farmer account"}
       action={
         <TouchableOpacity onPress={() => open("listEquipment")} style={styles.headerAddBtn}>
           <Plus size={18} color="#ffffff" />
@@ -353,9 +520,13 @@ export function MyEquipmentScreen() {
       <View style={styles.listWrap}>
         {mine.map((eq) => (
           <View key={eq.id} style={styles.card}>
-            <Text style={styles.cardTitle}>{eq.name}</Text>
-            <Text style={styles.priceHighlight}>₹{eq.pricePerDay}/day</Text>
-            <Text style={styles.bodyText}>Status: {eq.availability}</Text>
+            <Text style={styles.cardTitle}>{tx.name(eq.name)}</Text>
+            <Text style={styles.priceHighlight}>
+              ₹{eq.pricePerDay}/{isKn ? "ದಿನ" : "day"}
+            </Text>
+            <Text style={styles.bodyText}>
+              {isKn ? "ಸ್ಥಿತಿ" : "Status"}: {eq.availability}
+            </Text>
           </View>
         ))}
       </View>
@@ -368,15 +539,25 @@ export function MyEquipmentScreen() {
 /* -------------------------------------------------- */
 export function OwnerRequestsScreen() {
   const { ownerRequests, acceptRequest, rejectRequest } = useEquipment()
+  const { lang } = useLang()
+  const tx = useEquipText()
+  const isKn = lang === "kn"
 
   return (
-    <DetailShell title="Rental Requests" subtitle="Farmers requesting your machinery">
+    <DetailShell
+      title={isKn ? "ಬಾಡಿಗೆ ವಿನಂತಿಗಳು" : "Rental Requests"}
+      subtitle={isKn ? "ನಿಮ್ಮ ಯಂತ್ರ ಬಾಡಿಗೆಗೆ ಕೇಳುತ್ತಿರುವ ರೈತರು" : "Farmers requesting your machinery"}
+    >
       <View style={styles.listWrap}>
         {ownerRequests.map((req) => (
           <View key={req.id} style={styles.card}>
-            <Text style={styles.cardTitle}>{req.equipmentName}</Text>
-            <Text style={styles.ownerText}>Renter: {req.renter} · {req.location}</Text>
-            <Text style={styles.bodyText}>Total: ₹{req.total} ({req.days} days)</Text>
+            <Text style={styles.cardTitle}>{tx.name(req.equipmentName)}</Text>
+            <Text style={styles.ownerText}>
+              {isKn ? "ಬಾಡಿಗೆದಾರ" : "Renter"}: {req.renter} · {req.location}
+            </Text>
+            <Text style={styles.bodyText}>
+              {isKn ? "ಒಟ್ಟು" : "Total"}: ₹{req.total} ({tx.days(req.days)})
+            </Text>
 
             {req.status === "pending" && (
               <View style={styles.actionBtnRow}>
@@ -384,13 +565,17 @@ export function OwnerRequestsScreen() {
                   onPress={() => rejectRequest(req.id)}
                   style={styles.rejectBtn}
                 >
-                  <Text style={styles.rejectBtnText}>Decline</Text>
+                  <Text style={styles.rejectBtnText}>
+                    {isKn ? "ತಿರಸ್ಕರಿಸಿ" : "Decline"}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => acceptRequest(req.id)}
                   style={styles.acceptBtn}
                 >
-                  <Text style={styles.acceptBtnText}>Accept</Text>
+                  <Text style={styles.acceptBtnText}>
+                    {isKn ? "ಒಪ್ಪಿಕೊಳ್ಳಿ" : "Accept"}
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -406,13 +591,33 @@ export function OwnerRequestsScreen() {
 /* -------------------------------------------------- */
 export function OwnerDashboardScreen() {
   const { mine, ownerRequests } = useEquipment()
+  const { lang } = useLang()
+  const isKn = lang === "kn"
+
+  const approvedTotal = ownerRequests
+    .filter((r) => r.status === "approved")
+    .reduce((acc, r) => acc + r.total, 0)
+  const pendingTotal = ownerRequests
+    .filter((r) => r.status === "pending")
+    .reduce((acc, r) => acc + r.total, 0)
 
   return (
-    <DetailShell title="Owner Dashboard" subtitle="Manage bookings & equipment earnings">
+    <DetailShell
+      title={isKn ? "ಮಾಲೀಕರ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್" : "Owner Dashboard"}
+      subtitle={isKn ? "ಬುಕಿಂಗ್ ಮತ್ತು ಗಳಿಕೆಯನ್ನು ನಿರ್ವಹಿಸಿ" : "Manage bookings & equipment earnings"}
+    >
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Earnings Summary</Text>
-        <Text style={styles.priceHighlight}>₹24,800</Text>
-        <Text style={styles.bodyText}>Total rental earnings this season</Text>
+        <Text style={styles.cardTitle}>
+          {isKn ? "ಬಾಡಿಗೆ ಸಾರಾಂಶ" : "Earnings & Fleet Summary"}
+        </Text>
+        <Text style={styles.priceHighlight}>
+          ₹{approvedTotal.toLocaleString("en-IN")}
+        </Text>
+        <Text style={styles.bodyText}>
+          {isKn
+            ? `ಅನುಮೋದಿತ ಗಳಿಕೆ (${mine.length} ಯಂತ್ರಗಳು, ₹${pendingTotal.toLocaleString("en-IN")} ಬಾಕಿ ವಿನಂತಿಗಳು)`
+            : `Approved earnings across ${mine.length} machines (₹${pendingTotal.toLocaleString("en-IN")} in pending requests)`}
+        </Text>
       </View>
     </DetailShell>
   )
@@ -422,12 +627,33 @@ export function OwnerDashboardScreen() {
 /* 11. Rental History Screen                          */
 /* -------------------------------------------------- */
 export function RentalHistoryScreen() {
+  const { rentals } = useEquipment()
+  const { lang } = useLang()
+  const tx = useEquipText()
+  const isKn = lang === "kn"
+  const completed = rentals.filter((r) => r.status === "completed")
+
   return (
-    <DetailShell title="Rental History" subtitle="Past completed machinery rentals">
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Mahindra Rotavator 6ft</Text>
-        <Text style={styles.bodyText}>Completed on Sep 12, 2026 · ₹1,800 paid</Text>
-      </View>
+    <DetailShell
+      title={isKn ? "ಬಾಡಿಗೆ ಇತಿಹಾಸ" : "Rental History"}
+      subtitle={isKn ? "ಪೂರ್ಣಗೊಂಡ ಯಂತ್ರ ಬಾಡಿಗೆಗಳು" : "Past completed machinery rentals"}
+    >
+      {completed.length === 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.bodyText}>
+            {isKn ? "ಇನ್ನೂ ಯಾವುದೇ ಪೂರ್ಣಗೊಂಡ ಬಾಡಿಗೆ ಇಲ್ಲ." : "No completed rentals yet."}
+          </Text>
+        </View>
+      ) : (
+        completed.map((r) => (
+          <View key={r.id} style={styles.card}>
+            <Text style={styles.cardTitle}>{tx.name(r.equipmentName)}</Text>
+            <Text style={styles.bodyText}>
+              {r.startDate} – {r.endDate} · ₹{r.total} ({tx.days(r.days)})
+            </Text>
+          </View>
+        ))
+      )}
     </DetailShell>
   )
 }
@@ -436,18 +662,31 @@ export function RentalHistoryScreen() {
 /* 12. Rental Notifications Screen                    */
 /* -------------------------------------------------- */
 export function RentalNotificationsScreen() {
-  const { notifications } = useEquipment()
+  const { notifications, markNotifsRead } = useEquipment()
+  const { lang } = useLang()
+  const tx = useEquipText()
+  const isKn = lang === "kn"
 
   return (
-    <DetailShell title="Rental Alerts">
+    <DetailShell
+      title={isKn ? "ಬಾಡಿಗೆ ಎಚ್ಚರಿಕೆಗಳು" : "Rental Alerts"}
+      action={
+        <TouchableOpacity onPress={markNotifsRead} style={styles.headerAddBtn}>
+          <Bell size={16} color="#ffffff" />
+        </TouchableOpacity>
+      }
+    >
       <View style={styles.listWrap}>
-        {notifications.map((n) => (
-          <View key={n.id} style={styles.card}>
-            <Text style={styles.cardTitle}>{n.title}</Text>
-            <Text style={styles.bodyText}>{n.body}</Text>
-            <Text style={styles.ownerText}>{n.time}</Text>
-          </View>
-        ))}
+        {notifications.map((n) => {
+          const rendered = tx.notif(n)
+          return (
+            <View key={n.id} style={styles.card}>
+              <Text style={styles.cardTitle}>{rendered.title}</Text>
+              <Text style={styles.bodyText}>{rendered.body}</Text>
+              <Text style={styles.ownerText}>{rendered.time}</Text>
+            </View>
+          )
+        })}
       </View>
     </DetailShell>
   )
@@ -535,7 +774,8 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
   footerWrap: {
-    padding: 18,
+    paddingHorizontal: 18,
+    paddingTop: 14,
     backgroundColor: "#ffffff",
     borderTopWidth: 1,
     borderTopColor: "#f3f4f6",
@@ -641,6 +881,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     backgroundColor: "#f9fafb",
   },
+  typeChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: "#f3f4f6",
+  },
+  chipActive: {
+    backgroundColor: "#256428",
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#4b5563",
+  },
+  chipTextActive: {
+    color: "#ffffff",
+  },
   headerAddBtn: {
     width: 36,
     height: 36,
@@ -683,4 +946,3 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
 })
-

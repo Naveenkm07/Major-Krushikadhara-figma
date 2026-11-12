@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import { useLang, type Lang } from "../i18n"
 import { useNav } from "../nav"
+import { useProfile } from "../profile"
 import DetailShell from "./DetailShell"
 import { Check, Globe, Languages } from "lucide-react-native"
 
@@ -11,15 +12,24 @@ const LANGS: { id: Lang; label: string; native: string; desc: string }[] = [
 
 export default function LanguageScreen() {
   const { lang, setLang } = useLang()
+  const { saveProfile } = useProfile()
   const { back } = useNav()
 
   function handleSelect(id: Lang) {
     setLang(id)
-    setTimeout(() => back(), 200)
+    saveProfile({}, id).catch(() => {})
+    setTimeout(() => back(), 180)
   }
 
   return (
-    <DetailShell title="Language / ಭಾಷೆ" subtitle="Choose your preferred language">
+    <DetailShell
+      title={lang === "kn" ? "ಭಾಷೆ ಆಯ್ಕೆಮಾಡಿ" : "Choose Language"}
+      subtitle={
+        lang === "kn"
+          ? "ನಿಮ್ಮ ಆದ್ಯತೆಯ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ"
+          : "Choose your preferred app language"
+      }
+    >
       <View style={styles.list}>
         {LANGS.map((item) => {
           const active = lang === item.id

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   View,
   Text,
@@ -8,58 +8,161 @@ import {
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLang, fmt } from "../i18n"
+import { useProfile } from "../profile"
+import { getScanHistory, subscribeScanHistory } from "../storage/scanHistory"
 import {
   BarChart3,
   Sprout,
   IndianRupee,
   Droplets,
   Leaf,
-  TrendingUp,
 } from "lucide-react-native"
 
-const yieldTrend = [
-  { month: "Apr", yield: 320, pct: 44 },
-  { month: "May", yield: 410, pct: 56 },
-  { month: "Jun", yield: 380, pct: 52 },
-  { month: "Jul", yield: 520, pct: 72 },
-  { month: "Aug", yield: 610, pct: 84 },
-  { month: "Sep", yield: 720, pct: 100 },
+type RangeKey = "6M" | "1Y" | "All"
+
+const RANGE_TREND: Record<
+  RangeKey,
+  {
+    yieldScale: number
+    revScale: number
+    waterPct: string
+    deltaYield: string
+    deltaRev: string
+    bars: Array<{ monthKey: string; pct: number }>
+  }
+> = {
+  "6M": {
+    yieldScale: 1,
+    revScale: 1,
+    waterPct: "18%",
+    deltaYield: "+12%",
+    deltaRev: "+8%",
+    bars: [
+      { monthKey: "Apr", pct: 44 },
+      { monthKey: "May", pct: 56 },
+      { monthKey: "Jun", pct: 52 },
+      { monthKey: "Jul", pct: 72 },
+      { monthKey: "Aug", pct: 84 },
+      { monthKey: "Sep", pct: 100 },
+    ],
+  },
+  "1Y": {
+    yieldScale: 1.9,
+    revScale: 1.85,
+    waterPct: "22%",
+    deltaYield: "+18%",
+    deltaRev: "+15%",
+    bars: [
+      { monthKey: "Nov", pct: 48 },
+      { monthKey: "Jan", pct: 62 },
+      { monthKey: "Mar", pct: 55 },
+      { monthKey: "May", pct: 74 },
+      { monthKey: "Jul", pct: 88 },
+      { monthKey: "Sep", pct: 96 },
+    ],
+  },
+  All: {
+    yieldScale: 3.4,
+    revScale: 3.2,
+    waterPct: "24%",
+    deltaYield: "+29%",
+    deltaRev: "+24%",
+    bars: [
+      { monthKey: "2022", pct: 52 },
+      { monthKey: "2023", pct: 64 },
+      { monthKey: "2024", pct: 76 },
+      { monthKey: "2025", pct: 89 },
+      { monthKey: "2026", pct: 100 },
+    ],
+  },
+}
+
+const CROP_COLORS = ["#256428", "#7cc142", "#f59e0b", "#14b8a6", "#6366f1"]
+
+const SOIL_METRICS = [
+  { key: "n" as const, value: 78, color: "#16a34a" },
+  { key: "p" as const, value: 54, color: "#f59e0b" },
+  { key: "k" as const, value: 66, color: "#0d9488" },
+  { key: "moisture" as const, value: 42, color: "#2563eb" },
 ]
 
-const cropSplit: { key: "rice" | "ragi" | "tomato" | "others"; value: number; color: string }[] = [
-  { key: "rice", value: 45, color: "#256428" },
-  { key: "ragi", value: 25, color: "#7cc142" },
-  { key: "tomato", value: 20, color: "#f59e0b" },
-  { key: "others", value: 10, color: "#14b8a6" },
-]
-
-const moneyFlow = [
-  { month: "Jun", income: 42, expense: 28 },
-  { month: "Jul", income: 55, expense: 31 },
-  { month: "Aug", income: 61, expense: 34 },
-  { month: "Sep", income: 74, expense: 38 },
-]
-
-const soil = [
-  { key: "n", label: "Nitrogen (N)", value: 78, color: "#16a34a" },
-  { key: "p", label: "Phosphorus (P)", value: 54, color: "#f59e0b" },
-  { key: "k", label: "Potassium (K)", value: 66, color: "#0d9488" },
-  { key: "moisture", label: "Moisture", value: 42, color: "#2563eb" },
-]
-
-const ranges = ["6M", "1Y", "All"]
+const RANGES: RangeKey[] = ["6M", "1Y", "All"]
 
 export default function InsightsScreen() {
-  const { t } = useLang()
+  const { t, lang } = useLang()
+  const { profile, scansCount } = useProfile()
   const insets = useSafeAreaInsets()
-  const [range, setRange] = useState("6M")
+  const isKn = lang === "kn"
+
+  const [range, setRange] = useState<RangeKey>("6M")
+  const [scans, setScans] = useState(() => getScanHistory())
+
+  useEffect(() => {
+    setScans(getScanHistory())
+    return subscribeScanHistory(setScans)
+  }, [])
+
+  const cropMap = (t.x.coreA.crops as Record<string, string>) || {}
+  const monthsMap = (t.x.coreA.months as Record<string, string>) || {}
+  const rangeData = RANGE_TREND[range]
+
+  const acres = Math.max(0.5, parseFloat(profile.farmSize) || 4.2)
+  const totalYieldKg = Math.round(705 * acres * rangeData.yieldScale)
+  const totalRevenueInr = Math.round(17660 * acres * rangeData.revScale)
+
+  const cropsList =
+    profile.crops && profile.crops.length > 0 ? profile.crops : ["Rice", "Ragi"]
+  const baseShare = Math.floor(100 / cropsList.length)
+  const remainder = 100 - baseShare * cropsList.length
+  const dynamicCropSplit = cropsList.map((crop, idx) => ({
+    name: cropMap[crop] || crop,
+    value: baseShare + (idx === 0 ? remainder : 0),
+    color: CROP_COLORS[idx % CROP_COLORS.length],
+  }))
+
+  const healthyScans = scans.filter((s) => s.status === "healthy").length
+  const totalScanNum = Math.max(scans.length, scansCount)
+  const cropDelta =
+    totalScanNum > 0
+      ? isKn
+        ? `${healthyScans}/${totalScanNum} ಆರೋಗ್ಯ`
+        : `${healthyScans}/${totalScanNum} ok`
+      : t.insights.stats.ready
 
   const stats = [
-    { key: "yield", value: "2,960 kg", icon: Sprout, tint: "#dcfce7", color: "#16a34a", delta: "+12%" },
-    { key: "revenue", value: "₹74,200", icon: IndianRupee, tint: "#fef3c7", color: "#d97706", delta: "+8%" },
-    { key: "crops", value: "4", icon: Leaf, tint: "#ccfbf1", color: "#0d9488", delta: "2 ready" },
-    { key: "water", value: "18%", icon: Droplets, tint: "#dbeafe", color: "#2563eb", delta: "vs last yr" },
-  ] as const
+    {
+      key: "yield" as const,
+      value: `${totalYieldKg.toLocaleString("en-IN")} ${isKn ? "ಕೆ.ಜಿ" : "kg"}`,
+      icon: Sprout,
+      tint: "#dcfce7",
+      color: "#16a34a",
+      delta: rangeData.deltaYield,
+    },
+    {
+      key: "revenue" as const,
+      value: `₹${totalRevenueInr.toLocaleString("en-IN")}`,
+      icon: IndianRupee,
+      tint: "#fef3c7",
+      color: "#d97706",
+      delta: rangeData.deltaRev,
+    },
+    {
+      key: "crops" as const,
+      value: String(cropsList.length),
+      icon: Leaf,
+      tint: "#ccfbf1",
+      color: "#0d9488",
+      delta: cropDelta,
+    },
+    {
+      key: "water" as const,
+      value: rangeData.waterPct,
+      icon: Droplets,
+      tint: "#dbeafe",
+      color: "#2563eb",
+      delta: t.insights.stats.vsYr,
+    },
+  ]
 
   return (
     <View style={styles.container}>
@@ -80,7 +183,9 @@ export default function InsightsScreen() {
             <BarChart3 size={24} color="#ffffff" />
             <Text style={styles.headerTitle}>{t.insights.title}</Text>
           </View>
-          <Text style={styles.headerSubtitle}>{t.insights.subtitle}</Text>
+          <Text style={styles.headerSubtitle}>
+            {t.insights.subtitle} · {profile.district} ({fmt(t.x.coreA.common.acresValue, { size: profile.farmSize })})
+          </Text>
         </View>
 
         {/* 4 Stat Cards */}
@@ -107,7 +212,7 @@ export default function InsightsScreen() {
               <Text style={styles.cardSubtitle}>{t.insights.yieldUp}</Text>
             </View>
             <View style={styles.rangePicker}>
-              {ranges.map((r) => (
+              {RANGES.map((r) => (
                 <TouchableOpacity
                   key={r}
                   onPress={() => setRange(r)}
@@ -122,44 +227,38 @@ export default function InsightsScreen() {
                       range === r && styles.rangeTextActive,
                     ]}
                   >
-                    {r}
+                    {t.x.coreA.insights.ranges[r] || r}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          {/* Native Bar Visualization */}
           <View style={styles.barsContainer}>
-            {yieldTrend.map((item) => (
-              <View key={item.month} style={styles.barCol}>
+            {rangeData.bars.map((item) => (
+              <View key={item.monthKey} style={styles.barCol}>
                 <View style={styles.barTrack}>
-                  <View
-                    style={[
-                      styles.barFill,
-                      { height: `${item.pct}%` },
-                    ]}
-                  />
+                  <View style={[styles.barFill, { height: `${item.pct}%` }]} />
                 </View>
-                <Text style={styles.barLabel}>{item.month}</Text>
+                <Text style={styles.barLabel}>
+                  {monthsMap[item.monthKey] || item.monthKey}
+                </Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Crop Distribution */}
+        {/* Crop Distribution (Dynamic from Farmer Profile) */}
         <View style={styles.sectionCard}>
           <Text style={styles.cardTitle}>{t.insights.cropDist}</Text>
           <View style={styles.cropSplitList}>
-            {cropSplit.map((crop) => (
-              <View key={crop.key} style={styles.cropRow}>
+            {dynamicCropSplit.map((crop) => (
+              <View key={crop.name} style={styles.cropRow}>
                 <View style={styles.cropInfo}>
                   <View style={[styles.cropDot, { backgroundColor: crop.color }]} />
-                  <Text style={styles.cropName}>
-                    {t.insights.cropNames[crop.key] || crop.key}
-                  </Text>
+                  <Text style={styles.cropName}>{crop.name}</Text>
+                  <Text style={styles.cropValue}>{crop.value}%</Text>
                 </View>
-                <Text style={styles.cropValue}>{crop.value}%</Text>
                 <View style={styles.cropBarTrack}>
                   <View
                     style={[
@@ -177,10 +276,12 @@ export default function InsightsScreen() {
         <View style={styles.sectionCard}>
           <Text style={styles.cardTitle}>{t.insights.soil}</Text>
           <View style={styles.soilGrid}>
-            {soil.map((s) => (
+            {SOIL_METRICS.map((s) => (
               <View key={s.key} style={styles.soilCard}>
-                <Text style={styles.soilName}>{s.label}</Text>
-                <Text style={styles.soilValue}>{s.value}%</Text>
+                <View style={styles.soilTopRow}>
+                  <Text style={styles.soilName}>{t.insights.soilRows[s.key]}</Text>
+                  <Text style={styles.soilValue}>{s.value}%</Text>
+                </View>
                 <View style={styles.soilBarTrack}>
                   <View
                     style={[
@@ -400,6 +501,11 @@ const styles = StyleSheet.create({
   soilCard: {
     gap: 6,
   },
+  soilTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   soilName: {
     fontSize: 13,
     fontWeight: "600",
@@ -421,4 +527,3 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 })
-

@@ -1,68 +1,116 @@
 import { useEffect, useState } from "react"
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native"
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native"
 import { useNav } from "../nav"
+import { useProfile } from "../profile"
+import { useLang } from "../i18n"
 import { Cpu, AlertTriangle } from "lucide-react-native"
-import { diagnoseCropImage, type PestDetectionResult } from "../api/scan"
+import { diagnoseCropImage, type PestDetectionResult, type ScanMode } from "../api/scan"
 import { addScanToHistory } from "../storage/scanHistory"
 
-const STEPS = [
-  "Uploading image to cloud storage...",
-  "Preprocessing crop image for YOLO11s...",
-  "Running TFLite deep learning inference...",
-  "Analyzing 102 pest & insect classes...",
-  "Formulating treatment & remedies...",
+const STEPS_EN = [
+  "Uploading crop image securely...",
+  "Running YOLO11s TFLite 102-class insect check...",
+  "Inspecting leaf disease & nutrient signs with Gemini Vision...",
+  "Preparing English & Kannada treatment dosages...",
+  "Saving report to your farm history...",
+]
+
+const STEPS_KN = [
+  "ಬೆಳೆ ಚಿತ್ರವನ್ನು ಸುರಕ್ಷಿತವಾಗಿ ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ...",
+  "YOLO11s TFLite 102 ಕೀಟ ವರ್ಗಗಳ ತಪಾಸಣೆ...",
+  "Gemini Vision ಮೂಲಕ ಎಲೆ ರೋಗ ಮತ್ತು ಪೋಷಕಾಂಶ ಪರೀಕ್ಷೆ...",
+  "ಕನ್ನಡ ಮತ್ತು ಇಂಗ್ಲಿಷ್ ಚಿಕಿತ್ಸಾ ಪ್ರಮಾಣ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ...",
+  "ನಿಮ್ಮ ಜಮೀನಿನ ಇತಿಹಾಸಕ್ಕೆ ವರದಿ ಉಳಿಸಲಾಗುತ್ತಿದೆ...",
 ]
 
 export default function ScanProcessingScreen() {
   const { back, open, params } = useNav()
+  const { profile, refreshProfile } = useProfile()
+  const { lang } = useLang()
+  const isKn = lang === "kn"
+  const STEPS = isKn ? STEPS_KN : STEPS_EN
   const [stepIdx, setStepIdx] = useState(0)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const imageUri = params?.imageUri
+  const imageUri: string | undefined = params?.imageUri
+  const scanMode: ScanMode =
+    params?.mode === "crop" || params?.mode === "leaf" ? params.mode : "pest"
+  const cropChoice: string = params?.cropName || profile.crops?.[0] || "Auto"
 
   useEffect(() => {
     let isMounted = true
 
-    // Step progress interval simulation
     const interval = setInterval(() => {
-      setStepIdx((prev) => {
-        if (prev < STEPS.length - 1) {
-          return prev + 1
-        }
-        return prev
-      })
-    }, 1200)
+      setStepIdx((prev) => (prev < STEPS.length - 1 ? prev + 1 : prev))
+    }, 1100)
 
-    // Call real backend diagnose API
     async function runScan() {
       if (!imageUri) {
-        if (isMounted) setErrorMsg("No image selected for scanning.")
+        if (isMounted) {
+          setErrorMsg(
+            isKn ? "ಸ್ಕ್ಯಾನ್ ಮಾಡಲು ಯಾವುದೇ ಚಿತ್ರ ಆಯ್ಕೆಯಾಗಿಲ್ಲ." : "No image selected for scanning."
+          )
+        }
         return
       }
 
       try {
-        const result: PestDetectionResult = await diagnoseCropImage(imageUri)
+        const result: PestDetectionResult = await diagnoseCropImage(imageUri, {
+          mobile: profile.mobile,
+          cropName: cropChoice,
+          mode: scanMode,
+          language: lang,
+        })
         if (!isMounted) return
 
         clearInterval(interval)
+        setStepIdx(STEPS.length - 1)
 
-        // Save into scan history store
-        addScanToHistory(result, imageUri)
+        const resolvedCrop =
+          result.detected_crop && result.detected_crop !== "Auto"
+            ? result.detected_crop
+            : cropChoice !== "Auto"
+            ? cropChoice
+            : "Crop Leaf"
+        const finalUri = result.imageUrl || imageUri
 
-        // Transition to ScanResultScreen with real diagnosis data
-        // Use timeout to allow state updates and clear stack
+        // Route non-plant images or very uncertain results to dedicated LowConfidence guidance screen
+        if (result.is_plant === false || (result.low_confidence && !result.healthy)) {
+          setTimeout(() => {
+            back()
+            open("lowConfidence", {
+              diagnosis: result,
+              imageUri: finalUri,
+              cropName: resolvedCrop,
+              mode: scanMode,
+            })
+          }, 350)
+          return
+        }
+
+        // Persist into in-memory store & update farmer scan count
+        addScanToHistory(result, finalUri, resolvedCrop)
+        refreshProfile(profile.mobile).catch(() => {})
+
         setTimeout(() => {
           back()
           open("scanResult", {
             diagnosis: result,
-            imageUri: result.imageUrl || imageUri,
+            imageUri: finalUri,
+            cropName: resolvedCrop,
+            mode: scanMode,
           })
-        }, 500)
+        }, 400)
       } catch (err: any) {
         console.error("Diagnosis error:", err)
         if (isMounted) {
           clearInterval(interval)
-          setErrorMsg(err?.message || "Failed to analyze image. Please ensure backend is running.")
+          setErrorMsg(
+            err?.message ||
+              (isKn
+                ? "ಚಿತ್ರ ವಿಶ್ಲೇಷಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಬ್ಯಾಕೆಂಡ್ ಚಾಲನೆಯಲ್ಲಿದೆಯೇ ಪರಿಶೀಲಿಸಿ."
+                : "Failed to analyze image. Please check backend connection.")
+          )
         }
       }
     }
@@ -80,7 +128,6 @@ export default function ScanProcessingScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.centerBox}>
-        {/* Animated AI processing circle */}
         <View style={styles.circleWrap}>
           {errorMsg ? (
             <AlertTriangle size={56} color="#ef4444" />
@@ -99,23 +146,35 @@ export default function ScanProcessingScreen() {
         {errorMsg ? (
           <>
             <Text style={[styles.statusTitle, { color: "#f87171" }]}>
-              Diagnosis Failed
+              {isKn ? "ರೋಗನಿರ್ಣಯ ವಿಫಲವಾಗಿದೆ" : "Diagnosis Failed"}
             </Text>
             <Text style={styles.stepText}>{errorMsg}</Text>
-            <Text
-              onPress={() => back()}
-              style={[
-                styles.stepText,
-                { color: "#ffffff", textDecorationLine: "underline", marginTop: 20 },
-              ]}
-            >
-              Go Back & Try Again
-            </Text>
+            <TouchableOpacity onPress={() => back()} style={styles.retryBtn}>
+              <Text style={styles.retryBtnText}>
+                {isKn ? "ಹಿಂದೆ ಹೋಗಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ" : "Go Back & Try Again"}
+              </Text>
+            </TouchableOpacity>
           </>
         ) : (
           <>
             <Text style={styles.percentageText}>{progress}%</Text>
-            <Text style={styles.statusTitle}>Crop Pest Diagnosis</Text>
+            <Text style={styles.statusTitle}>
+              {isKn ? "AI ಬೆಳೆ ತಪಾಸಣೆ" : "AI Crop Inspection"}
+            </Text>
+            <Text style={styles.modeTag}>
+              {scanMode === "leaf"
+                ? isKn
+                  ? "ಎಲೆ ರೋಗ ಮೋಡ್"
+                  : "Leaf Disease Mode"
+                : scanMode === "crop"
+                ? isKn
+                  ? "ಬೆಳೆ ಆರೋಗ್ಯ ಮೋಡ್"
+                  : "Crop Health Mode"
+                : isKn
+                ? "ಕೀಟ ಪತ್ತೆ ಮೋಡ್"
+                : "Pest Detection Mode"}
+              {cropChoice !== "Auto" ? ` · ${cropChoice}` : ""}
+            </Text>
             <Text style={styles.stepText}>{STEPS[stepIdx]}</Text>
 
             <View style={styles.progressBar}>
@@ -171,24 +230,43 @@ const styles = StyleSheet.create({
     color: "#f6efd8",
     marginTop: 8,
   },
+  modeTag: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#86efac",
+    marginTop: 4,
+  },
   stepText: {
     fontSize: 13,
-    color: "rgba(255, 255, 255, 0.8)",
+    color: "rgba(255, 255, 255, 0.85)",
     textAlign: "center",
-    marginTop: 8,
-    minHeight: 36,
+    marginTop: 10,
+    minHeight: 38,
+    lineHeight: 19,
   },
   progressBar: {
     width: "100%",
     height: 8,
     backgroundColor: "rgba(255, 255, 255, 0.2)",
     borderRadius: 4,
-    marginTop: 24,
+    marginTop: 22,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
     backgroundColor: "#4ade80",
     borderRadius: 4,
+  },
+  retryBtn: {
+    marginTop: 20,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 16,
+  },
+  retryBtnText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "bold",
   },
 })

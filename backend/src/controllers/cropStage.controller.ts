@@ -1,12 +1,106 @@
 import type { Request, Response } from "express"
-import { prisma } from "../config/db.js"
+import { prisma, withDbRetry } from "../config/db.js"
 import {
   getCropGrowthStage,
+  getStagesForCrop,
   generateStageAwareAdvice,
-  CROP_STAGE_DEFINITIONS,
 } from "../services/stageAdvisory.service.js"
 import { transcribeAudioWithSarvam } from "../services/sarvam.service.js"
 import { getAgriAdvisory } from "../services/gemini.service.js"
+
+interface FarmerWithCropResult {
+  farmer: {
+    id: string | null
+    name: string | null
+    district: string | null
+  }
+  activeField: {
+    id: string
+    cropName: string
+    variety: string | null
+    sowingDate: Date
+    currentStage: string
+    healthStatus: string
+    latestFarmerNote: string | null
+  }
+  dbBacked: boolean
+}
+
+async function findOrCreateFarmerWithCrop(mobile: string): Promise<FarmerWithCropResult> {
+  try {
+    return await withDbRetry(async () => {
+      let farmer = await prisma.farmer.findUnique({
+        where: { mobile },
+        include: {
+          activeCrops: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      })
+
+      if (!farmer) {
+        farmer = await prisma.farmer.create({
+          data: {
+            mobile,
+            name: "Naveen Kumar KM",
+            district: "Mandya",
+            state: "Karnataka",
+            taluk: "Pandavapura",
+            village: "Channasandra",
+            farmSize: 4.2,
+            experienceYears: 6,
+          },
+          include: {
+            activeCrops: true,
+          },
+        })
+      }
+
+      let activeField = farmer.activeCrops[0]
+
+      if (!activeField) {
+        const sowingDate = new Date()
+        sowingDate.setDate(sowingDate.getDate() - 35)
+
+        activeField = await prisma.cropField.create({
+          data: {
+            farmerId: farmer.id,
+            cropName: "Rice (Paddy)",
+            variety: "BPT 5204 (Sona Masoori)",
+            sowingDate,
+            currentStage: "TILLERING_VEGETATIVE",
+            stageDayCount: 35,
+            healthStatus: "HEALTHY",
+          },
+        })
+      }
+
+      return { farmer, activeField, dbBacked: true }
+    }, "findOrCreateFarmerWithCrop")
+  } catch (err: any) {
+    console.warn("⚠️ [CropStage DB Fallback] Using default crop profile:", err?.message || err)
+    const sowingDate = new Date()
+    sowingDate.setDate(sowingDate.getDate() - 35)
+    return {
+      farmer: {
+        id: null,
+        name: "Naveen Kumar KM",
+        district: "Mandya",
+      },
+      activeField: {
+        id: "default-field",
+        cropName: "Rice (Paddy)",
+        variety: "BPT 5204 (Sona Masoori)",
+        sowingDate,
+        currentStage: "TILLERING_VEGETATIVE",
+        healthStatus: "HEALTHY",
+        latestFarmerNote: null,
+      },
+      dbBacked: false,
+    }
+  }
+}
 
 /**
  * GET /api/crop-stage/active
@@ -15,56 +109,7 @@ import { getAgriAdvisory } from "../services/gemini.service.js"
 export async function getActiveCropStage(req: Request, res: Response) {
   try {
     const mobile = (req.query.mobile as string) || "9591502209"
-
-    // Find farmer or default demo farmer in Neon PostgreSQL
-    let farmer = await prisma.farmer.findUnique({
-      where: { mobile },
-      include: {
-        activeCrops: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
-    })
-
-    if (!farmer) {
-      // Create farmer record if not yet created
-      farmer = await prisma.farmer.create({
-        data: {
-          mobile,
-          name: "Naveen Kumar KM",
-          district: "Mandya",
-          state: "Karnataka",
-          taluk: "Pandavapura",
-          village: "Channasandra",
-          farmSize: 4.2,
-          experienceYears: 6,
-        },
-        include: {
-          activeCrops: true,
-        },
-      })
-    }
-
-    let activeField = farmer.activeCrops[0]
-
-    // If farmer has no active crop field yet, create one (e.g. Rice transplanted 35 days ago)
-    if (!activeField) {
-      const sowingDate = new Date()
-      sowingDate.setDate(sowingDate.getDate() - 35) // 35 days ago (Tillering / Vegetative stage)
-
-      activeField = await prisma.cropField.create({
-        data: {
-          farmerId: farmer.id,
-          cropName: "Rice (Paddy)",
-          variety: "BPT 5204 (Sona Masoori)",
-          sowingDate,
-          currentStage: "TILLERING_VEGETATIVE",
-          stageDayCount: 35,
-          healthStatus: "HEALTHY",
-        },
-      })
-    }
+    const { farmer, activeField } = await findOrCreateFarmerWithCrop(mobile)
 
     // Calculate days since sowing
     const now = new Date()
@@ -73,6 +118,7 @@ export async function getActiveCropStage(req: Request, res: Response) {
 
     // Calculate present stage and advisories dynamically
     const stageDef = getCropGrowthStage(activeField.cropName, daysSinceSowing)
+    const stagesForCrop = getStagesForCrop(activeField.cropName)
 
     return res.json({
       success: true,
@@ -96,7 +142,7 @@ export async function getActiveCropStage(req: Request, res: Response) {
         latestNote: activeField.latestFarmerNote,
       },
       dailyAdvisories: stageDef.advisories,
-      allStages: (CROP_STAGE_DEFINITIONS.rice || []).map((s) => ({
+      allStages: stagesForCrop.map((s) => ({
         key: s.key,
         nameEn: s.nameEn,
         nameKn: s.nameKn,
@@ -124,14 +170,18 @@ export async function updateCropStage(req: Request, res: Response) {
     const { fieldId } = req.params
     const { stageKey, healthStatus, latestNote } = req.body
 
-    const updated = await prisma.cropField.update({
-      where: { id: fieldId },
-      data: {
-        currentStage: stageKey,
-        healthStatus: healthStatus || undefined,
-        latestFarmerNote: latestNote || undefined,
-      },
-    })
+    const updated = await withDbRetry(
+      () =>
+        prisma.cropField.update({
+          where: { id: fieldId },
+          data: {
+            currentStage: stageKey,
+            healthStatus: healthStatus || undefined,
+            latestFarmerNote: latestNote || undefined,
+          },
+        }),
+      "updateCropStage"
+    )
 
     return res.json({
       success: true,
@@ -179,31 +229,22 @@ export async function handleVoiceObservation(req: Request, res: Response) {
 
     const transcript = sttResult.transcript
 
-    // 2. Load farmer's active crop field
-    const farmer = await prisma.farmer.findUnique({
-      where: { mobile },
-      include: {
-        activeCrops: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
-    })
-
-    const field = farmer?.activeCrops[0]
-    const cropName = field?.cropName || "Rice (Paddy)"
-    const daysSinceSowing = field ? Math.max(1, Math.floor((Date.now() - new Date(field.sowingDate).getTime()) / 86400000)) : 35
+    // 2. Load (or auto-provision) farmer's active crop field
+    const { farmer, activeField: field, dbBacked } = await findOrCreateFarmerWithCrop(mobile)
+    const cropName = field.cropName || "Rice (Paddy)"
+    const daysSinceSowing = Math.max(1, Math.floor((Date.now() - new Date(field.sowingDate).getTime()) / 86400000))
     const stageDef = getCropGrowthStage(cropName, daysSinceSowing)
+    const isEnglish = (sttResult.languageCode || language).toLowerCase().startsWith("en")
 
     // 3. Generate agronomy advice tailored to this exact present stage
-    // Attempt real-time Gemini advisory with strict agricultural prompt; fallback to rule engine
     let geminiAdvice = ""
     try {
       geminiAdvice = await getAgriAdvisory(transcript, {
         cropName,
-        growthStage: stageDef.nameKn + " (" + stageDef.nameEn + ")",
+        growthStage: `${stageDef.nameKn} (${stageDef.nameEn})`,
         daysSinceSowing,
-        district: farmer?.district || "Karnataka",
+        district: farmer.district || "Karnataka",
+        preferredLanguage: isEnglish ? "en" : "kn",
       })
     } catch (gErr: any) {
       console.warn("⚠️ [Gemini fallback to rule engine]:", gErr?.message || gErr)
@@ -217,31 +258,30 @@ export async function handleVoiceObservation(req: Request, res: Response) {
       language: sttResult.languageCode,
     })
 
-    const finalAdviceKn = geminiAdvice || advice.adviceKn
-    const finalAdviceEn = geminiAdvice || advice.adviceEn
+    const finalAdviceKn = !isEnglish && geminiAdvice ? geminiAdvice : advice.adviceKn
+    const finalAdviceEn = isEnglish && geminiAdvice ? geminiAdvice : advice.adviceEn
 
-    // 4. Log interaction in Neon PostgreSQL
-    if (farmer) {
-      await prisma.farmerInteraction.create({
-        data: {
-          farmerId: farmer.id,
-          cropFieldId: field?.id,
-          inputType: "VOICE",
-          language: sttResult.languageCode,
-          transcriptText: transcript,
-          aiResponseText: finalAdviceKn,
-        },
-      })
-
-      // Update latest farmer note on crop field
-      if (field) {
-        await prisma.cropField.update({
-          where: { id: field.id },
+    // 4. Log interaction in Neon PostgreSQL (best-effort with retry)
+    if (dbBacked && farmer.id) {
+      const farmerId = farmer.id
+      await withDbRetry(async () => {
+        await prisma.farmerInteraction.create({
           data: {
-            latestFarmerNote: transcript,
+            farmerId,
+            cropFieldId: field.id,
+            inputType: "VOICE",
+            language: sttResult.languageCode,
+            transcriptText: transcript,
+            aiResponseText: isEnglish ? finalAdviceEn : finalAdviceKn,
           },
         })
-      }
+        await prisma.cropField.update({
+          where: { id: field.id },
+          data: { latestFarmerNote: transcript },
+        })
+      }, "logVoiceObservation").catch((dbErr) =>
+        console.warn("⚠️ [CropStage Voice Log Warning]:", dbErr?.message || dbErr)
+      )
     }
 
     return res.json({
@@ -281,28 +321,20 @@ export async function handleTextObservation(req: Request, res: Response) {
       })
     }
 
-    const farmer = await prisma.farmer.findUnique({
-      where: { mobile },
-      include: {
-        activeCrops: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
-    })
-
-    const field = farmer?.activeCrops[0]
-    const cropName = field?.cropName || "Rice (Paddy)"
-    const daysSinceSowing = field ? Math.max(1, Math.floor((Date.now() - new Date(field.sowingDate).getTime()) / 86400000)) : 35
+    const { farmer, activeField: field, dbBacked } = await findOrCreateFarmerWithCrop(mobile)
+    const cropName = field.cropName || "Rice (Paddy)"
+    const daysSinceSowing = Math.max(1, Math.floor((Date.now() - new Date(field.sowingDate).getTime()) / 86400000))
     const stageDef = getCropGrowthStage(cropName, daysSinceSowing)
+    const isEnglish = String(language).toLowerCase().startsWith("en")
 
     let geminiAdvice = ""
     try {
       geminiAdvice = await getAgriAdvisory(text, {
         cropName,
-        growthStage: stageDef.nameKn + " (" + stageDef.nameEn + ")",
+        growthStage: `${stageDef.nameKn} (${stageDef.nameEn})`,
         daysSinceSowing,
-        district: farmer?.district || "Karnataka",
+        district: farmer.district || "Karnataka",
+        preferredLanguage: isEnglish ? "en" : "kn",
       })
     } catch (gErr: any) {
       console.warn("⚠️ [Gemini fallback to rule engine]:", gErr?.message || gErr)
@@ -316,29 +348,29 @@ export async function handleTextObservation(req: Request, res: Response) {
       language,
     })
 
-    const finalAdviceKn = geminiAdvice || advice.adviceKn
-    const finalAdviceEn = geminiAdvice || advice.adviceEn
+    const finalAdviceKn = !isEnglish && geminiAdvice ? geminiAdvice : advice.adviceKn
+    const finalAdviceEn = isEnglish && geminiAdvice ? geminiAdvice : advice.adviceEn
 
-    if (farmer) {
-      await prisma.farmerInteraction.create({
-        data: {
-          farmerId: farmer.id,
-          cropFieldId: field?.id,
-          inputType: "TEXT",
-          language,
-          transcriptText: text,
-          aiResponseText: finalAdviceKn,
-        },
-      })
-
-      if (field) {
-        await prisma.cropField.update({
-          where: { id: field.id },
+    if (dbBacked && farmer.id) {
+      const farmerId = farmer.id
+      await withDbRetry(async () => {
+        await prisma.farmerInteraction.create({
           data: {
-            latestFarmerNote: text,
+            farmerId,
+            cropFieldId: field.id,
+            inputType: "TEXT",
+            language,
+            transcriptText: text,
+            aiResponseText: isEnglish ? finalAdviceEn : finalAdviceKn,
           },
         })
-      }
+        await prisma.cropField.update({
+          where: { id: field.id },
+          data: { latestFarmerNote: text },
+        })
+      }, "logTextObservation").catch((dbErr) =>
+        console.warn("⚠️ [CropStage Text Log Warning]:", dbErr?.message || dbErr)
+      )
     }
 
     return res.json({

@@ -4,10 +4,8 @@
 // based on dynamic GPS coordinates collected from the farmer.
 // ==============================================================================
 
-import dotenv from "dotenv"
-dotenv.config()
+import "../config/env.js"
 
-const WEATHER_API_KEY = process.env.WEATHER_API_KEY || "ceb65eb731d94e998e2164550260911"
 const CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes cache
 
 interface WeatherCacheEntry {
@@ -161,6 +159,129 @@ function generateFarmingAdvisory(current: any, day1: any): LiveWeatherData["advi
   }
 }
 
+const WMO_CODE_MAP: Record<number, { en: string; kn: string }> = {
+  0: { en: "Clear sky", kn: "ಸ್ವಚ್ಛ ಆಕಾಶ" },
+  1: { en: "Mainly clear", kn: "ಮುಖ್ಯವಾಗಿ ಸ್ವಚ್ಛ" },
+  2: { en: "Partly cloudy", kn: "ಭಾಗಶಃ ಮೋಡ" },
+  3: { en: "Overcast", kn: "ದಟ್ಟ ಮೋಡ" },
+  45: { en: "Fog", kn: "ದಟ್ಟ ಮಂಜು" },
+  48: { en: "Depositing rime fog", kn: "ಮಂಜು" },
+  51: { en: "Light drizzle", kn: "ಹಗುರ ತುಂತುರು ಮಳೆ" },
+  53: { en: "Moderate drizzle", kn: "ಸಾಧಾರಣ ತುಂತುರು ಮಳೆ" },
+  61: { en: "Light rain", kn: "ಸಾಧಾರಣ ಮಳೆ" },
+  63: { en: "Moderate rain", kn: "ಮಧ್ಯಮ ಮಳೆ" },
+  65: { en: "Heavy rain", kn: "ಭಾರೀ ಮಳೆ" },
+  80: { en: "Rain showers", kn: "ಮಳೆ ಸಿಂಚನ" },
+  95: { en: "Thunderstorm", kn: "ಗುಡುಗು ಸಹಿತ ಮಳೆ" },
+}
+
+function describeWmoCode(code: number): { en: string; kn: string } {
+  if (WMO_CODE_MAP[code]) return WMO_CODE_MAP[code]
+  if (code >= 51 && code <= 67) return { en: "Light rain", kn: "ಸಾಧಾರಣ ಮಳೆ" }
+  if (code >= 80 && code <= 82) return { en: "Rain showers", kn: "ಮಳೆ ಸಿಂಚನ" }
+  if (code >= 95) return { en: "Thunderstorm", kn: "ಗುಡುಗು ಸಹಿತ ಮಳೆ" }
+  return { en: "Partly cloudy", kn: "ಭಾಗಶಃ ಮೋಡ" }
+}
+
+async function fetchOpenMeteoFallback(lat: number, lng: number, days: number): Promise<LiveWeatherData> {
+  const url = new URL("https://api.open-meteo.com/v1/forecast")
+  url.searchParams.set("latitude", String(lat))
+  url.searchParams.set("longitude", String(lng))
+  url.searchParams.set(
+    "current",
+    "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m"
+  )
+  url.searchParams.set(
+    "daily",
+    "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max"
+  )
+  url.searchParams.set("timezone", "Asia/Kolkata")
+  url.searchParams.set("forecast_days", String(Math.max(1, Math.min(days, 7))))
+
+  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) })
+  if (!res.ok) {
+    throw new Error(`Open-Meteo returned HTTP ${res.status}`)
+  }
+  const om = (await res.json()) as any
+  const cur = om.current || {}
+  const daily = om.daily || {}
+  const times: string[] = Array.isArray(daily.time) ? daily.time : []
+
+  const forecast: ForecastDayItem[] = times.map((dateStr, idx) => {
+    const d = new Date(dateStr)
+    const dayOfWeek = d.getDay()
+    const maxT = Math.round(daily.temperature_2m_max?.[idx] ?? cur.temperature_2m ?? 28)
+    const minT = Math.round(daily.temperature_2m_min?.[idx] ?? (maxT - 6))
+    const code = Number(daily.weather_code?.[idx] ?? cur.weather_code ?? 1)
+    const desc = describeWmoCode(code)
+
+    return {
+      date: dateStr,
+      dayNameEn: idx === 0 ? "Today" : DAYS_EN[dayOfWeek],
+      dayNameKn: idx === 0 ? "ಇಂದು" : DAYS_KN[dayOfWeek],
+      maxTempC: maxT,
+      minTempC: minT,
+      avgTempC: Math.round((maxT + minT) / 2),
+      conditionTextEn: desc.en,
+      conditionTextKn: desc.kn,
+      iconUrl: "",
+      chanceOfRain: Math.round(daily.precipitation_probability_max?.[idx] ?? 0),
+      totalPrecipMm: Number(daily.precipitation_sum?.[idx] ?? 0),
+      maxWindKph: Math.round(daily.wind_speed_10m_max?.[idx] ?? cur.wind_speed_10m ?? 10),
+      humidity: Math.round(cur.relative_humidity_2m ?? 65),
+      uv: Math.round(daily.uv_index_max?.[idx] ?? 5),
+    }
+  })
+
+  const curTempC = Math.round(cur.temperature_2m ?? 28)
+  const curDesc = describeWmoCode(Number(cur.weather_code ?? 1))
+  const day0Rain = forecast[0]?.chanceOfRain ?? 0
+  const advisory = generateFarmingAdvisory(
+    {
+      chance_of_rain: day0Rain,
+      precip_mm: cur.precipitation ?? 0,
+      wind_kph: cur.wind_speed_10m ?? 10,
+      temp_c: curTempC,
+    },
+    {
+      day: {
+        daily_chance_of_rain: day0Rain,
+        totalprecip_mm: forecast[0]?.totalPrecipMm ?? 0,
+      },
+    }
+  )
+
+  return {
+    location: {
+      name: `${lat.toFixed(2)}, ${lng.toFixed(2)}`,
+      region: "Karnataka",
+      country: "India",
+      latitude: om.latitude ?? lat,
+      longitude: om.longitude ?? lng,
+      localtime: new Date().toISOString(),
+    },
+    current: {
+      tempC: curTempC,
+      tempF: Math.round((curTempC * 9) / 5 + 32),
+      feelsLikeC: Math.round(cur.apparent_temperature ?? curTempC),
+      conditionTextEn: curDesc.en,
+      conditionTextKn: curDesc.kn,
+      iconUrl: "",
+      humidity: Math.round(cur.relative_humidity_2m ?? 65),
+      windKph: Math.round(cur.wind_speed_10m ?? 10),
+      windDir: String(cur.wind_direction_10m ?? "E"),
+      precipMm: Number(cur.precipitation ?? 0),
+      chanceOfRain: day0Rain,
+      uv: forecast[0]?.uv ?? 5,
+      pressureMb: Math.round(cur.surface_pressure ?? 1013),
+      airQualityIndex: null,
+    },
+    forecast,
+    advisory,
+    source: "Open-Meteo (Live GPS Weather Fallback)",
+  }
+}
+
 /**
  * Retrieves real-time weather and 3-day agricultural forecast for given GPS coordinates.
  */
@@ -179,20 +300,44 @@ export async function getLiveWeatherForecast(
     return cached.data
   }
 
+  const apiKey = process.env.WEATHER_API_KEY?.trim() || ""
+  if (!apiKey) {
+    const omResult = await fetchOpenMeteoFallback(lat, lng, days)
+    weatherCache.set(cacheKey, { data: omResult, expiresAt: Date.now() + CACHE_TTL_MS })
+    return omResult
+  }
+
   const url = new URL("https://api.weatherapi.com/v1/forecast.json")
-  url.searchParams.set("key", WEATHER_API_KEY)
+  url.searchParams.set("key", apiKey)
   url.searchParams.set("q", `${lat},${lng}`)
   url.searchParams.set("days", String(days))
   url.searchParams.set("aqi", "yes")
 
   console.log(`🌦️ [Weather API] Fetching live forecast for (${lat}, ${lng})...`)
 
-  const response = await fetch(url.toString(), {
-    signal: AbortSignal.timeout(10000),
-  })
+  let response: Response | null = null
+  let lastErr: unknown = null
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const r = await fetch(url.toString(), {
+        signal: AbortSignal.timeout(attempt === 1 ? 6500 : 8000),
+      })
+      if (r.ok) {
+        response = r
+        break
+      }
+      lastErr = new Error(`WeatherAPI returned HTTP ${r.status}: ${r.statusText}`)
+    } catch (err) {
+      lastErr = err
+      console.warn(`⚠️ [Weather API] Attempt ${attempt}/2 failed:`, err instanceof Error ? err.message : err)
+    }
+  }
 
-  if (!response.ok) {
-    throw new Error(`WeatherAPI returned HTTP ${response.status}: ${response.statusText}`)
+  if (!response) {
+    console.warn("⚠️ [Weather API] Falling back to live Open-Meteo:", lastErr instanceof Error ? lastErr.message : lastErr)
+    const omResult = await fetchOpenMeteoFallback(lat, lng, days)
+    weatherCache.set(cacheKey, { data: omResult, expiresAt: Date.now() + CACHE_TTL_MS })
+    return omResult
   }
 
   const data = (await response.json()) as any
