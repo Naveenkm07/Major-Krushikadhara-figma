@@ -550,7 +550,17 @@ function buildFullAdminHtml() {
             />
           </div>
 
-          <div class="flex items-center space-x-2 flex-wrap">
+          <div class="flex items-center space-x-2 flex-wrap gap-y-2">
+            <!-- Naveen KM Shortcut -->
+            <button
+              onclick="filterNaveen()"
+              class="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs px-3 py-2 rounded-xl font-bold transition flex items-center space-x-1 shadow-sm"
+              title="Focus on Naveen Kumar KM demo profile"
+            >
+              <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Naveen KM (Mandya)</span>
+            </button>
+
             <select id="districtFilter" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 font-medium">
               <option value="ALL">All Districts (10)</option>
               <option value="Mandya">Mandya (ಮಂಡ್ಯ)</option>
@@ -1317,6 +1327,9 @@ function buildFullAdminHtml() {
         overlay.classList.remove('hidden');
       } else {
         overlay.classList.add('hidden');
+        if (window.location.pathname.includes('/login')) {
+          window.history.replaceState({}, '', '/');
+        }
       }
     }
 
@@ -1324,6 +1337,9 @@ function buildFullAdminHtml() {
       localStorage.setItem('krushikadhara_admin_auth', 'true');
       localStorage.setItem('krushikadhara_admin_token', 'krushika-adm-' + Date.now());
       document.getElementById('loginOverlay').classList.add('hidden');
+      if (window.location.pathname.includes('/login')) {
+        window.history.replaceState({}, '', '/');
+      }
       showToast('Welcome, Naveen Kumar KM (Super Admin)!');
     }
 
@@ -1359,6 +1375,9 @@ function buildFullAdminHtml() {
           localStorage.setItem('krushikadhara_admin_auth', 'true');
           localStorage.setItem('krushikadhara_admin_token', data.token);
           document.getElementById('loginOverlay').classList.add('hidden');
+          if (window.location.pathname.includes('/login')) {
+            window.history.replaceState({}, '', '/');
+          }
           showToast('Welcome, ' + (data.admin?.name || 'Administrator') + '!');
           return;
         }
@@ -1369,6 +1388,9 @@ function buildFullAdminHtml() {
       if (validIds.includes(id.toLowerCase()) && validPasswords.includes(password)) {
         localStorage.setItem('krushikadhara_admin_auth', 'true');
         document.getElementById('loginOverlay').classList.add('hidden');
+        if (window.location.pathname.includes('/login')) {
+          window.history.replaceState({}, '', '/');
+        }
         showToast('Authenticated as Administrator!');
       } else {
         document.getElementById('loginErrorMsg').classList.remove('hidden');
@@ -1378,6 +1400,7 @@ function buildFullAdminHtml() {
     function handleLogout() {
       if (confirm('Lock the Admin Portal console?')) {
         localStorage.removeItem('krushikadhara_admin_auth');
+        localStorage.removeItem('krushikadhara_admin_token');
         document.getElementById('loginOverlay').classList.remove('hidden');
         showToast('Console locked securely');
       }
@@ -1451,6 +1474,15 @@ function buildFullAdminHtml() {
       setTimeout(() => {
         toast.classList.add('translate-y-24', 'opacity-0');
       }, 3200);
+    }
+
+    function filterNaveen() {
+      document.getElementById('searchInput').value = 'Naveen';
+      document.getElementById('districtFilter').value = 'ALL';
+      document.getElementById('cropFilter').value = 'ALL';
+      document.getElementById('healthFilter').value = 'ALL';
+      applyFilters();
+      showToast('Focused on Naveen Kumar KM (Mandya · 4.2 ac)');
     }
 
     // --------------------------------------------------------------------------
@@ -2479,14 +2511,14 @@ function buildFullAdminHtml() {
         }).join('');
 
         return \`
-          <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3.5 shadow-sm">
+          <div id="plotCard-\${p.id}" class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3.5 shadow-sm">
             
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center space-x-2">
                 <span class="font-black text-slate-800 text-sm">\${p.cropName}</span>
                 <span class="text-[11px] text-slate-500 font-medium">\${p.variety}</span>
                 <span class="text-[11px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-semibold">\${p.acreage} ac</span>
-                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold border \${badgeColor}">\${badgeText}</span>
+                <span id="badge-\${p.id}" class="text-[10px] px-2 py-0.5 rounded-full font-bold border \${badgeColor}">\${badgeText}</span>
               </div>
               <button onclick="handleDeletePlot('\${p.id}')" class="text-rose-500 hover:text-rose-700 p-1" title="Remove plot">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -2494,17 +2526,17 @@ function buildFullAdminHtml() {
             </div>
 
             <!-- Active Growth Stage Card (Screen 2 Alignment) -->
-            <div class="bg-gradient-to-r from-emerald-900 to-teal-900 text-white rounded-2xl p-3.5 space-y-2 border border-emerald-800">
+            <div class="bg-gradient-to-r from-emerald-900 to-teal-900 text-white rounded-2xl p-3.5 space-y-2 border border-emerald-800 shadow-sm">
               <div class="flex items-center justify-between text-[10px] text-emerald-300 font-semibold uppercase tracking-wider">
                 <span>Active Growth Stage</span>
-                <span>Day \${day} of \${totalDays}</span>
+                <span id="dayLabel-\${p.id}">Day \${day} of \${totalDays}</span>
               </div>
               <div class="font-extrabold text-sm text-white flex items-center justify-between">
-                <span>\${activeStage?.nameEn || p.currentStage}</span>
-                <span class="text-xs text-emerald-200 font-mono">\${progressPercent}%</span>
+                <span id="stageName-\${p.id}">\${activeStage?.nameEn || p.currentStage}</span>
+                <span id="progressPct-\${p.id}" class="text-xs text-emerald-200 font-mono">\${progressPercent}%</span>
               </div>
               <div class="w-full bg-emerald-950/80 rounded-full h-2 overflow-hidden border border-emerald-700/60">
-                <div class="bg-emerald-400 h-2 rounded-full transition-all" style="width: \${progressPercent}%"></div>
+                <div id="progressBar-\${p.id}" class="bg-emerald-400 h-2 rounded-full transition-all" style="width: \${progressPercent}%"></div>
               </div>
               <!-- Interactive Range Slider -->
               <div class="pt-1">
@@ -2513,7 +2545,8 @@ function buildFullAdminHtml() {
                   min="1"
                   max="\${totalDays}"
                   value="\${day}"
-                  oninput="handleSliderChange('\${p.id}', this.value)"
+                  oninput="handleSliderInput('\${p.id}', this.value)"
+                  onchange="handleSliderSave('\${p.id}', this.value)"
                   class="w-full accent-emerald-400 cursor-pointer"
                 />
                 <div class="flex justify-between text-[9px] text-emerald-300/80 mt-0.5">
@@ -2529,24 +2562,28 @@ function buildFullAdminHtml() {
               <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Plot Health Check-in</span>
               <div class="grid grid-cols-4 gap-1.5">
                 <button
+                  type="button"
                   onclick="quickUpdatePlotHealth('\${p.id}', 'HEALTHY')"
                   class="py-1.5 px-2 rounded-xl text-center text-[10px] font-bold border transition \${p.healthStatus === 'HEALTHY' ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm ring-2 ring-emerald-300' : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50'}"
                 >
                   🟢 Healthy
                 </button>
                 <button
+                  type="button"
                   onclick="quickUpdatePlotHealth('\${p.id}', 'WATER_STRESSED')"
                   class="py-1.5 px-2 rounded-xl text-center text-[10px] font-bold border transition \${p.healthStatus === 'WATER_STRESSED' ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-300' : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50'}"
                 >
                   💧 Needs Water
                 </button>
                 <button
+                  type="button"
                   onclick="quickUpdatePlotHealth('\${p.id}', 'LOW_NUTRIENTS')"
                   class="py-1.5 px-2 rounded-xl text-center text-[10px] font-bold border transition \${p.healthStatus === 'LOW_NUTRIENTS' ? 'bg-amber-600 text-white border-amber-700 shadow-sm ring-2 ring-amber-300' : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50'}"
                 >
                   ⚠️ Low Nutrients
                 </button>
                 <button
+                  type="button"
                   onclick="quickUpdatePlotHealth('\${p.id}', 'PEST_SUSPECTED')"
                   class="py-1.5 px-2 rounded-xl text-center text-[10px] font-bold border transition \${p.healthStatus === 'PEST_SUSPECTED' ? 'bg-rose-600 text-white border-rose-700 shadow-sm ring-2 ring-rose-300' : 'bg-white text-slate-700 border-slate-200 hover:bg-rose-50'}"
                 >
@@ -2556,7 +2593,7 @@ function buildFullAdminHtml() {
             </div>
 
             <!-- Today's Stage Advisories (Matching Screen 2) -->
-            <div class="space-y-2 bg-white p-3 rounded-2xl border border-slate-200">
+            <div id="advisoriesBox-\${p.id}" class="space-y-2 bg-white p-3 rounded-2xl border border-slate-200">
               <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Today's Stage Advisories (Day \${day})</span>
               \${fertAdv ? \`
                 <div class="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-1">
@@ -2596,18 +2633,35 @@ function buildFullAdminHtml() {
       document.getElementById('plotsModal').classList.add('hidden');
     }
 
-    async function handleSliderChange(plotId, newDay) {
+    function handleSliderInput(plotId, newDay) {
       const f = allFarmers.find(x => x.mobile === currentPlotsFarmerMobile);
       if (!f || !Array.isArray(f.activeCrops)) return;
       const plot = f.activeCrops.find(p => p.id === plotId);
       if (!plot) return;
 
       plot.stageDayCount = parseInt(newDay, 10);
-      const { activeStage } = calculateStageDetails(plot.cropName, plot.stageDayCount);
+      const { totalDays, activeStage } = calculateStageDetails(plot.cropName, plot.stageDayCount);
       if (activeStage) {
         plot.currentStage = activeStage.nameEn;
       }
+      const pct = Math.min(100, Math.round((plot.stageDayCount / totalDays) * 100));
 
+      const dayLbl = document.getElementById('dayLabel-' + plotId);
+      const stageLbl = document.getElementById('stageName-' + plotId);
+      const pctLbl = document.getElementById('progressPct-' + plotId);
+      const pBar = document.getElementById('progressBar-' + plotId);
+
+      if (dayLbl) dayLbl.textContent = 'Day ' + plot.stageDayCount + ' of ' + totalDays;
+      if (stageLbl) stageLbl.textContent = activeStage ? activeStage.nameEn : plot.currentStage;
+      if (pctLbl) pctLbl.textContent = pct + '%';
+      if (pBar) pBar.style.width = pct + '%';
+    }
+
+    async function handleSliderSave(plotId, newDay) {
+      handleSliderInput(plotId, newDay);
+      const f = allFarmers.find(x => x.mobile === currentPlotsFarmerMobile);
+      if (!f) return;
+      const plot = f.activeCrops.find(p => p.id === plotId);
       renderExistingPlots(f.activeCrops);
       applyFilters();
 
@@ -2619,6 +2673,8 @@ function buildFullAdminHtml() {
           body: JSON.stringify({ stageDayCount: plot.stageDayCount, currentStage: plot.currentStage }),
         });
       } catch (e) {}
+
+      showToast('Stage updated to Day ' + plot.stageDayCount + ' (' + plot.currentStage + ')');
     }
 
     async function quickUpdatePlotHealth(plotId, healthStatus) {
