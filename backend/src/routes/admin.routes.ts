@@ -18,13 +18,19 @@ import {
   deleteBroadcastHandler,
   getSchemesOverviewHandler,
   updateSchemeStatusHandler,
+  verifyAdminLoginHandler,
+  getMandiOverviewHandler,
 } from "../controllers/admin.controller.js"
 
 const router = Router()
 
-// Aggregate & Data Export
+// Authentication Gate
+router.post("/auth/login", verifyAdminLoginHandler)
+
+// Aggregate, Mandi & Data Export
 router.get("/stats", getStatsHandler)
 router.get("/export", exportFarmersHandler)
+router.get("/mandi/overview", getMandiOverviewHandler)
 
 // Farmers Profile CRUD
 router.get("/farmers", listFarmersHandler)

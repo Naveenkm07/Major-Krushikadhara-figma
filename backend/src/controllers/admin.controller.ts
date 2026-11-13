@@ -381,3 +381,179 @@ export async function updateSchemeStatusHandler(req: Request, res: Response) {
   }
 }
 
+export async function verifyAdminLoginHandler(req: Request, res: Response) {
+  try {
+    const { id, password } = req.body
+    const validIds = ["admin", "naveenkm07", "krushikadhara"]
+    const validPasswords = ["admin123", "admin", "123456"]
+
+    if (id && password && validIds.includes(id.toLowerCase().trim()) && validPasswords.includes(password.trim())) {
+      res.json({
+        success: true,
+        token: `krushika-adm-${Date.now()}`,
+        admin: {
+          id: id.trim(),
+          name: "Naveen Kumar KM",
+          role: "State Agriculture Administrator (Super Admin)",
+          zone: "Karnataka Directorate of Agriculture",
+        },
+      })
+      return
+    }
+
+    res.status(401).json({
+      success: false,
+      error: "Invalid Admin ID or Password. Try 'admin' / 'admin123'",
+    })
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || "Authentication error" })
+  }
+}
+
+export async function getMandiOverviewHandler(_req: Request, res: Response) {
+  try {
+    const mandiRates = [
+      {
+        mandi: "Mandya APMC Yard",
+        district: "Mandya",
+        commodity: "Paddy (Sona Masoori)",
+        variety: "BPT 5204",
+        modalPrice: 2450,
+        minPrice: 2300,
+        maxPrice: 2600,
+        arrivalsTons: 185,
+        trend: "+3.2%",
+        trendDirection: "UP",
+        updatedAt: "Today, 09:30 AM",
+      },
+      {
+        mandi: "Kolar APMC Market",
+        district: "Kolar",
+        commodity: "Tomato (Hybrid)",
+        variety: "Arka Rakshak",
+        modalPrice: 1950,
+        minPrice: 1600,
+        maxPrice: 2200,
+        arrivalsTons: 420,
+        trend: "+5.8%",
+        trendDirection: "UP",
+        updatedAt: "Today, 10:15 AM",
+      },
+      {
+        mandi: "Byadagi APMC (Haveri)",
+        district: "Haveri",
+        commodity: "Chilli (Byadagi Kaddi)",
+        variety: "Special Grade 1",
+        modalPrice: 38500,
+        minPrice: 32000,
+        maxPrice: 42500,
+        arrivalsTons: 95,
+        trend: "+4.1%",
+        trendDirection: "UP",
+        updatedAt: "Today, 08:45 AM",
+      },
+      {
+        mandi: "Shimoga APMC Yard",
+        district: "Shimoga",
+        commodity: "Arecanut (Rashi)",
+        variety: "Thirthahalli Chali",
+        modalPrice: 48500,
+        minPrice: 45000,
+        maxPrice: 51200,
+        arrivalsTons: 110,
+        trend: "-1.2%",
+        trendDirection: "DOWN",
+        updatedAt: "Today, 11:00 AM",
+      },
+      {
+        mandi: "Belagavi APMC Yard",
+        district: "Belagavi",
+        commodity: "Soybean",
+        variety: "JS-335 Yellow",
+        modalPrice: 4600,
+        minPrice: 4350,
+        maxPrice: 4800,
+        arrivalsTons: 240,
+        trend: "+1.8%",
+        trendDirection: "UP",
+        updatedAt: "Today, 09:10 AM",
+      },
+      {
+        mandi: "Chikkamagaluru Market",
+        district: "Chikkamagaluru",
+        commodity: "Coffee (Arabica Cherry)",
+        variety: "Sln 795",
+        modalPrice: 18500,
+        minPrice: 17200,
+        maxPrice: 19800,
+        arrivalsTons: 65,
+        trend: "+2.5%",
+        trendDirection: "UP",
+        updatedAt: "Today, 10:45 AM",
+      },
+      {
+        mandi: "Vijayapura APMC Yard",
+        district: "Vijayapura",
+        commodity: "Jowar (Maldandi)",
+        variety: "White Winter",
+        modalPrice: 3800,
+        minPrice: 3500,
+        maxPrice: 4100,
+        arrivalsTons: 150,
+        trend: "0.0%",
+        trendDirection: "FLAT",
+        updatedAt: "Today, 09:50 AM",
+      },
+      {
+        mandi: "Yeshwanthpur APMC (Bengaluru)",
+        district: "Bengaluru Urban",
+        commodity: "Onion (Bellary Medium)",
+        variety: "Red Local",
+        modalPrice: 2200,
+        minPrice: 1900,
+        maxPrice: 2500,
+        arrivalsTons: 580,
+        trend: "-3.5%",
+        trendDirection: "DOWN",
+        updatedAt: "Today, 07:30 AM",
+      },
+      {
+        mandi: "Bagalkot APMC Market",
+        district: "Bagalkot",
+        commodity: "Pomegranate (Bhagwa)",
+        variety: "A-Grade Export",
+        modalPrice: 9500,
+        minPrice: 8200,
+        maxPrice: 11000,
+        arrivalsTons: 80,
+        trend: "+6.2%",
+        trendDirection: "UP",
+        updatedAt: "Today, 10:00 AM",
+      },
+      {
+        mandi: "Tumkur APMC Yard",
+        district: "Tumkur",
+        commodity: "Coconut (Copra)",
+        variety: "Tiptur Special",
+        modalPrice: 11200,
+        minPrice: 10400,
+        maxPrice: 12000,
+        arrivalsTons: 210,
+        trend: "+2.1%",
+        trendDirection: "UP",
+        updatedAt: "Today, 08:15 AM",
+      },
+    ]
+
+    res.json({
+      success: true,
+      count: mandiRates.length,
+      rates: mandiRates,
+      lastRefreshed: new Date().toISOString(),
+    })
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || "Failed to fetch mandi overview" })
+  }
+}
+
+

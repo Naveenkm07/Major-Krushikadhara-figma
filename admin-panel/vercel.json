@@ -1,11 +1,15 @@
 {
-  "version": 2,
-  "name": "krushikadhara-admin",
+  "framework": null,
+  "buildCommand": null,
+  "outputDirectory": ".",
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://krushikadhara-api.onrender.com/api/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "/index.html"
     }
   ]
 }
-
