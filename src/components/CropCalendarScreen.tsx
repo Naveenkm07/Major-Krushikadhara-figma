@@ -67,6 +67,21 @@ const HEALTH_OPTIONS = [
   { key: "PEST_SUSPECTED", en: "Pest Alert", kn: "ಕೀಟ ಶಂಕೆ" },
 ]
 
+function formatAdvCategory(cat: string, isKn: boolean): string {
+  switch (cat) {
+    case "FERTILIZER":
+      return isKn ? "ರಸಗೊಬ್ಬರ" : "FERTILIZER"
+    case "PEST_PREVENTION":
+      return isKn ? "ಕೀಟ & ರೋಗ ನಿಯಂತ್ರಣ" : "PEST & DISEASE CONTROL"
+    case "IRRIGATION":
+      return isKn ? "ನೀರಾವರಿ ನಿರ್ವಹಣೆ" : "IRRIGATION"
+    case "WEATHER_ALERT":
+      return isKn ? "ಹವಾಮಾನ ಎಚ್ಚರಿಕೆ" : "WEATHER ALERT"
+    default:
+      return cat.replace(/_/g, " ")
+  }
+}
+
 export default function CropCalendarScreen() {
   const { t, lang } = useLang()
   const { profile, refreshProfile, addCropField } = useProfile()
@@ -427,8 +442,8 @@ export default function CropCalendarScreen() {
               {isKn ? "ಪ್ರಸ್ತುತ ಬೆಳವಣಿಗೆ ಹಂತ" : "Active Growth Stage"}
             </Text>
             <Text style={styles.bannerCrop}>
-              {field?.cropName || currentCropDef.nameEn}{" "}
-              {field?.variety ? `(${field.variety})` : `(${currentCropDef.nameKn})`}
+              {field?.cropName || (isKn ? currentCropDef.nameKn : currentCropDef.nameEn)}
+              {field?.variety ? ` • ${field.variety}` : ""}
             </Text>
           </View>
 
@@ -560,7 +575,7 @@ export default function CropCalendarScreen() {
               >
                 <View style={styles.advHeaderRow}>
                   <Text style={[styles.advCat, isHigh && styles.advCatHigh]}>
-                    {adv.category}
+                    {formatAdvCategory(adv.category, isKn)}
                   </Text>
                   {isHigh ? (
                     <View style={styles.urgentPill}>
@@ -685,7 +700,9 @@ export default function CropCalendarScreen() {
                         {st.advisories.map((adv, aIdx) => (
                           <View key={aIdx} style={styles.stageAdvMiniCard}>
                             <View style={styles.stageAdvMiniHeader}>
-                              <Text style={styles.stageAdvMiniCat}>{adv.category}</Text>
+                              <Text style={styles.stageAdvMiniCat}>
+                                {formatAdvCategory(adv.category, isKn)}
+                              </Text>
                               <Text style={styles.stageAdvMiniTitle}>
                                 {isKn ? adv.titleKn : adv.titleEn}
                               </Text>
