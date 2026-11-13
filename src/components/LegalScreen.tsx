@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { View, Text, StyleSheet, Alert, ActivityIndicator } from "react-native"
-import { ShieldCheck, FileText, Trash2, Lock, Camera, Mic, MapPin } from "lucide-react-native"
+import { View, Text, StyleSheet, Alert, ActivityIndicator, Linking } from "react-native"
+import { ShieldCheck, FileText, Trash2, Lock, Camera, Mic, MapPin, ExternalLink } from "lucide-react-native"
 import DetailShell from "./DetailShell"
 import { useLang } from "../i18n"
 import { useProfile } from "../profile"
@@ -43,9 +43,17 @@ const PRIVACY_SECTIONS: SectionItem[] = [
     headingEn: "4. Retention & Account Deletion Rights",
     headingKn: "4. ಡೇಟಾ ಅಳಿಸುವ ಹಕ್ಕು",
     bodyEn:
-      "You retain complete ownership of your farm records. You may permanently delete your farmer profile, scan history, saved tips, equipment bookings, and crop insurance records directly inside this screen at any time, or contact support@krushikadhara.in.",
+      "You retain complete ownership of your farm records. You may permanently delete your farmer profile, scan history, saved tips, equipment bookings, and crop insurance records directly inside this screen at any time, or contact needioindia@gmail.com / support@krushikadhara.in.",
     bodyKn:
       "ನಿಮ್ಮ ಜಮೀನಿನ ದಾಖಲೆಗಳ ಸಂಪೂರ್ಣ ಹಕ್ಕು ನಿಮ್ಮದೇ ಆಗಿದೆ. ನೀವು ಯಾವುದೇ ಸಮಯದಲ್ಲಿ ಕೆಳಗಿನ ಬಟನ್ ಬಳಸಿ ನಿಮ್ಮ ಖಾತೆ ಮತ್ತು ಎಲ್ಲಾ ಡೇಟಾವನ್ನು ಶಾಶ್ವತವಾಗಿ ಅಳಿಸಬಹುದು.",
+  },
+  {
+    headingEn: "5. Non-Government Entity Disclaimer",
+    headingKn: "5. ಸರ್ಕಾರೇತರ ಸ್ವತಂತ್ರ ಸಂಸ್ಥೆ ಸೂಚನೆ",
+    bodyEn:
+      "KrushikaDhara is an independent farmer decision-support application developed by NeedIO. It is NOT an official government entity, and is NOT affiliated with, endorsed by, or authorized by the Government of India, the Government of Karnataka, or any state agricultural department. Crop insurance and scheme calculators reference public open data from official portals (pmfby.gov.in, pmkisan.gov.in, and myscheme.gov.in).",
+    bodyKn:
+      "ಕೃಷಿಕಧಾರಾ ಸ್ವತಂತ್ರ ಕೃಷಿ ಮಾರ್ಗದರ್ಶಿ ಆ್ಯಪ್ ಆಗಿದ್ದು, ಯಾವುದೇ ಸರ್ಕಾರಿ ಇಲಾಖೆ ಅಥವಾ ಸರ್ಕಾರದೊಂದಿಗೆ ನೇರ ಸಂಬಂಧ ಹೊಂದಿಲ್ಲ. PM-Kisan ಮತ್ತು ಬೆಳೆ ವಿಮೆ ವಿವರಗಳು ಸಾರ್ವಜನಿಕ pmfby.gov.in ಹಾಗೂ myscheme.gov.in ಮಾಹಿತಿಯನ್ನು ಆಧರಿಸಿವೆ.",
   },
 ]
 
@@ -199,6 +207,29 @@ function LegalScreen({ mode }: { mode: "privacy" | "terms" }) {
           </View>
         </FadeSlideIn>
       ))}
+
+      <FadeSlideIn delay={320}>
+        <ScalePressable
+          onPress={() => {
+            const url = isPrivacy
+              ? "https://krushikadhara-api.onrender.com/privacy"
+              : "https://krushikadhara-api.onrender.com/terms"
+            Linking.openURL(url).catch(() => {})
+          }}
+          style={styles.webLinkBtn}
+        >
+          <ExternalLink size={15} color="#15803d" />
+          <Text style={styles.webLinkBtnText}>
+            {isPrivacy
+              ? isKn
+                ? "ಅಧಿಕೃತ ವೆಬ್ ಗೌಪ್ಯತಾ ನೀತಿ ವೀಕ್ಷಿಸಿ →"
+                : "Open Official Web Privacy Policy →"
+              : isKn
+              ? "ಅಧಿಕೃತ ವೆಬ್ ಸೇವಾ ನಿಯಮಗಳು ವೀಕ್ಷಿಸಿ →"
+              : "Open Official Web Terms of Service →"}
+          </Text>
+        </ScalePressable>
+      </FadeSlideIn>
 
       {isPrivacy ? (
         <FadeSlideIn delay={340}>
@@ -372,6 +403,24 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 13,
     fontWeight: "bold",
+  },
+  webLinkBtn: {
+    backgroundColor: "#f0fdf4",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    marginBottom: 16,
+  },
+  webLinkBtnText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#15803d",
   },
   crossLinkBtn: {
     backgroundColor: "#ffffff",
