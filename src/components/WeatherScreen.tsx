@@ -104,11 +104,14 @@ export default function WeatherScreen() {
   )
 
   // GPS Location State (language-independent so toggling EN/KN never resets GPS)
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>(() => ({
+    lat: profileFallbackHub.lat,
+    lng: profileFallbackHub.lng,
+  }))
   const [gpsStatus, setGpsStatus] = useState<"detecting" | "success" | "denied" | "manual">("detecting")
   const [gpsErrorReason, setGpsErrorReason] = useState<"denied" | "timeout" | null>(null)
   const [showManualPicker, setShowManualPicker] = useState<boolean>(false)
-  const [selectedHubName, setSelectedHubName] = useState<string>("")
+  const [selectedHubName, setSelectedHubName] = useState<string>(profileFallbackHub.label)
 
   // Live Weather Data State
   const [weatherData, setWeatherData] = useState<LiveWeatherData | null>(null)

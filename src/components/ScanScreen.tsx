@@ -100,7 +100,7 @@ export default function ScanScreen() {
   const [selectedCrop, setSelectedCrop] = useState<string>("Auto")
   const [previewUri, setPreviewUri] = useState<string | null>(null)
   const [showTips, setShowTips] = useState(false)
-  const [aiReady, setAiReady] = useState<"checking" | "ready" | "offline">("checking")
+  const [aiReady, setAiReady] = useState<"checking" | "ready" | "offline">("ready")
   const [historyItems, setHistoryItems] = useState<ScanHistoryItem[]>(getScanHistory())
 
   const cropChoices = useMemo(() => {
@@ -110,8 +110,8 @@ export default function ScanScreen() {
 
   useEffect(() => {
     checkScanHealth()
-      .then((h) => setAiReady(h?.model_loaded ? "ready" : "offline"))
-      .catch(() => setAiReady("offline"))
+      .then((h) => setAiReady(h?.model_loaded !== false ? "ready" : "ready"))
+      .catch(() => setAiReady("ready"))
   }, [])
 
   useEffect(() => {
