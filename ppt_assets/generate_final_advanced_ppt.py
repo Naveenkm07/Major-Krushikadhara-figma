@@ -692,3 +692,4 @@ del prs.slides._sldIdLst[3]
 # Save updated presentation
 prs.save(output_path)
 print(f"✅ Generated 21 slides with diagrams & screenshots to {output_path}!")
+

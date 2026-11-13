@@ -34,3 +34,4 @@ if clean:
     print("\n✅ Verification PASSED: Zero template placeholders found across all 21 slides!")
 else:
     print("\n❌ Verification FAILED: Placeholder strings detected.")
+
