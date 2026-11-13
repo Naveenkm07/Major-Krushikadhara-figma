@@ -4,7 +4,14 @@ import {
   getCropGrowthStage,
   getStagesForCrop,
   generateStageAwareAdvice,
+  getAllCropsCatalog,
 } from "../services/stageAdvisory.service.js"
+import {
+  CROPS_CATALOG,
+  findCropInCatalog,
+  calculateDynamicCropStage,
+  CROP_CATEGORIES,
+} from "../data/cropCalendarCatalog.js"
 import { transcribeAudioWithSarvam } from "../services/sarvam.service.js"
 import { getAgriAdvisory } from "../services/gemini.service.js"
 import {
@@ -143,8 +150,9 @@ export async function getActiveCropStage(req: Request, res: Response) {
     const daysSinceSowing = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
 
     // Calculate present stage and advisories dynamically
-    const stageDef = getCropGrowthStage(activeField.cropName, daysSinceSowing)
-    const stagesForCrop = getStagesForCrop(activeField.cropName)
+    const dynamic = calculateDynamicCropStage(activeField.cropName, daysSinceSowing)
+    const stageDef = dynamic.currentStage
+    const cropCatalogItem = dynamic.crop
 
     return res.json({
       success: true,
@@ -152,6 +160,20 @@ export async function getActiveCropStage(req: Request, res: Response) {
         name: farmer.name,
         nameKn: farmer.nameKn || farmer.name,
         district: farmer.district,
+      },
+      cropInfo: {
+        id: cropCatalogItem.id,
+        nameEn: cropCatalogItem.nameEn,
+        nameKn: cropCatalogItem.nameKn,
+        category: cropCatalogItem.category,
+        categoryKn: cropCatalogItem.categoryKn,
+        totalDays: cropCatalogItem.totalDays,
+        isPerennial: cropCatalogItem.isPerennial || false,
+        popularVarieties: cropCatalogItem.popularVarieties,
+        seasons: cropCatalogItem.seasons,
+        soilType: cropCatalogItem.soilType,
+        soilTypeKn: cropCatalogItem.soilTypeKn,
+        iconName: cropCatalogItem.iconName,
       },
       fields: allFields.map((f) => {
         const d = Math.max(1, Math.floor((now.getTime() - new Date(f.sowingDate).getTime()) / 86400000))
@@ -179,13 +201,19 @@ export async function getActiveCropStage(req: Request, res: Response) {
         latestNote: activeField.latestFarmerNote,
       },
       dailyAdvisories: stageDef.advisories,
-      allStages: stagesForCrop.map((s) => ({
+      allStages: dynamic.stages.map((s) => ({
         key: s.key,
         nameEn: s.nameEn,
         nameKn: s.nameKn,
         startDay: s.startDay,
         endDay: s.endDay,
-        isCurrent: s.key === stageDef.key,
+        descriptionEn: s.descriptionEn,
+        descriptionKn: s.descriptionKn,
+        advisories: s.advisories,
+        isCurrent: s.isCurrent,
+        isCompleted: s.isCompleted,
+        isUpcoming: s.isUpcoming,
+        daysRemainingUntilStart: s.daysRemainingUntilStart,
       })),
     })
   } catch (error) {
@@ -194,6 +222,166 @@ export async function getActiveCropStage(req: Request, res: Response) {
       success: false,
       message: "Failed to fetch active crop stage",
       error: error instanceof Error ? error.message : "Internal Error",
+    })
+  }
+}
+
+/**
+ * GET /api/crop-stage/catalog?category=...&query=...
+ * Returns the complete 32+ crop calendar directory with summary details
+ */
+export async function getCropsCatalog(req: Request, res: Response) {
+  try {
+    const category = (req.query.category as string) || "ALL"
+    const query = ((req.query.query as string) || "").trim().toLowerCase()
+
+    let list = CROPS_CATALOG
+
+    if (category && category !== "ALL") {
+      list = list.filter((c) => c.category === category)
+    }
+
+    if (query) {
+      list = list.filter(
+        (c) =>
+          c.nameEn.toLowerCase().includes(query) ||
+          c.nameKn.toLowerCase().includes(query) ||
+          c.scientificName.toLowerCase().includes(query) ||
+          c.popularVarieties.some((v) => v.toLowerCase().includes(query))
+      )
+    }
+
+    const summary = list.map((c) => ({
+      id: c.id,
+      nameEn: c.nameEn,
+      nameKn: c.nameKn,
+      scientificName: c.scientificName,
+      category: c.category,
+      categoryKn: c.categoryKn,
+      totalDays: c.totalDays,
+      isPerennial: c.isPerennial || false,
+      popularVarieties: c.popularVarieties,
+      seasons: c.seasons,
+      soilType: c.soilType,
+      soilTypeKn: c.soilTypeKn,
+      iconName: c.iconName,
+      stagesCount: c.stages.length,
+    }))
+
+    return res.json({
+      success: true,
+      totalCount: CROPS_CATALOG.length,
+      filteredCount: summary.length,
+      categories: CROP_CATEGORIES,
+      crops: summary,
+    })
+  } catch (error) {
+    console.error("❌ [CropStage Catalog Error]:", error)
+    return res.status(500).json({
+      success: false,
+      error: "Failed to load crops catalog",
+    })
+  }
+}
+
+/**
+ * GET /api/crop-stage/crop/:cropKey?day=35&sowingDate=...
+ * Returns the full lifecycle calendar and dynamic stage calculations for a specific crop
+ */
+export async function getCropCalendarDetail(req: Request, res: Response) {
+  try {
+    const { cropKey } = req.params
+    const dayQuery = req.query.day ? parseInt(String(req.query.day), 10) : undefined
+    const sowingDateQuery = req.query.sowingDate as string | undefined
+
+    const crop = findCropInCatalog(cropKey)
+    if (!crop) {
+      return res.status(404).json({
+        success: false,
+        error: `Crop '${cropKey}' not found in catalog`,
+      })
+    }
+
+    const dayParam = dayQuery !== undefined && !isNaN(dayQuery) ? dayQuery : sowingDateQuery || 35
+    const dynamic = calculateDynamicCropStage(crop, dayParam)
+
+    return res.json({
+      success: true,
+      crop: dynamic.crop,
+      elapsedDays: dynamic.elapsedDays,
+      totalDays: dynamic.totalDays,
+      progressPct: dynamic.progressPct,
+      currentStage: dynamic.currentStage,
+      currentStageIndex: dynamic.currentStageIndex,
+      stages: dynamic.stages,
+      dailyAdvisories: dynamic.currentStage.advisories,
+    })
+  } catch (error) {
+    console.error("❌ [CropStage Detail Error]:", error)
+    return res.status(500).json({
+      success: false,
+      error: "Failed to get crop calendar detail",
+    })
+  }
+}
+
+/**
+ * PUT /api/crop-stage/:fieldId/sowing-date
+ * Updates the sowing date of a crop field and recalculates stages
+ */
+export async function updateSowingDate(req: Request, res: Response) {
+  const { fieldId } = req.params
+  const { sowingDate, daysAgo, mobile } = req.body || {}
+  const clean = normalizeMobile(mobile)
+
+  try {
+    let newSowingDate: Date
+    if (sowingDate) {
+      newSowingDate = new Date(sowingDate)
+    } else if (daysAgo !== undefined) {
+      const days = Math.max(1, parseInt(String(daysAgo), 10) || 1)
+      newSowingDate = new Date(Date.now() - days * 86400000)
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "Either sowingDate or daysAgo is required",
+      })
+    }
+
+    const updated = await withDbRetry(
+      () =>
+        prisma.cropField.update({
+          where: { id: fieldId },
+          data: {
+            sowingDate: newSowingDate,
+          },
+        }),
+      "updateSowingDate"
+    )
+
+    return res.json({
+      success: true,
+      data: updated,
+    })
+  } catch (error: any) {
+    console.warn("⚠️ [CropStage Sowing Date Update Fallback]:", error?.message || error)
+    const fb = getOrCreateFallbackFarmer(clean)
+    let field = fb.activeCrops?.find((f: any) => f.id === fieldId)
+    if (!field && fb.activeCrops?.length > 0) {
+      field = fb.activeCrops[0]
+    }
+    if (field) {
+      let targetDate: Date
+      if (sowingDate) targetDate = new Date(sowingDate)
+      else targetDate = new Date(Date.now() - (parseInt(String(daysAgo), 10) || 1) * 86400000)
+      field.sowingDate = targetDate
+    }
+    cacheFallbackFarmer(fb)
+
+    return res.json({
+      success: true,
+      fallback: true,
+      data: field,
     })
   }
 }

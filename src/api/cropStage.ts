@@ -1,11 +1,20 @@
 // ==============================================================================
 // Crop Stage & Sarvam AI Voice Advisory API Client
 // Connects mobile frontend to Neon PostgreSQL & Sarvam STT engine
+// Powered by 32+ Dynamic Crop Calendar & Agronomy Catalog
 // ==============================================================================
 
 import { Platform } from "react-native"
 import { API_BASE } from "./config"
 import { postMultipartFormData } from "./multipart"
+import {
+  CROPS_CATALOG,
+  findCropInCatalog,
+  calculateDynamicCropStage,
+  type CropCalendarItem,
+  type CropGrowthStage,
+  type CropStageAdvisory,
+} from "../data/cropCalendarCatalog"
 
 export interface GrowthStageItem {
   key: string
@@ -13,7 +22,13 @@ export interface GrowthStageItem {
   nameKn: string
   startDay: number
   endDay: number
+  descriptionEn?: string
+  descriptionKn?: string
+  advisories?: CropStageAdvisory[]
   isCurrent: boolean
+  isCompleted?: boolean
+  isUpcoming?: boolean
+  daysRemainingUntilStart?: number
 }
 
 export interface StageAdvisoryItem {
@@ -27,6 +42,20 @@ export interface StageAdvisoryItem {
 
 export interface ActiveCropStageResponse {
   success: boolean
+  cropInfo?: {
+    id: string
+    nameEn: string
+    nameKn: string
+    category: string
+    categoryKn: string
+    totalDays: number
+    isPerennial: boolean
+    popularVarieties: string[]
+    seasons: string[]
+    soilType: string
+    soilTypeKn: string
+    iconName: string
+  }
   fields?: Array<{
     id: string
     cropName: string
@@ -66,64 +95,77 @@ export interface VoiceObservationResult {
   urgency: "LOW" | "MEDIUM" | "HIGH"
 }
 
-// Default fallback active stage when backend server is offline or launching
-const FALLBACK_CROP_STAGE: ActiveCropStageResponse = {
-  success: true,
-  cropField: {
-    id: "fb-field-1",
-    cropName: "Rice (Paddy)",
-    variety: "BPT 5204 (Sona Masoori)",
-    sowingDate: new Date(Date.now() - 35 * 86400000).toISOString(),
-    daysSinceSowing: 35,
-    currentStageKey: "TILLERING_VEGETATIVE",
-    currentStageNameEn: "Tillering & Vegetative",
-    currentStageNameKn: "ಕವಲೊಡೆಯುವಿಕೆ ಮತ್ತು ಕಾಯಿಕ ಬೆಳವಣಿಗೆ",
-    stageDescriptionEn: "Active tillering stage; plant produces multiple shoots.",
-    stageDescriptionKn: "ಸಸಿ ಕವಲೊಡೆಯುವ ಹಂತ; ಗಿಡವು ಬಲವಾದ ಬೇರು ಮತ್ತು ಹೆಚ್ಚುವರಿ ಕವಲುಗಳನ್ನು ನೀಡುತ್ತದೆ.",
-    healthStatus: "HEALTHY",
-    latestNote: "Healthy green leaves observed across all plots.",
-  },
-  dailyAdvisories: [
-    {
-      category: "FERTILIZER",
-      titleEn: "First Top-Dressing of Nitrogen (Urea)",
-      titleKn: "ಮೊದಲ ಕಂತಿನ ಯೂರಿಯಾ ಸಿಂಪಡಣೆ",
-      bodyEn: "Apply 25 kg Urea per acre along with 10 kg MOP (Potash) to boost tiller production.",
-      bodyKn: "ಹೆಚ್ಚು ಕವಲುಗಳು ಬರಲು ಪ್ರತಿ ಎಕರೆಗೆ 25 ಕೆಜಿ ಯೂರಿಯಾ ಜೊತೆಗೆ 10 ಕೆಜಿ ಪೊಟ್ಯಾಷ್ ಗೊಬ್ಬರ ನೀಡಿ.",
-      urgency: "HIGH",
+/**
+ * Builds an offline dynamic stage response for any crop name & days count
+ */
+export function buildOfflineActiveCropStage(
+  cropName: string = "Rice (Paddy)",
+  daysSinceSowing: number = 35,
+  fieldId: string = "offline-field-1",
+  variety: string = ""
+): ActiveCropStageResponse {
+  const dynamic = calculateDynamicCropStage(cropName, daysSinceSowing)
+  const c = dynamic.crop
+
+  return {
+    success: true,
+    cropInfo: {
+      id: c.id,
+      nameEn: c.nameEn,
+      nameKn: c.nameKn,
+      category: c.category,
+      categoryKn: c.categoryKn,
+      totalDays: c.totalDays,
+      isPerennial: c.isPerennial || false,
+      popularVarieties: c.popularVarieties,
+      seasons: c.seasons,
+      soilType: c.soilType,
+      soilTypeKn: c.soilTypeKn,
+      iconName: c.iconName,
     },
-    {
-      category: "PEST_PREVENTION",
-      titleEn: "Yellow Stem Borer Surveillance",
-      titleKn: "ಹಳದಿ ಕಾಂಡ ಕೊರೆಯುವ ಕೀಟ ಪರಿಶೀಲನೆ",
-      bodyEn: "Look for 'dead hearts' in tillers. If 5% damage is seen, spray Chlorantraniliprole 18.5% SC (0.3 ml/L).",
-      bodyKn: "ಸುಳಿ ಒಣಗುವುದನ್ನು ಗಮನಿಸಿ. 5% ಕ್ಕಿಂತ ಹೆಚ್ಚು ಹಾನಿಯಿದ್ದರೆ ಕ್ಲೋರಾಂಟ್ರಾನಿಲಿಪ್ರೋಲ್ (0.3 ಮಿ.ಲೀ/ಲೀ) ಸಿಂಪಡಿಸಿ.",
-      urgency: "HIGH",
+    cropField: {
+      id: fieldId,
+      cropName: c.nameEn,
+      variety: variety || c.popularVarieties[0] || "Local High-Yield",
+      sowingDate: new Date(Date.now() - dynamic.elapsedDays * 86400000).toISOString(),
+      daysSinceSowing: dynamic.elapsedDays,
+      currentStageKey: dynamic.currentStage.key,
+      currentStageNameEn: dynamic.currentStage.nameEn,
+      currentStageNameKn: dynamic.currentStage.nameKn,
+      stageDescriptionEn: dynamic.currentStage.descriptionEn,
+      stageDescriptionKn: dynamic.currentStage.descriptionKn,
+      healthStatus: "HEALTHY",
+      latestNote: undefined,
     },
-    {
-      category: "IRRIGATION",
-      titleEn: "Maintain Shallow 2-3cm Water",
-      titleKn: "ತೆಳು ನೀರಿನ ಮಟ್ಟ ನಿರ್ವಹಿಸಿ",
-      bodyEn: "Do not allow field to dry up; maintain shallow water to suppress weeds.",
-      bodyKn: "ಗದ್ದೆ ಒಣಗದಂತೆ 2-3 ಸೆಂ.ಮೀ ನೀರು ನಿಲ್ಲಿಸಿ ಕಳೆ ನಿಯಂತ್ರಿಸಿ.",
-      urgency: "MEDIUM",
-    },
-  ],
-  allStages: [
-    { key: "NURSERY_SOWING", nameEn: "Nursery & Sowing", nameKn: "ಸಸಿಮಡಿ ಮತ್ತು ಬಿತ್ತನೆ", startDay: 0, endDay: 25, isCurrent: false },
-    { key: "TILLERING_VEGETATIVE", nameEn: "Tillering & Vegetative", nameKn: "ಕವಲೊಡೆಯುವಿಕೆ ಮತ್ತು ಕಾಯಿಕ", startDay: 26, endDay: 50, isCurrent: true },
-    { key: "PANICLE_INITIATION", nameEn: "Panicle Initiation", nameKn: "ತೆನೆ ಮೂಡುವ ಹಂತ", startDay: 51, endDay: 75, isCurrent: false },
-    { key: "FLOWERING_HEADING", nameEn: "Flowering & Heading", nameKn: "ಹೂವಾಡುವ ಹಂತ", startDay: 76, endDay: 95, isCurrent: false },
-    { key: "GRAIN_FILLING_RIPENING", nameEn: "Grain Ripening", nameKn: "ಕಾಳು ಮಾಗುವ ಹಂತ", startDay: 96, endDay: 115, isCurrent: false },
-  ],
+    dailyAdvisories: dynamic.currentStage.advisories,
+    allStages: dynamic.stages.map((st) => ({
+      key: st.key,
+      nameEn: st.nameEn,
+      nameKn: st.nameKn,
+      startDay: st.startDay,
+      endDay: st.endDay,
+      descriptionEn: st.descriptionEn,
+      descriptionKn: st.descriptionKn,
+      advisories: st.advisories,
+      isCurrent: st.isCurrent,
+      isCompleted: st.isCompleted,
+      isUpcoming: st.isUpcoming,
+      daysRemainingUntilStart: st.daysRemainingUntilStart,
+    })),
+  }
 }
+
+// Default fallback active stage when backend server is offline or launching
+const FALLBACK_CROP_STAGE: ActiveCropStageResponse = buildOfflineActiveCropStage("Rice (Paddy)", 35)
 
 /**
  * Fetches farmer's active crop, current growth stage and tailored advisories
  */
 export async function fetchActiveCropStage(
   mobile: string = "9591502209",
-  fieldId?: string
+  fieldId?: string,
+  preferredCropName?: string,
+  preferredDaysSinceSowing?: number
 ): Promise<ActiveCropStageResponse> {
   try {
     const controller = new AbortController()
@@ -144,10 +186,112 @@ export async function fetchActiveCropStage(
       }
     }
   } catch (err) {
-    console.warn("⚠️ [CropStage API] Using cached stage definition:", err)
+    console.warn("⚠️ [CropStage API] Using cached dynamic stage definition:", err)
+  }
+
+  if (preferredCropName) {
+    return buildOfflineActiveCropStage(
+      preferredCropName,
+      preferredDaysSinceSowing || 35,
+      fieldId || "offline-field-preferred"
+    )
   }
 
   return FALLBACK_CROP_STAGE
+}
+
+/**
+ * Fetches the 32+ crop catalog from backend or returns bundled local catalog
+ */
+export async function fetchCropsCatalog(category?: string, query?: string): Promise<CropCalendarItem[]> {
+  try {
+    const qs = new URLSearchParams()
+    if (category && category !== "ALL") qs.set("category", category)
+    if (query) qs.set("query", query)
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 6000)
+    const res = await fetch(`${API_BASE}/crop-stage/catalog?${qs.toString()}`, {
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+
+    if (res.ok) {
+      const json = await res.json()
+      if (json.success && Array.isArray(json.crops)) {
+        return json.crops
+      }
+    }
+  } catch {
+    // Graceful fallback to bundled catalog
+  }
+
+  let list = CROPS_CATALOG
+  if (category && category !== "ALL") {
+    list = list.filter((c) => c.category === category)
+  }
+  if (query) {
+    const q = query.toLowerCase()
+    list = list.filter(
+      (c) =>
+        c.nameEn.toLowerCase().includes(q) ||
+        c.nameKn.toLowerCase().includes(q) ||
+        c.popularVarieties.some((v) => v.toLowerCase().includes(q))
+    )
+  }
+  return list
+}
+
+/**
+ * Fetches full detail for any specific crop or computes it dynamically offline
+ */
+export async function fetchCropCalendarDetail(cropKey: string, dayOrSowingDate: number | string = 35) {
+  try {
+    const qs = new URLSearchParams()
+    if (typeof dayOrSowingDate === "number") qs.set("day", String(dayOrSowingDate))
+    else qs.set("sowingDate", String(dayOrSowingDate))
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 6000)
+    const res = await fetch(`${API_BASE}/crop-stage/crop/${encodeURIComponent(cropKey)}?${qs.toString()}`, {
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+
+    if (res.ok) {
+      const json = await res.json()
+      if (json.success && json.crop) return json
+    }
+  } catch {
+    // Offline calculation fallback
+  }
+
+  const crop = findCropInCatalog(cropKey)
+  return calculateDynamicCropStage(crop, dayOrSowingDate)
+}
+
+/**
+ * Updates plot sowing date on backend
+ */
+export async function updateFieldSowingDate(
+  fieldId: string,
+  payload: {
+    mobile?: string
+    sowingDate?: string
+    daysAgo?: number
+  }
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/crop-stage/${encodeURIComponent(fieldId)}/sowing-date`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const json = await res.json().catch(() => ({}))
+    return Boolean(res.ok && json?.success)
+  } catch {
+    return false
+  }
 }
 
 export async function updateCropStageStatus(

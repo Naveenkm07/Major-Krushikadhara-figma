@@ -4,6 +4,13 @@
 // ==============================================================================
 
 import { prisma } from "../config/db.js"
+import {
+  CROPS_CATALOG,
+  findCropInCatalog,
+  calculateDynamicCropStage,
+  type CropCalendarItem,
+  type CropGrowthStage,
+} from "../data/cropCalendarCatalog.js"
 
 export interface GrowthStageDef {
   key: string
@@ -21,6 +28,10 @@ export interface GrowthStageDef {
     bodyKn: string
     urgency: "LOW" | "MEDIUM" | "HIGH"
   }[]
+}
+
+export function getAllCropsCatalog(): CropCalendarItem[] {
+  return CROPS_CATALOG
 }
 
 // Stage definitions for key crops
@@ -439,36 +450,19 @@ export const CROP_STAGE_DEFINITIONS: Record<string, GrowthStageDef[]> = {
 
 /**
  * Returns the growth stages defined for a given crop.
+ * Seamlessly matches any of the 32+ Karnataka crops or aliases.
  */
 export function getStagesForCrop(cropName: string): GrowthStageDef[] {
-  const norm = cropName.toLowerCase()
-  if (norm.includes("ragi") || norm.includes("finger millet")) {
-    return CROP_STAGE_DEFINITIONS.ragi
-  }
-  if (norm.includes("tomato")) {
-    return CROP_STAGE_DEFINITIONS.tomato
-  }
-  if (norm.includes("rice") || norm.includes("paddy")) {
-    return CROP_STAGE_DEFINITIONS.rice
-  }
-  return CROP_STAGE_DEFINITIONS.general
+  const crop = findCropInCatalog(cropName)
+  return (crop?.stages || CROP_STAGE_DEFINITIONS.general) as GrowthStageDef[]
 }
 
 /**
- * Gets or calculates the current growth stage for a crop field
+ * Gets or calculates the current growth stage for a crop field dynamically.
  */
 export function getCropGrowthStage(cropName: string, daysSinceSowing: number): GrowthStageDef {
-  const stages = getStagesForCrop(cropName)
-
-  // Find stage matching daysSinceSowing
-  for (const s of stages) {
-    if (daysSinceSowing >= s.startDay && daysSinceSowing <= s.endDay) {
-      return s
-    }
-  }
-
-  // Default to final stage if past end
-  return stages[stages.length - 1]
+  const dynamic = calculateDynamicCropStage(cropName, daysSinceSowing)
+  return dynamic.currentStage as GrowthStageDef
 }
 
 /**

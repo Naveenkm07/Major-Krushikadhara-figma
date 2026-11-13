@@ -17,6 +17,7 @@ import { useProfile } from "../profile"
 import { useLang, fmt } from "../i18n"
 import { useNav } from "../nav"
 import type { CropFieldDTO } from "../api/profile"
+import { CROPS_CATALOG, findCropInCatalog } from "../data/cropCalendarCatalog"
 import DetailShell from "./DetailShell"
 import {
   Ruler,
@@ -100,13 +101,19 @@ export default function MyFarmScreen() {
     .filter(Boolean)
     .join(", ")
 
+  function handleSelectQuickCrop(cropItem: (typeof CROPS_CATALOG)[0]) {
+    setPlotCrop(cropItem.nameEn)
+    setPlotVariety(cropItem.popularVarieties[0] || "Local High-Yield")
+    setPlotSeason(cropItem.seasons[0] || "Kharif")
+  }
+
   function openNewPlotModal() {
     setEditingFieldId(null)
-    setPlotCrop("")
-    setPlotVariety("")
+    setPlotCrop("Rice (Paddy)")
+    setPlotVariety("BPT 5204 (Sona Masoori)")
     setPlotAcres("1.0")
     setPlotSeason("Kharif")
-    setPlotDaysAgo("15")
+    setPlotDaysAgo("25")
     setPlotModalOpen(true)
   }
 
@@ -498,7 +505,41 @@ export default function MyFarmScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={styles.modalLabel}>{isKn ? "ಬೆಳೆಯ ಹೆಸರು" : "Crop Name"}</Text>
+                <Text style={styles.modalLabel}>
+                  {isKn ? "32 ಪ್ರಮುಖ ಬೆಳೆಗಳಿಂದ ಆರಿಸಿ" : "Pick from 32 Popular Crops"}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.quickCropsScroll}
+                >
+                  {CROPS_CATALOG.map((c) => {
+                    const isSelected =
+                      plotCrop.toLowerCase() === c.nameEn.toLowerCase() ||
+                      plotCrop.toLowerCase() === c.id.toLowerCase()
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        onPress={() => handleSelectQuickCrop(c)}
+                        style={[
+                          styles.quickCropChip,
+                          isSelected && styles.quickCropChipActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.quickCropChipText,
+                            isSelected && styles.quickCropChipTextActive,
+                          ]}
+                        >
+                          {c.nameEn}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </ScrollView>
+
+                <Text style={styles.modalLabel}>{isKn ? "ಬೆಳೆಯ ಹೆಸರು (ಸಂಪಾದಿಸಿ)" : "Crop Name (Or Type Custom)"}</Text>
                 <TextInput
                   value={plotCrop}
                   onChangeText={setPlotCrop}
@@ -845,6 +886,31 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 6,
+  },
+  quickCropsScroll: {
+    gap: 6,
+    paddingVertical: 4,
+  },
+  quickCropChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+    backgroundColor: "#f3f4f6",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  quickCropChipActive: {
+    backgroundColor: "#dcfce7",
+    borderColor: "#16a34a",
+  },
+  quickCropChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  quickCropChipTextActive: {
+    color: "#15803d",
+    fontWeight: "bold",
   },
   modalSaveBtn: {
     backgroundColor: "#256428",
