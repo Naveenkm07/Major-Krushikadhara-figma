@@ -15,16 +15,16 @@ export function AIAnalysisScreen() {
   return (
     <DetailShell
       title={isKn ? "AI ಆಳ ವಿಶ್ಲೇಷಣೆ" : "AI Analysis Deep Dive"}
-      subtitle={isKn ? "YOLO11s + Gemini Vision ವಿಶ್ಲೇಷಣೆ" : "Hybrid Vision Feature Breakdown"}
+      subtitle={isKn ? "AI ದೃಷ್ಟಿ ತಂತ್ರಜ್ಞಾನ ವಿಶ್ಲೇಷಣೆ" : "AI Vision Feature Breakdown"}
     >
       <View style={styles.card}>
         <Text style={styles.cardTitle}>
-          {isKn ? "YOLO11s + Gemini Vision ಪೈಪ್‌ಲೈನ್" : "YOLO11s + Gemini Vision Pipeline"}
+          {isKn ? "ಸುಧಾರಿತ AI ವಿಶ್ಲೇಷಣೆ ಪೈಪ್‌ಲೈನ್" : "Advanced AI Vision Pipeline"}
         </Text>
         <Text style={styles.bodyText}>
           {isKn
-            ? "102 ಕೀಟ ವರ್ಗಗಳಿಗಾಗಿ 640×640 ಲೆಟರ್‌ಬಾಕ್ಸ್ TFLite ಮಾದರಿ ಮತ್ತು ಎಲೆ ರೋಗ/ಪೋಷಕಾಂಶ ಕೊರತೆಗಾಗಿ Gemini Vision ಮೂಲಕ ಚಿತ್ರವನ್ನು ಪರಿಶೀಲಿಸಲಾಗಿದೆ."
-            : "Analyzed via 640×640 letterboxed YOLO11s TFLite (102 insect classes) combined with Gemini Multimodal Vision plant pathology."}
+            ? "ಕೀಟ ವರ್ಗಗಳು ಮತ್ತು ಎಲೆ ರೋಗ/ಪೋಷಕಾಂಶ ಕೊರತೆಗಾಗಿ ಆಳವಾದ AI ಮಾದರಿಗಳ ಮೂಲಕ ಚಿತ್ರವನ್ನು ಪರಿಶೀಲಿಸಲಾಗಿದೆ."
+            : "Analyzed via high-precision deep learning computer vision combined with multimodal plant pathology."}
         </Text>
         {diagnosis && (
           <Text style={[styles.bodyText, { marginTop: 10, fontWeight: "600", color: "#15803d" }]}>
@@ -218,8 +218,8 @@ export function AiPredictionsScreen() {
       title={isKn ? "AI ಪತ್ತೆ ಶ್ರೇಣಿ" : "AI Detection Breakdown"}
       subtitle={
         isKn
-          ? "YOLO11s + Gemini Vision ಫಲಿತಾಂಶಗಳು"
-          : "YOLO11s + Gemini Vision confidence scores"
+          ? "AI ದೃಷ್ಟಿ ವಿಶ್ಲೇಷಣೆ ಫಲಿತಾಂಶಗಳು"
+          : "AI Vision Diagnostic confidence scores"
       }
     >
       <View style={styles.card}>
@@ -231,8 +231,8 @@ export function AiPredictionsScreen() {
         </View>
         <Text style={[styles.bodyText, { marginTop: 6 }]}>
           {isKn
-            ? "• YOLO11s TFLite: 640×640 ಇನ್‌ಪುಟ್ · 102 ಕೀಟ ವರ್ಗಗಳು (ಬಾಕ್ಸ್ ಪತ್ತೆ)\n• Gemini Multimodal Vision: ಎಲೆ ರೋಗ, ಶಿಲೀಂಧ್ರ, ವೈರಲ್ ಮತ್ತು ಪೋಷಕಾಂಶ ವಿಶ್ಲೇಷಣೆ"
-            : "• YOLO11s TFLite: 640×640 input · 102 insect species with bounding boxes\n• Gemini Multimodal Vision: Foliar fungal/bacterial/viral & nutrient analysis"}
+            ? "• ಆನ್‌ಲೈನ್ & ಆಫ್‌ಲೈನ್ AI ಎಂಜಿನ್: ಕೀಟ ಹಾಗೂ ರೋಗ ಬಾಧೆಗಳ ನಿಖರ ತಪಾಸಣೆ\n• ಮಲ್ಟಿಮೋಡಲ್ ಕೃಷಿ ದೃಷ್ಟಿ: ಎಲೆ ರೋಗ, ಶಿಲೀಂಧ್ರ, ವೈರಲ್ ಮತ್ತು ಪೋಷಕಾಂಶ ವಿಶ್ಲೇಷಣೆ"
+            : "• Online & Offline AI Engine: High-precision pest and disease detection\n• Multimodal Agriculture Vision: Foliar fungal/bacterial/viral & nutrient analysis"}
         </Text>
       </View>
 

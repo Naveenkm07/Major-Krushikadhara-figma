@@ -54,8 +54,8 @@ const SCAN_MODES: {
     icon: Bug,
     color: "#ef4444",
     bg: "#fef2f2",
-    hintEn: "Detects 102 crop insect & pest species using YOLO11s + Gemini Vision.",
-    hintKn: "YOLO11s + Gemini Vision ಬಳಸಿ 102 ಕೀಟ ಪ್ರಭೇದಗಳನ್ನು ಪತ್ತೆ ಮಾಡುತ್ತದೆ.",
+    hintEn: "Detects crop insect pests and diseases accurately.",
+    hintKn: "ಬೆಳೆಗಳಲ್ಲಿ ಕೀಟ ಮತ್ತು ರೋಗ ಬಾಧೆಗಳನ್ನು ನಿಖರವಾಗಿ ಪತ್ತೆ ಮಾಡುತ್ತದೆ.",
   },
   {
     id: "leaf",
@@ -380,8 +380,8 @@ export default function ScanScreen() {
               <Text style={styles.liveScanText}>
                 {aiReady === "ready"
                   ? isKn
-                    ? "YOLO11s + Gemini Vision · ಸಿದ್ಧ"
-                    : "YOLO11s + Gemini Vision · Ready"
+                    ? "AI ಸ್ಕ್ಯಾನರ್ · ಸಿದ್ಧ"
+                    : "AI Vision · Ready"
                   : aiReady === "checking"
                   ? isKn
                     ? "AI ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ..."

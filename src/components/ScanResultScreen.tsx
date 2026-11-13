@@ -374,7 +374,7 @@ export default function ScanResultScreen() {
             </View>
             {diagnosis?.gemini_used && (
               <Text style={styles.engineLabel}>
-                YOLO11s + Gemini Vision
+                AI Vision Diagnostic
               </Text>
             )}
           </View>

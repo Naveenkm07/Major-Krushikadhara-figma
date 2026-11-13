@@ -466,8 +466,8 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (tab: Tab) => v
                   <Mic size={14} color="#166534" />
                   <Text style={styles.stageVoiceHintText}>
                     {isKn
-                      ? "ಈ ಹಂತದ ಬಗ್ಗೆ ಸರ್ವಂ AI ಕೇಳಿ"
-                      : "Ask Sarvam AI about this stage"}
+                      ? "ಈ ಹಂತದ ಬಗ್ಗೆ AI ಸಲಹೆ ಕೇಳಿ"
+                      : "Ask AI about this stage"}
                   </Text>
                 </View>
                 <Text style={styles.stageVoiceTap}>

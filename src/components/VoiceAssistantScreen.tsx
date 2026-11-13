@@ -297,7 +297,7 @@ export default function VoiceAssistantScreen() {
     filename: string
   ) => {
     setIsProcessing(true)
-    setVoiceStatusText(isKn ? "ಧ್ವನಿ ಪರಿವರ್ತಿಸಲಾಗುತ್ತಿದೆ..." : "Transcribing with Sarvam AI...")
+    setVoiceStatusText(isKn ? "ಧ್ವನಿ ಪರಿವರ್ತಿಸಲಾಗುತ್ತಿದೆ..." : "Transcribing...")
 
     let accumulatedText = ""
     const assistantPlaceholder: ChatEntry = {
@@ -625,8 +625,8 @@ export default function VoiceAssistantScreen() {
             <ActivityIndicator size="small" color="#15803d" />
             <Text style={styles.processingText}>
               {isKn
-                ? "ಸರ್ವಮ್ AI ಮೂಲಕ ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ..."
-                : "Evaluating with Sarvam AI against current growth stage..."}
+                ? "ಮೌಲ್ಯಮಾಪನ ಮಾಡಲಾಗುತ್ತಿದೆ..."
+                : "Evaluating..."}
             </Text>
           </View>
         )}
@@ -678,7 +678,7 @@ export default function VoiceAssistantScreen() {
           <View style={styles.listeningNotice}>
             <WaveformBars active color="#dc2626" barCount={7} maxHeight={16} />
             <Text style={styles.listeningText}>
-              {voiceStatusText || (isKn ? "ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ... (ಸರ್ವಮ್ STT ಕೇಳುತ್ತಿದೆ)" : "Listening in Kannada/English (Sarvam STT)...")}
+              {voiceStatusText || (isKn ? "ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ..." : "Listening in Kannada/English...")}
             </Text>
           </View>
         </FadeSlideIn>

@@ -10,16 +10,16 @@ import { AnimatedProgressFill, FadeSlideIn, PulseHalo, ScalePressable } from "./
 
 const STEPS_EN = [
   "Uploading crop image securely...",
-  "Running YOLO11s TFLite 102-class insect check...",
-  "Inspecting leaf disease & nutrient signs with Gemini Vision...",
+  "Running AI crop insect & pest check...",
+  "Inspecting leaf disease & nutrient health...",
   "Preparing English & Kannada treatment dosages...",
   "Saving report to your farm history...",
 ]
 
 const STEPS_KN = [
   "ಬೆಳೆ ಚಿತ್ರವನ್ನು ಸುರಕ್ಷಿತವಾಗಿ ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ...",
-  "YOLO11s TFLite 102 ಕೀಟ ವರ್ಗಗಳ ತಪಾಸಣೆ...",
-  "Gemini Vision ಮೂಲಕ ಎಲೆ ರೋಗ ಮತ್ತು ಪೋಷಕಾಂಶ ಪರೀಕ್ಷೆ...",
+  "AI ಕೀಟ ಮತ್ತು ರೋಗ ತಪಾಸಣೆ...",
+  "ಎಲೆ ರೋಗ ಮತ್ತು ಪೋಷಕಾಂಶ ಪರೀಕ್ಷೆ...",
   "ಕನ್ನಡ ಮತ್ತು ಇಂಗ್ಲಿಷ್ ಚಿಕಿತ್ಸಾ ಪ್ರಮಾಣ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ...",
   "ನಿಮ್ಮ ಜಮೀನಿನ ಇತಿಹಾಸಕ್ಕೆ ವರದಿ ಉಳಿಸಲಾಗುತ್ತಿದೆ...",
 ]
