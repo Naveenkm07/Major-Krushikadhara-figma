@@ -46,8 +46,15 @@ export async function listFarmersHandler(req: Request, res: Response) {
     }
 
     if (health && health !== "ALL") {
+      const hNorm = (h: string) =>
+        h === "nutrient_deficient" || h === "low_nutrients"
+          ? "low_nutrients"
+          : h === "pest_alert" || h === "pest_suspected"
+          ? "pest_suspected"
+          : h
+      const target = hNorm(health.toLowerCase())
       farmers = farmers.filter((f) =>
-        f.activeCrops?.some((c) => c.healthStatus.toLowerCase() === health.toLowerCase())
+        f.activeCrops?.some((c) => hNorm((c.healthStatus || "").toLowerCase()) === target)
       )
     }
 

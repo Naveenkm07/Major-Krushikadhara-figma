@@ -60,11 +60,11 @@ const STAGE_VISUALS = [
   { icon: Scissors, color: "#9333ea", bg: "#f3e8ff" },
 ]
 
-const HEALTH_OPTIONS = [
+const HEALTH_OPTIONS: Array<{ key: string; altKeys?: string[]; en: string; kn: string }> = [
   { key: "HEALTHY", en: "Healthy", kn: "ಆರೋಗ್ಯಕರ" },
   { key: "WATER_STRESSED", en: "Needs Water", kn: "ನೀರಿನ ಅಗತ್ಯ" },
-  { key: "NUTRIENT_DEFICIENT", en: "Low Nutrients", kn: "ಪೋಷಕಾಂಶ ಕೊರತೆ" },
-  { key: "PEST_SUSPECTED", en: "Pest Alert", kn: "ಕೀಟ ಶಂಕೆ" },
+  { key: "LOW_NUTRIENTS", altKeys: ["NUTRIENT_DEFICIENT"], en: "Low Nutrients", kn: "ಪೋಷಕಾಂಶ ಕೊರತೆ" },
+  { key: "PEST_SUSPECTED", altKeys: ["PEST_ALERT"], en: "Pest Alert", kn: "ಕೀಟ ಶಂಕೆ" },
 ]
 
 function formatAdvCategory(cat: string, isKn: boolean): string {
@@ -505,7 +505,10 @@ export default function CropCalendarScreen() {
         </View>
         <View style={styles.healthRow}>
           {HEALTH_OPTIONS.map((opt) => {
-            const active = field?.healthStatus === opt.key
+            const currentHs = field?.healthStatus
+            const active =
+              currentHs === opt.key ||
+              Boolean(opt.altKeys?.includes(currentHs as string))
             return (
               <TouchableOpacity
                 key={opt.key}
@@ -529,7 +532,7 @@ export default function CropCalendarScreen() {
                 ? isKn
                   ? `ಪ್ರಸ್ತುತ ${field.currentStageNameKn} ಹಂತದಲ್ಲಿ ನೀರು ಕಡಿಮೆಯಾಗದಂತೆ ತೇವಾಂಶ ಕಾಪಾಡಿ.`
                   : `Ensure critical irrigation during ${field.currentStageNameEn} to prevent yield drop.`
-                : field.healthStatus === "PEST_SUSPECTED"
+                : field.healthStatus === "PEST_SUSPECTED" || field.healthStatus === "PEST_ALERT"
                 ? isKn
                   ? `ಕೀಟದ ಲಕ್ಷಣ ಕಂಡರೆ ರೋಗನಿದಾನಕ್ಕೆ ಕ್ರಾಪ್ ಸ್ಕ್ಯಾನ್ ಅಥವಾ ಬೇವಿನ ಎಣ್ಣೆ (5 ಮಿ.ಲೀ/ಲೀ) ಬಳಸಿ.`
                   : `Scout undersides of leaves and take an AI Pest Scan to identify pest precisely.`

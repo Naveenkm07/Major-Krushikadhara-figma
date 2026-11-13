@@ -324,8 +324,8 @@ export default function MyFarmScreen() {
                     const hs = String(field.healthStatus || "HEALTHY").toUpperCase()
                     if (hs === "HEALTHY") return isKn ? "ಆರೋಗ್ಯಕರ" : "Healthy"
                     if (hs === "WATER_STRESSED") return isKn ? "ನೀರಿನ ಒತ್ತಡ" : "Water Stressed"
-                    if (hs === "NUTRIENT_DEFICIENT") return isKn ? "ಪೋಷಕಾಂಶ ಕೊರತೆ" : "Nutrient Deficient"
-                    if (hs === "PEST_SUSPECTED") return isKn ? "ಕೀಟ ಶಂಕೆ" : "Pest Suspected"
+                    if (hs === "NUTRIENT_DEFICIENT" || hs === "LOW_NUTRIENTS") return isKn ? "ಪೋಷಕಾಂಶ ಕೊರತೆ" : "Low Nutrients"
+                    if (hs === "PEST_SUSPECTED" || hs === "PEST_ALERT") return isKn ? "ಕೀಟ ಶಂಕೆ" : "Pest Suspected"
                     return field.healthStatus
                   })()}
                 </Text>
