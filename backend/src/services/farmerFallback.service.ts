@@ -2341,19 +2341,36 @@ export function getAdminAggregateStats() {
   const farmers = getAllFallbackFarmers()
   let totalAcres = 0
   const cropCounts: Record<string, number> = {}
+  const cropAcreage: Record<string, number> = {}
   const districtCounts: Record<string, number> = {}
+  const districtAcres: Record<string, number> = {}
+  const irrigationCounts: Record<string, number> = {}
+  const healthCounts: Record<string, number> = {
+    HEALTHY: 0,
+    WATER_STRESSED: 0,
+    PEST_SUSPECTED: 0,
+    LOW_NUTRIENTS: 0,
+  }
   let activeAlerts = 0
   let totalPlots = 0
   let rtcVerifiedCount = 0
 
   for (const f of farmers) {
-    totalAcres += Number(f.farmSize) || 0
+    const size = Number(f.farmSize) || 0
+    totalAcres += size
     if (f.rtcVerified) rtcVerifiedCount++
     districtCounts[f.district] = (districtCounts[f.district] || 0) + 1
+    districtAcres[f.district] = Math.round(((districtAcres[f.district] || 0) + size) * 10) / 10
+    irrigationCounts[f.irrigationType] = (irrigationCounts[f.irrigationType] || 0) + 1
+
     if (Array.isArray(f.activeCrops)) {
       totalPlots += f.activeCrops.length
       for (const p of f.activeCrops) {
         cropCounts[p.cropName] = (cropCounts[p.cropName] || 0) + 1
+        cropAcreage[p.cropName] = Math.round(((cropAcreage[p.cropName] || 0) + (Number(p.acreage) || 0)) * 10) / 10
+        if (p.healthStatus && healthCounts[p.healthStatus] !== undefined) {
+          healthCounts[p.healthStatus]++
+        }
         if (
           p.healthStatus === "PEST_SUSPECTED" ||
           p.healthStatus === "WATER_STRESSED" ||
@@ -2366,8 +2383,14 @@ export function getAdminAggregateStats() {
   }
 
   let totalScans = 0
+  const diseaseCounts: Record<string, number> = {}
   for (const scans of fallbackScans.values()) {
     totalScans += scans.length
+    for (const s of scans) {
+      if (s.diseaseName) {
+        diseaseCounts[s.diseaseName] = (diseaseCounts[s.diseaseName] || 0) + 1
+      }
+    }
   }
 
   return {
@@ -2378,8 +2401,314 @@ export function getAdminAggregateStats() {
     activeAlerts,
     totalScans,
     cropCounts,
+    cropAcreage,
     districtCounts,
+    districtAcres,
+    irrigationCounts,
+    healthCounts,
+    diseaseCounts,
     lastUpdated: new Date().toISOString(),
   }
 }
+
+export function updateFarmerSoil(
+  mobile: string,
+  soil: { soilN?: number; soilP?: number; soilK?: number; soilPh?: number; soilType?: string }
+): any {
+  const norm = normalizeFallbackMobile(mobile)
+  const f = getOrCreateFallbackFarmer(norm)
+  if (soil.soilN !== undefined) f.soilN = Number(soil.soilN)
+  if (soil.soilP !== undefined) f.soilP = Number(soil.soilP)
+  if (soil.soilK !== undefined) f.soilK = Number(soil.soilK)
+  if (soil.soilPh !== undefined) f.soilPh = Number(soil.soilPh)
+  if (soil.soilType) f.soilType = soil.soilType
+  saveStoreToDisk()
+  return f
+}
+
+export interface BroadcastAdvisory {
+  id: string
+  titleEn: string
+  titleKn: string
+  category: "WEATHER_ALERT" | "PEST_WARNING" | "FERTILIZER" | "MARKET_SPIKE" | "SCHEME"
+  targetDistrict: string
+  targetCrop: string
+  urgency: "INFO" | "MODERATE" | "URGENT"
+  messageEn: string
+  messageKn: string
+  createdAt: string
+  sentCount: number
+}
+
+const SEED_BROADCAST_ADVISORIES: BroadcastAdvisory[] = [
+  {
+    id: "bcast-01",
+    titleEn: "Yellow Stem Borer Outbreak Alert in Mandya & Cauvery Basin",
+    titleKn: "ಮಂಡ್ಯ ಮತ್ತು ಕಾವೇರಿ ಕಣಿವೆಯಲ್ಲಿ ಹಳದಿ ಕಾಂಡ ಕೊರೆಯುವ ಹುಳುವಿನ ಎಚ್ಚರಿಕೆ",
+    category: "PEST_WARNING",
+    targetDistrict: "Mandya",
+    targetCrop: "Rice (Paddy)",
+    urgency: "URGENT",
+    messageEn: "Continuous cloudy weather has caused pest incidence in tillering paddy. Monitor for dead hearts. Apply Cartap Hydrochloride 4G @ 8 kg/acre or spray Chlorantraniliprole 18.5% SC @ 0.3 ml/L immediately.",
+    messageKn: "ಮೋಡ ಕವಿದ ವಾತಾವರಣದಿಂದ ಭತ್ತದಲ್ಲಿ ಕಾಂಡ ಕೊರೆಯುವ ಹುಳು ಬಾಧೆ ಹೆಚ್ಚಾಗಿದೆ. ಸುಳಿ ಒಣಗುವುದನ್ನು ಗಮನಿಸಿ. ತಕ್ಷಣ ಪ್ರತಿ ಎಕರೆಗೆ ಕಾರ್ಟಾಪ್ ಹೈಡ್ರೋಕ್ಲೋರೈಡ್ 4G (8 ಕೆ.ಜಿ) ಅಥವಾ ಕ್ಲೋರಾಂಟ್ರಾನಿಲಿಪ್ರೋಲ್ (0.3 ಮಿ.ಲೀ/ಲೀ) ಸಿಂಪಡಿಸಿ.",
+    createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+    sentCount: 1420,
+  },
+  {
+    id: "bcast-02",
+    titleEn: "Heavy Thunderstorm Warning for Malnad & Western Ghats",
+    titleKn: "ಮಲೆನಾಡು ಮತ್ತು ಪಶ್ಚಿಮ ಘಟ್ಟಗಳಲ್ಲಿ ಭಾರಿ ಗುಡುಗು ಸಹಿತ ಮಳೆ ಎಚ್ಚರಿಕೆ",
+    category: "WEATHER_ALERT",
+    targetDistrict: "Shimoga",
+    targetCrop: "Arecanut",
+    urgency: "URGENT",
+    messageEn: "IMD predicts heavy unseasonal rain (40-65 mm) with wind gusts in Shimoga and Chikkamagaluru. Ensure proper trench drainage in Arecanut and Coffee estates. Suspend spraying operations.",
+    messageKn: "ಶಿವಮೊಗ್ಗ ಮತ್ತು ಚಿಕ್ಕಮಗಳೂರಿನಲ್ಲಿ ಭಾರಿ ಮಳೆ (40-65 ಮಿ.ಮೀ) ಸಾಧ್ಯತೆ. ಅಡಿಕೆ ಹಾಗೂ ಕಾಫಿ ತೋಟಗಳಲ್ಲಿ ನೀರು ಸರಾಗವಾಗಿ ಹರಿಯಲು ಬಸಿಗಾಲುವೆಗಳನ್ನು ಸ್ವಚ್ಛಗೊಳಿಸಿ. ಯಾವುದೇ ಕೀಟನಾಶಕ ಸಿಂಪಡಣೆಯನ್ನು ಮುಂದೂಡಿ.",
+    createdAt: new Date(Date.now() - 14 * 3600000).toISOString(),
+    sentCount: 2850,
+  },
+  {
+    id: "bcast-03",
+    titleEn: "Raitha Siri ₹10,000/ha Millet Incentive DBT Verification Drive",
+    titleKn: "ರೈತ ಸಿರಿ ₹10,000/ಹೆಕ್ಟೇರ್ ಸಿರಿಧಾನ್ಯ ಪ್ರೋತ್ಸಾಹಧನ ಪರಿಶೀಲನಾ ಅಭಿಯಾನ",
+    category: "SCHEME",
+    targetDistrict: "ALL",
+    targetCrop: "Ragi",
+    urgency: "MODERATE",
+    messageEn: "Karnataka Dept of Agriculture announces direct benefit transfer under Raitha Siri for certified Finger Millet (Ragi), Foxtail, and Little Millet growers. Ensure your Aadhaar is linked to FRUITS FID.",
+    messageKn: "ಕರ್ನಾಟಕ ಕೃಷಿ ಇಲಾಖೆಯಿಂದ ರಾಗಿ ಮತ್ತು ಸಿರಿಧಾನ್ಯ ಬೆಳೆಗಾರರಿಗೆ ಹೆಕ್ಟೇರ್‌ಗೆ ₹10,000 ನೇರ ನಗದು ವರ್ಗಾವಣೆ. ನಿಮ್ಮ ಆಧಾರ್ ಅನ್ನು ಫ್ರೂಟ್ಸ್ (FRUITS) ಐಡಿಗೆ ಲಿಂಕ್ ಮಾಡಲಾಗಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ.",
+    createdAt: new Date(Date.now() - 28 * 3600000).toISOString(),
+    sentCount: 5600,
+  },
+  {
+    id: "bcast-04",
+    titleEn: "Urea & DAP Supply Replenished at Raita Samparka Kendras (RSK)",
+    titleKn: "ರೈತ ಸಂಪರ್ಕ ಕೇಂದ್ರಗಳಲ್ಲಿ (RSK) ಯೂರಿಯಾ ಮತ್ತು ಡಿಎಪಿ ಗೊಬ್ಬರ ದಾಸ್ತಾನು ಲಭ್ಯ",
+    category: "FERTILIZER",
+    targetDistrict: "Belagavi",
+    targetCrop: "Sugarcane",
+    urgency: "INFO",
+    messageEn: "Subsidized Neem-coated Urea and DAP rake has arrived in Belagavi & Bagalkot. Farmers can collect up to 5 bags per registered RTC at their nearest RSK center.",
+    messageKn: "ಬೆಳಗಾವಿ ಮತ್ತು ಬಾಗಲಕೋಟೆ ರೈತ ಸಂಪರ್ಕ ಕೇಂದ್ರಗಳಲ್ಲಿ ಬೇವಿನ ಲೇಪಿತ ಯೂರಿಯಾ ಮತ್ತು ಡಿಎಪಿ ದಾಸ್ತಾನು ತಲುಪಿದೆ. ನೋಂದಾಯಿತ ಪಹಣಿ (RTC) ತೋರಿಸಿ ರಿಯಾಯಿತಿ ದರದಲ್ಲಿ ರಸಗೊಬ್ಬರ ಪಡೆಯಬಹುದು.",
+    createdAt: new Date(Date.now() - 48 * 3600000).toISOString(),
+    sentCount: 3900,
+  },
+]
+
+let fallbackBroadcasts: BroadcastAdvisory[] = [...SEED_BROADCAST_ADVISORIES]
+
+export function getAllBroadcastAdvisories(): BroadcastAdvisory[] {
+  return [...fallbackBroadcasts]
+}
+
+export function addBroadcastAdvisory(advisory: Omit<BroadcastAdvisory, "id" | "createdAt" | "sentCount">): BroadcastAdvisory {
+  const newAdvisory: BroadcastAdvisory = {
+    ...advisory,
+    id: `bcast-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    sentCount: advisory.targetDistrict === "ALL" ? 12450 : Math.floor(1200 + Math.random() * 2500),
+  }
+  fallbackBroadcasts.unshift(newAdvisory)
+  return newAdvisory
+}
+
+export function deleteBroadcastAdvisory(id: string): boolean {
+  const initialLen = fallbackBroadcasts.length
+  fallbackBroadcasts = fallbackBroadcasts.filter((b) => b.id !== id)
+  return fallbackBroadcasts.length < initialLen
+}
+
+export interface SchemeApplicationRecord {
+  farmerMobile: string
+  farmerName: string
+  farmerNameKn: string
+  district: string
+  schemeId: string
+  schemeNameEn: string
+  schemeNameKn: string
+  benefitEn: string
+  status: "APPROVED" | "VERIFIED" | "UNDER_REVIEW" | "NOT_APPLIED" | "DISBURSED"
+  appliedDate: string
+  disbursedAmount?: string
+}
+
+const SEED_SCHEME_APPLICATIONS: SchemeApplicationRecord[] = [
+  {
+    farmerMobile: "9591502209",
+    farmerName: "Naveen Kumar KM",
+    farmerNameKn: "ನವೀನ್ ಕುಮಾರ್ ಕೆಎಂ",
+    district: "Mandya",
+    schemeId: "pm-kisan",
+    schemeNameEn: "PM-KISAN Samman Nidhi",
+    schemeNameKn: "ಪ್ರಧಾನ ಮಂತ್ರಿ ಕಿಸಾನ್ ಸಮ್ಮಾನ್ ನಿಧಿ",
+    benefitEn: "₹6,000 / year (3 installments)",
+    status: "DISBURSED",
+    appliedDate: "2024-03-15",
+    disbursedAmount: "₹2,000 (16th Installment Credited)",
+  },
+  {
+    farmerMobile: "9591502209",
+    farmerName: "Naveen Kumar KM",
+    farmerNameKn: "ನವೀನ್ ಕುಮಾರ್ ಕೆಎಂ",
+    district: "Mandya",
+    schemeId: "pmfby",
+    schemeNameEn: "PMFBY Crop Insurance (Paddy & Ragi)",
+    schemeNameKn: "ಪ್ರಧಾನ ಮಂತ್ರಿ ಫಸಲ್ ಬಿಮಾ ಯೋಜನೆ",
+    benefitEn: "100% sum insured against natural perils",
+    status: "APPROVED",
+    appliedDate: "2024-06-20",
+    disbursedAmount: "Policy Active: PMFBY-KA-2024-101",
+  },
+  {
+    farmerMobile: "9845011001",
+    farmerName: "Basavaraj Patil",
+    farmerNameKn: "ಬಸವರಾಜ ಪಾಟೀಲ",
+    district: "Belagavi",
+    schemeId: "pm-kisan",
+    schemeNameEn: "PM-KISAN Samman Nidhi",
+    schemeNameKn: "ಪ್ರಧಾನ ಮಂತ್ರಿ ಕಿಸಾನ್ ಸಮ್ಮಾನ್ ನಿಧಿ",
+    benefitEn: "₹6,000 / year",
+    status: "DISBURSED",
+    appliedDate: "2024-02-10",
+    disbursedAmount: "₹2,000 Credited",
+  },
+  {
+    farmerMobile: "9845011001",
+    farmerName: "Basavaraj Patil",
+    farmerNameKn: "ಬಸವರಾಜ ಪಾಟೀಲ",
+    district: "Belagavi",
+    schemeId: "krushi-bhagya",
+    schemeNameEn: "Krushi Bhagya Farm Pond & Polyhouse",
+    schemeNameKn: "ಕೃಷಿ ಭಾಗ್ಯ ಯೋಜನೆ (ಕೃಷಿ ಹೊಂಡ)",
+    benefitEn: "80-90% subsidy on farm pond with polythene lining",
+    status: "UNDER_REVIEW",
+    appliedDate: "2024-08-04",
+  },
+  {
+    farmerMobile: "9845011002",
+    farmerName: "Manjunath Hegde",
+    farmerNameKn: "ಮಂಜುನಾಥ ಹೆಗಡೆ",
+    district: "Shimoga",
+    schemeId: "pmksy-micro-irrigation",
+    schemeNameEn: "PMKSY Drip & Sprinkler Subsidy",
+    schemeNameKn: "ಸೂಕ್ಷ್ಮ ನೀರಾವರಿ ಯೋಜನೆ (ಹನಿ ನೀರಾವರಿ)",
+    benefitEn: "90% subsidy for small & marginal farmers",
+    status: "APPROVED",
+    appliedDate: "2024-05-18",
+    disbursedAmount: "Subsidy Sanctioned: ₹42,500",
+  },
+  {
+    farmerMobile: "9845011003",
+    farmerName: "Siddaramaiah Reddy",
+    farmerNameKn: "ಸಿದ್ದರಾಮಯ್ಯ ರೆಡ್ಡಿ",
+    district: "Kolar",
+    schemeId: "raitha-siri",
+    schemeNameEn: "Karnataka Raitha Siri (Millet Incentive)",
+    schemeNameKn: "ರೈತ ಸಿರಿ ಯೋಜನೆ",
+    benefitEn: "₹10,000 per hectare direct DBT",
+    status: "VERIFIED",
+    appliedDate: "2024-07-12",
+  },
+  {
+    farmerMobile: "9845011004",
+    farmerName: "Mallikarjun Biradar",
+    farmerNameKn: "ಮಲ್ಲಿಕಾರ್ಜುನ ಬಿರಾದಾರ",
+    district: "Vijayapura",
+    schemeId: "kcc",
+    schemeNameEn: "Kisan Credit Card (Subsidized 4% Crop Loan)",
+    schemeNameKn: "ಕಿಸಾನ್ ಕ್ರೆಡಿಟ್ ಕಾರ್ಡ್",
+    benefitEn: "Collateral-free loan up to ₹1.6 Lakhs @ 4%",
+    status: "APPROVED",
+    appliedDate: "2024-04-11",
+    disbursedAmount: "Limit: ₹1,50,000",
+  },
+  {
+    farmerMobile: "9845011005",
+    farmerName: "Chandrashekar Gowda",
+    farmerNameKn: "ಚಂದ್ರಶೇಖರ ಗೌಡ",
+    district: "Chikkamagaluru",
+    schemeId: "pmfby",
+    schemeNameEn: "Coffee & Spices Weather-Based Insurance",
+    schemeNameKn: "ಹವಾಮಾನ ಆಧಾರಿತ ಬೆಳೆ ವಿಮೆ ಯೋಜನೆ",
+    benefitEn: "Protection against deficit rainfall",
+    status: "APPROVED",
+    appliedDate: "2024-06-01",
+    disbursedAmount: "Policy Active",
+  },
+  {
+    farmerMobile: "9845011006",
+    farmerName: "Revanna Siddappa",
+    farmerNameKn: "ರೇವಣ್ಣ ಸಿದ್ದಪ್ಪ",
+    district: "Davanagere",
+    schemeId: "pm-kisan",
+    schemeNameEn: "PM-KISAN Samman Nidhi",
+    schemeNameKn: "ಪ್ರಧಾನ ಮಂತ್ರಿ ಕಿಸಾನ್ ಸಮ್ಮಾನ್ ನಿಧಿ",
+    benefitEn: "₹6,000 / year",
+    status: "DISBURSED",
+    appliedDate: "2024-03-22",
+    disbursedAmount: "₹2,000 Credited",
+  },
+  {
+    farmerMobile: "9845011007",
+    farmerName: "Gurusiddappa Pujar",
+    farmerNameKn: "ಗುರುಸಿದ್ದಪ್ಪ ಪೂಜಾರ",
+    district: "Haveri",
+    schemeId: "raitha-siri",
+    schemeNameEn: "Karnataka Raitha Siri",
+    schemeNameKn: "ರೈತ ಸಿರಿ ಯೋಜನೆ",
+    benefitEn: "₹10,000/ha for Byadagi Chilli intercropped with Millets",
+    status: "VERIFIED",
+    appliedDate: "2024-07-29",
+  },
+  {
+    farmerMobile: "9845011008",
+    farmerName: "Sangappa Terdal",
+    farmerNameKn: "ಸಂಗಪ್ಪ ತೇರದಾಳ",
+    district: "Bagalkot",
+    schemeId: "krushi-bhagya",
+    schemeNameEn: "Krushi Bhagya Farm Pond",
+    schemeNameKn: "ಕೃಷಿ ಭಾಗ್ಯ ಯೋಜನೆ",
+    benefitEn: "80% Subsidy for Pomegranate Orchard Farm Pond",
+    status: "UNDER_REVIEW",
+    appliedDate: "2024-09-02",
+  },
+  {
+    farmerMobile: "9845011009",
+    farmerName: "Kempegowda Patil",
+    farmerNameKn: "ಕೆಂಪೇಗೌಡ ಪಾಟೀಲ",
+    district: "Tumkur",
+    schemeId: "pashu-bhagya",
+    schemeNameEn: "Pashu Bhagya (Dairy & Fodder Subsidy)",
+    schemeNameKn: "ಪಶು ಭಾಗ್ಯ ಯೋಜನೆ",
+    benefitEn: "50% subsidy for 2 milch cows + chaff cutter",
+    status: "APPROVED",
+    appliedDate: "2024-05-14",
+    disbursedAmount: "Sanctioned: ₹60,000",
+  },
+]
+
+let fallbackSchemeApplications: SchemeApplicationRecord[] = [...SEED_SCHEME_APPLICATIONS]
+
+export function getAllSchemeApplications(): SchemeApplicationRecord[] {
+  return [...fallbackSchemeApplications]
+}
+
+export function updateSchemeApplicationStatus(
+  farmerMobile: string,
+  schemeId: string,
+  newStatus: SchemeApplicationRecord["status"],
+  disbursedAmount?: string
+): boolean {
+  const app = fallbackSchemeApplications.find(
+    (a) => a.farmerMobile === farmerMobile && a.schemeId === schemeId
+  )
+  if (app) {
+    app.status = newStatus
+    if (disbursedAmount !== undefined) app.disbursedAmount = disbursedAmount
+    saveStoreToDisk()
+    return true
+  }
+  return false
+}
+
 

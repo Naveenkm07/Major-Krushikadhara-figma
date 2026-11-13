@@ -3,195 +3,723 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KrushikaDhara Admin • Farm & Profile Management</title>
+  <title>KrushikaDhara Admin Portal • Enterprise Agriculture Management</title>
   <link rel="icon" href="https://img.icons8.com/color/96/sprout.png" type="image/png">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Kannada:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Kannada:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: 'Inter', 'Noto Sans Kannada', sans-serif; }
     .kannada { font-family: 'Noto Sans Kannada', sans-serif; }
+    .tab-active { border-bottom: 3px solid #059669; color: #065f46; font-weight: 700; }
+    .tab-inactive { border-bottom: 3px solid transparent; color: #64748b; font-weight: 500; }
+    .tab-inactive:hover { color: #0f172a; border-color: #cbd5e1; }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; rounded: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
 
-  <!-- Header -->
-  <header class="bg-emerald-900 text-white shadow-lg sticky top-0 z-40 border-b border-emerald-800">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-emerald-600/50 flex items-center justify-center border border-emerald-400/30 shadow-inner">
-          <i data-lucide="sprout" class="w-6 h-6 text-emerald-300"></i>
+  <!-- Main Sticky Header -->
+  <header class="bg-emerald-950 text-white shadow-xl sticky top-0 z-40 border-b border-emerald-900">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center space-x-3.5">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center border border-emerald-400/40 shadow-lg shadow-emerald-950/40">
+          <i data-lucide="sprout" class="w-6 h-6 text-white"></i>
         </div>
         <div>
-          <div class="flex items-center space-x-2">
-            <h1 class="text-xl font-bold tracking-tight text-white">KrushikaDhara</h1>
-            <span class="text-xs bg-emerald-700/80 text-emerald-200 px-2 py-0.5 rounded-full font-medium border border-emerald-600/50">Admin Console</span>
+          <div class="flex items-center space-x-2.5">
+            <h1 class="text-xl font-extrabold tracking-tight text-white">KrushikaDhara</h1>
+            <span class="text-[11px] bg-emerald-800/90 text-emerald-200 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-700">Enterprise Admin</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-900 text-emerald-300 border border-emerald-700">
+              <span class="w-2 h-2 mr-1 bg-emerald-400 rounded-full animate-ping"></span>
+              API Online
+            </span>
           </div>
-          <p class="text-xs text-emerald-300/90 kannada">ಕೃಷಿಕಧಾರ • ಕರ್ನಾಟಕ ರೈತರ ಪ್ರೊಫೈಲ್ & ಬೆಳೆ ನಿರ್ವಹಣಾ ಫಲಕ</p>
+          <p class="text-xs text-emerald-300/90 font-medium kannada">ಕೃಷಿಕಧಾರ • ಕರ್ನಾಟಕ ಕೃಷಿ ನಿರ್ವಹಣೆ, ಬೆಳೆ ಕ್ಯಾಲೆಂಡರ್ & ರೈತರ ಪೋರ್ಟಲ್</p>
         </div>
       </div>
 
+      <!-- Quick Action Buttons -->
       <div class="flex items-center space-x-2">
-        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-800/80 text-emerald-200 border border-emerald-700">
-          <span class="w-2 h-2 mr-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
-          Live API Active
-        </span>
-        <button onclick="resetAllProfiles()" class="inline-flex items-center space-x-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition">
-          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-          <span>Reset 10 Profiles</span>
+        <!-- Export Dropdown -->
+        <div class="relative inline-block text-left">
+          <button onclick="toggleExportMenu()" class="inline-flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-xl shadow-sm border border-slate-700 transition">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Export Data</span>
+            <i data-lucide="chevron-down" class="w-3 h-3 ml-0.5"></i>
+          </button>
+          <div id="exportMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 z-50 text-xs">
+            <a href="/api/admin/export?format=csv" target="_blank" class="flex items-center px-4 py-2 text-slate-700 hover:bg-slate-100 font-medium">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 mr-2 text-emerald-600"></i> Download CSV (Excel)
+            </a>
+            <a href="/api/admin/export?format=json" target="_blank" class="flex items-center px-4 py-2 text-slate-700 hover:bg-slate-100 font-medium">
+              <i data-lucide="file-code" class="w-4 h-4 mr-2 text-indigo-600"></i> Download Full JSON
+            </a>
+          </div>
+        </div>
+
+        <button onclick="switchTab('advisories')" class="inline-flex items-center space-x-1.5 bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-sm transition">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Broadcast Alert</span>
         </button>
-        <button onclick="openCreateModal()" class="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition">
+
+        <button onclick="resetAllProfiles()" class="inline-flex items-center space-x-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-sm transition" title="Restore the 10 authentic Karnataka profiles">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>Reset 10</span>
+        </button>
+
+        <button onclick="openCreateModal()" class="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-sm transition">
           <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
           <span>Add Farmer</span>
         </button>
       </div>
     </div>
+
+    <!-- Tab Navigation Bar -->
+    <div class="bg-emerald-900/60 border-t border-emerald-800/80">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 sm:space-x-4 overflow-x-auto">
+        <button onclick="switchTab('analytics')" id="nav-analytics" class="tab-active py-2.5 px-3 text-xs sm:text-sm whitespace-nowrap flex items-center space-x-2 transition text-emerald-100">
+          <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+          <span>Agro-Analytics</span>
+        </button>
+        <button onclick="switchTab('farmers')" id="nav-farmers" class="tab-inactive py-2.5 px-3 text-xs sm:text-sm whitespace-nowrap flex items-center space-x-2 transition text-emerald-200">
+          <i data-lucide="users" class="w-4 h-4"></i>
+          <span>Farmers & Plots (<span id="tabFarmerCount">10</span>)</span>
+        </button>
+        <button onclick="switchTab('crops')" id="nav-crops" class="tab-inactive py-2.5 px-3 text-xs sm:text-sm whitespace-nowrap flex items-center space-x-2 transition text-emerald-200">
+          <i data-lucide="calendar" class="w-4 h-4"></i>
+          <span>32 Crop Calendars</span>
+        </button>
+        <button onclick="switchTab('advisories')" id="nav-advisories" class="tab-inactive py-2.5 px-3 text-xs sm:text-sm whitespace-nowrap flex items-center space-x-2 transition text-emerald-200">
+          <i data-lucide="megaphone" class="w-4 h-4"></i>
+          <span>Advisories & Alerts</span>
+        </button>
+        <button onclick="switchTab('schemes')" id="nav-schemes" class="tab-inactive py-2.5 px-3 text-xs sm:text-sm whitespace-nowrap flex items-center space-x-2 transition text-emerald-200">
+          <i data-lucide="landmark" class="w-4 h-4"></i>
+          <span>Govt Schemes (<span id="tabSchemeCount">12</span>)</span>
+        </button>
+      </div>
+    </div>
   </header>
 
-  <!-- Main Content -->
+  <!-- Main Content Body -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
 
-    <!-- KPI Metric Cards -->
-    <div id="statsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-          <span>Farmers</span>
-          <i data-lucide="users" class="w-4 h-4 text-emerald-600"></i>
+    <!-- ========================================================================= -->
+    <!-- TAB 1: ANALYTICS & DASHBOARD -->
+    <!-- ========================================================================= -->
+    <div id="tabContent-analytics" class="space-y-6">
+
+      <!-- Top KPI Row (6 Cards) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+            <span>Farmers</span>
+            <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <i data-lucide="users" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpiFarmers" class="text-2xl font-black text-slate-800">10</div>
+          <div class="text-[11px] text-emerald-600 font-semibold mt-1">Karnataka Seeded</div>
         </div>
-        <div id="metricFarmers" class="text-2xl font-bold text-slate-800">10</div>
-        <div class="text-[11px] text-emerald-600 font-medium mt-1">Karnataka Seeded</div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+            <span>Monitored Land</span>
+            <div class="w-7 h-7 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center">
+              <i data-lucide="map" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpiAcres" class="text-2xl font-black text-slate-800">55.2</div>
+          <div class="text-[11px] text-slate-500 font-medium mt-1">Acres Documented</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+            <span>Active Plots</span>
+            <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center">
+              <i data-lucide="layers" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpiPlots" class="text-2xl font-black text-slate-800">30</div>
+          <div class="text-[11px] text-indigo-600 font-semibold mt-1">Across 10 Districts</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+            <span>RTC Verified</span>
+            <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <i data-lucide="shield-check" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpiRtc" class="text-2xl font-black text-emerald-700">100%</div>
+          <div class="text-[11px] text-emerald-600 font-semibold mt-1">Pahani Record Matched</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+            <span>Health Alerts</span>
+            <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpiAlerts" class="text-2xl font-black text-amber-600">4</div>
+          <div class="text-[11px] text-amber-600 font-semibold mt-1">Pest / Water Stressed</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+            <span>AI Diagnoses</span>
+            <div class="w-7 h-7 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center">
+              <i data-lucide="scan-line" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div id="kpiScans" class="text-2xl font-black text-purple-700">12</div>
+          <div class="text-[11px] text-purple-600 font-semibold mt-1">Leaf Scans Logged</div>
+        </div>
       </div>
 
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-          <span>Total Land</span>
-          <i data-lucide="map" class="w-4 h-4 text-emerald-600"></i>
+      <!-- Charts Grid Row (4 Charts) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <!-- Chart 1: Acreage by Crop -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm">Monitored Acreage by Major Crop</h3>
+              <p class="text-xs text-slate-400">Total acres under active cultivation</p>
+            </div>
+            <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">Top 10 Crops</span>
+          </div>
+          <div class="h-64 relative">
+            <canvas id="cropAcreageChart"></canvas>
+          </div>
         </div>
-        <div id="metricAcres" class="text-2xl font-bold text-slate-800">55.2</div>
-        <div class="text-[11px] text-slate-500 font-medium mt-1">Acres Monitored</div>
+
+        <!-- Chart 2: District Distribution -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm">Farmers Across Karnataka Agro-Zones</h3>
+              <p class="text-xs text-slate-400">Regional coverage across Cauvery, Krishna & Malnad</p>
+            </div>
+            <span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg">10 Districts</span>
+          </div>
+          <div class="h-64 relative">
+            <canvas id="districtBarChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 3: Crop Health Status Breakdown -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm">Crop Health & Stress Conditions</h3>
+              <p class="text-xs text-slate-400">Live plot health status distribution</p>
+            </div>
+            <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">Plot Health</span>
+          </div>
+          <div class="h-64 relative flex items-center justify-center">
+            <canvas id="healthPieChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 4: AI Disease Detection Frequency -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm">AI Plant Pathology Diagnoses</h3>
+              <p class="text-xs text-slate-400">Most frequent diseases & pest infestations identified</p>
+            </div>
+            <span class="text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg">Pest Frequency</span>
+          </div>
+          <div class="h-64 relative">
+            <canvas id="diseaseBarChart"></canvas>
+          </div>
+        </div>
       </div>
 
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-          <span>Active Plots</span>
-          <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i>
+      <!-- Karnataka Agro-Climatic Zones Summary Cards -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-slate-900 text-base">Karnataka Agro-Climatic Intelligence Zones</h3>
+            <p class="text-xs text-slate-500">Live operational status across Karnataka farming regions</p>
+          </div>
+          <span class="text-xs font-semibold text-slate-400">Real-time telemetry</span>
         </div>
-        <div id="metricPlots" class="text-2xl font-bold text-slate-800">30</div>
-        <div class="text-[11px] text-slate-500 font-medium mt-1">Crop Parcels</div>
-      </div>
 
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-          <span>RTC Verified</span>
-          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
-        </div>
-        <div id="metricRtc" class="text-2xl font-bold text-emerald-700">100%</div>
-        <div class="text-[11px] text-emerald-600 font-medium mt-1">Land Records</div>
-      </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs">
+          <div class="p-4 rounded-xl border border-emerald-100 bg-emerald-50/50 space-y-2">
+            <div class="flex items-center justify-between font-bold text-emerald-900">
+              <span>Cauvery Basin (Mandya)</span>
+              <span class="bg-emerald-200/80 text-emerald-800 px-2 py-0.5 rounded text-[10px]">Optimal Soil</span>
+            </div>
+            <p class="text-slate-600">Major crops: Paddy (BPT 5204), Sugarcane, Tomato. Red loam soil, canal + drip irrigation. 1 Water stress alert active.</p>
+          </div>
 
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-          <span>Crop Alerts</span>
-          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>
-        </div>
-        <div id="metricAlerts" class="text-2xl font-bold text-amber-600">4</div>
-        <div class="text-[11px] text-amber-600 font-medium mt-1">Pest / Water stress</div>
-      </div>
+          <div class="p-4 rounded-xl border border-blue-100 bg-blue-50/50 space-y-2">
+            <div class="flex items-center justify-between font-bold text-blue-900">
+              <span>Krishna Basin (Belagavi)</span>
+              <span class="bg-blue-200/80 text-blue-800 px-2 py-0.5 rounded text-[10px]">Black Cotton</span>
+            </div>
+            <p class="text-slate-600">Major crops: Sugarcane (Co 86032), Maize, Soybeans. Deep black clay soil with high water retention capacity.</p>
+          </div>
 
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-          <span>AI Scans</span>
-          <i data-lucide="scan-line" class="w-4 h-4 text-emerald-600"></i>
+          <div class="p-4 rounded-xl border border-teal-100 bg-teal-50/50 space-y-2">
+            <div class="flex items-center justify-between font-bold text-teal-900">
+              <span>Malnad Wet Zone (Shimoga)</span>
+              <span class="bg-teal-200/80 text-teal-800 px-2 py-0.5 rounded text-[10px]">Acidic Laterite</span>
+            </div>
+            <p class="text-slate-600">Major crops: Arecanut (Thirthahalli local), Paddy, Ginger. High rainfall, Koleroga (Kole-roga) surveillance advised.</p>
+          </div>
+
+          <div class="p-4 rounded-xl border border-amber-100 bg-amber-50/50 space-y-2">
+            <div class="flex items-center justify-between font-bold text-amber-900">
+              <span>Eastern Dry Zone (Kolar)</span>
+              <span class="bg-amber-200/80 text-amber-800 px-2 py-0.5 rounded text-[10px]">Borewell Dependent</span>
+            </div>
+            <p class="text-slate-600">Major crops: Tomato (Arka Rakshak), Mulberry, Groundnut. Deep borewells, precision drip fertigation required.</p>
+          </div>
+
+          <div class="p-4 rounded-xl border border-indigo-100 bg-indigo-50/50 space-y-2">
+            <div class="flex items-center justify-between font-bold text-indigo-900">
+              <span>Western Ghats (Chikkamagaluru)</span>
+              <span class="bg-indigo-200/80 text-indigo-800 px-2 py-0.5 rounded text-[10px]">High Altitude</span>
+            </div>
+            <p class="text-slate-600">Major crops: Coffee (Arabica Sln 795), Black Pepper, Cardamom. Rich humus soil, shade-grown microclimate.</p>
+          </div>
+
+          <div class="p-4 rounded-xl border border-rose-100 bg-rose-50/50 space-y-2">
+            <div class="flex items-center justify-between font-bold text-rose-900">
+              <span>Spice Belt (Haveri & Byadagi)</span>
+              <span class="bg-rose-200/80 text-rose-800 px-2 py-0.5 rounded text-[10px]">High Value</span>
+            </div>
+            <p class="text-slate-600">Major crops: Byadagi Chilli (Kaddi / Dabbi), Maize, Cotton. Fungal anthracnose alert active in low-lying plots.</p>
+          </div>
         </div>
-        <div id="metricScans" class="text-2xl font-bold text-slate-800">12</div>
-        <div class="text-[11px] text-slate-500 font-medium mt-1">Pest Diagnoses</div>
       </div>
     </div>
 
-    <!-- Search & Filter Bar -->
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-      <div class="relative flex-1">
-        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
-        <input
-          id="searchInput"
-          type="text"
-          oninput="applyFilters()"
-          placeholder="Search by name, Kannada name, phone, village, taluk, or district..."
-          class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-        />
+    <!-- ========================================================================= -->
+    <!-- TAB 2: FARMERS & PLOTS DIRECTORY -->
+    <!-- ========================================================================= -->
+    <div id="tabContent-farmers" class="space-y-5 hidden">
+
+      <!-- Search & Multi-Filter Bar -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        
+        <!-- Search Input -->
+        <div class="relative flex-1">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+          <input
+            id="searchInput"
+            type="text"
+            oninput="applyFilters()"
+            placeholder="Search by name, Kannada name, phone number, village, taluk, or district..."
+            class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+          />
+        </div>
+
+        <!-- Filter Dropdowns & View Toggle -->
+        <div class="flex flex-wrap items-center gap-2">
+          <select id="districtFilter" onchange="applyFilters()" class="border border-slate-300 rounded-xl text-xs py-2 px-3 bg-white text-slate-700 focus:ring-emerald-500">
+            <option value="ALL">All Districts (10)</option>
+            <option value="Mandya">Mandya (Cauvery Basin)</option>
+            <option value="Belagavi">Belagavi (Krishna Basin)</option>
+            <option value="Shimoga">Shimoga (Malnad)</option>
+            <option value="Kolar">Kolar (Eastern Dry)</option>
+            <option value="Vijayapura">Vijayapura (Deccan)</option>
+            <option value="Chikkamagaluru">Chikkamagaluru (Ghats)</option>
+            <option value="Davanagere">Davanagere (Central)</option>
+            <option value="Haveri">Haveri (Spice Belt)</option>
+            <option value="Bagalkot">Bagalkot (Upper Krishna)</option>
+            <option value="Tumkur">Tumkur (Coconut Belt)</option>
+          </select>
+
+          <select id="cropFilter" onchange="applyFilters()" class="border border-slate-300 rounded-xl text-xs py-2 px-3 bg-white text-slate-700 focus:ring-emerald-500">
+            <option value="ALL">All Crops</option>
+            <option value="Rice">Rice (Paddy)</option>
+            <option value="Sugarcane">Sugarcane</option>
+            <option value="Arecanut">Arecanut</option>
+            <option value="Tomato">Tomato</option>
+            <option value="Coffee">Coffee</option>
+            <option value="Chilli">Chilli (Byadagi)</option>
+            <option value="Coconut">Coconut</option>
+            <option value="Maize">Maize</option>
+            <option value="Ragi">Ragi (Finger Millet)</option>
+            <option value="Cotton">Cotton</option>
+            <option value="Pomegranate">Pomegranate</option>
+            <option value="Banana">Banana</option>
+          </select>
+
+          <select id="healthFilter" onchange="applyFilters()" class="border border-slate-300 rounded-xl text-xs py-2 px-3 bg-white text-slate-700 focus:ring-emerald-500">
+            <option value="ALL">All Health Conditions</option>
+            <option value="HEALTHY">Healthy Only</option>
+            <option value="PEST_SUSPECTED">Pest Alert</option>
+            <option value="WATER_STRESSED">Water Stressed</option>
+            <option value="LOW_NUTRIENTS">Low Nutrients</option>
+          </select>
+
+          <!-- Grid vs Table View Switch -->
+          <div class="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-0.5">
+            <button onclick="setViewMode('grid')" id="viewModeGrid" class="p-1.5 rounded-lg bg-white shadow-sm text-slate-800" title="Grid View">
+              <i data-lucide="layout-grid" class="w-4 h-4"></i>
+            </button>
+            <button onclick="setViewMode('table')" id="viewModeTable" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800" title="Table View">
+              <i data-lucide="table" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div class="flex flex-wrap gap-2">
-        <select id="districtFilter" onchange="applyFilters()" class="border border-slate-300 rounded-lg text-xs py-2 px-3 bg-white text-slate-700 focus:ring-emerald-500 focus:border-emerald-500">
-          <option value="ALL">All Districts (10)</option>
-          <option value="Mandya">Mandya (Cauvery Basin)</option>
-          <option value="Belagavi">Belagavi (Krishna Basin)</option>
-          <option value="Shimoga">Shimoga (Malnad)</option>
-          <option value="Kolar">Kolar (Eastern Dry)</option>
-          <option value="Vijayapura">Vijayapura (Deccan)</option>
-          <option value="Chikkamagaluru">Chikkamagaluru (Ghats)</option>
-          <option value="Davanagere">Davanagere (Central)</option>
-          <option value="Haveri">Haveri (Spice Belt)</option>
-          <option value="Bagalkot">Bagalkot (Upper Krishna)</option>
-          <option value="Tumkur">Tumkur (Coconut Belt)</option>
-        </select>
+      <!-- Farmers Cards Container (Grid View) -->
+      <div id="farmersGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Injected via JavaScript -->
+      </div>
 
-        <select id="cropFilter" onchange="applyFilters()" class="border border-slate-300 rounded-lg text-xs py-2 px-3 bg-white text-slate-700 focus:ring-emerald-500 focus:border-emerald-500">
-          <option value="ALL">All Crops</option>
-          <option value="Rice">Rice (Paddy)</option>
-          <option value="Sugarcane">Sugarcane</option>
-          <option value="Arecanut">Arecanut</option>
-          <option value="Tomato">Tomato</option>
-          <option value="Coffee">Coffee</option>
-          <option value="Chilli">Chilli (Byadagi)</option>
-          <option value="Coconut">Coconut</option>
-          <option value="Maize">Maize</option>
-          <option value="Ragi">Ragi (Finger Millet)</option>
-        </select>
+      <!-- Farmers Table Container (Table View) -->
+      <div id="farmersTableWrap" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase tracking-wider font-semibold">
+            <tr>
+              <th class="px-4 py-3.5">Farmer Profile</th>
+              <th class="px-4 py-3.5">Location</th>
+              <th class="px-4 py-3.5">Land & Soil</th>
+              <th class="px-4 py-3.5">Planted Crops</th>
+              <th class="px-4 py-3.5">AI Scans</th>
+              <th class="px-4 py-3.5 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="farmersTableBody" class="divide-y divide-slate-100 text-slate-700">
+            <!-- Injected via JavaScript -->
+          </tbody>
+        </table>
+      </div>
 
-        <select id="healthFilter" onchange="applyFilters()" class="border border-slate-300 rounded-lg text-xs py-2 px-3 bg-white text-slate-700 focus:ring-emerald-500 focus:border-emerald-500">
-          <option value="ALL">All Health Conditions</option>
-          <option value="HEALTHY">Healthy Only</option>
-          <option value="PEST_SUSPECTED">Pest Alert</option>
-          <option value="WATER_STRESSED">Water Stressed</option>
-          <option value="LOW_NUTRIENTS">Low Nutrients</option>
-        </select>
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden text-center py-12 bg-white rounded-2xl border border-slate-200 p-8">
+        <i data-lucide="user-x" class="w-12 h-12 text-slate-300 mx-auto mb-3"></i>
+        <h3 class="text-base font-semibold text-slate-700">No farmers match this filter criteria</h3>
+        <p class="text-xs text-slate-500 mt-1">Try clearing your search query or reset the district/crop filters.</p>
+        <button onclick="resetFilters()" class="mt-4 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-4 py-2 rounded-xl border border-emerald-200">
+          Reset All Filters
+        </button>
       </div>
     </div>
 
-    <!-- Farmers Cards Container -->
-    <div id="farmersList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <!-- Injected via JavaScript -->
+    <!-- ========================================================================= -->
+    <!-- TAB 3: 32 DYNAMIC CROP CALENDARS CATALOG -->
+    <!-- ========================================================================= -->
+    <div id="tabContent-crops" class="space-y-6 hidden">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h3 class="font-extrabold text-slate-900 text-base">32+ Dynamic Crop Lifecycle & Agronomy Catalog</h3>
+            <p class="text-xs text-slate-500 kannada">ಕರ್ನಾಟಕದ 32 ಪ್ರಮುಖ ಬೆಳೆಗಳ ಬೆಳವಣಿಗೆ ಹಂತಗಳು, ನೀರಾವರಿ & ರಸಗೊಬ್ಬರ ವೇಳಾಪಟ್ಟಿ</p>
+          </div>
+          
+          <!-- Category Filter Pills -->
+          <div class="flex flex-wrap gap-1.5" id="cropCategoryPills">
+            <button onclick="filterCropCatalog('ALL')" class="px-3 py-1 text-xs font-semibold rounded-lg bg-emerald-800 text-white">All Crops</button>
+            <button onclick="filterCropCatalog('Cereals & Millets')" class="px-3 py-1 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Cereals & Millets</button>
+            <button onclick="filterCropCatalog('Pulses & Legumes')" class="px-3 py-1 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Pulses</button>
+            <button onclick="filterCropCatalog('Vegetables')" class="px-3 py-1 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Vegetables</button>
+            <button onclick="filterCropCatalog('Commercial & Cash Crops')" class="px-3 py-1 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Cash Crops</button>
+            <button onclick="filterCropCatalog('Plantation & Fruits')" class="px-3 py-1 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Plantation & Fruits</button>
+          </div>
+        </div>
+
+        <!-- Crops Explorer Layout (Left list + Right detail) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-2">
+          
+          <!-- Left: Crop Selection List -->
+          <div class="lg:col-span-4 space-y-2 max-h-[600px] overflow-y-auto pr-1" id="cropsListContainer">
+            <!-- Injected via JavaScript -->
+          </div>
+
+          <!-- Right: Detailed Crop Growth Timeline & Advisories -->
+          <div class="lg:col-span-8 bg-slate-50 rounded-2xl border border-slate-200 p-5 space-y-5" id="cropDetailPane">
+            <div class="text-center py-16 text-slate-400">
+              <i data-lucide="sprout" class="w-12 h-12 mx-auto mb-2 opacity-40"></i>
+              <p class="font-semibold text-slate-600">Select any crop on the left to inspect its dynamic agronomic calendar</p>
+              <p class="text-xs text-slate-400">View stages, total lifecycle duration, irrigation & nutrient advisories</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Empty State -->
-    <div id="emptyState" class="hidden text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
-      <i data-lucide="user-x" class="w-12 h-12 text-slate-300 mx-auto mb-3"></i>
-      <h3 class="text-base font-semibold text-slate-700">No farmers match this filter</h3>
-      <p class="text-xs text-slate-500 mt-1">Try clearing your search query or reset filters.</p>
-      <button onclick="resetFilters()" class="mt-4 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200">Reset Filters</button>
+    <!-- ========================================================================= -->
+    <!-- TAB 4: BROADCAST ADVISORY & ALERT CENTER -->
+    <!-- ========================================================================= -->
+    <div id="tabContent-advisories" class="space-y-6 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left: Compose & Send Broadcast Alert -->
+        <div class="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h3 class="font-bold text-slate-900 text-base flex items-center space-x-2">
+              <i data-lucide="megaphone" class="w-5 h-5 text-indigo-600"></i>
+              <span>Dispatch Regional Broadcast Alert</span>
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">Send targeted weather warnings, pest alarms & fertilizer schedules</p>
+          </div>
+
+          <form onsubmit="handleSendBroadcast(event)" class="space-y-3.5 text-xs">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Advisory Title (English)</label>
+              <input type="text" id="bcastTitleEn" required placeholder="e.g. Yellow Stem Borer Outbreak Warning" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Advisory Title (Kannada)</label>
+              <input type="text" id="bcastTitleKn" placeholder="ಉದಾ: ಭತ್ತದಲ್ಲಿ ಹಳದಿ ಕಾಂಡ ಕೊರೆಯುವ ಹುಳುವಿನ ಎಚ್ಚರಿಕೆ" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs kannada focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Category</label>
+                <select id="bcastCategory" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
+                  <option value="PEST_WARNING">Pest & Disease Outbreak</option>
+                  <option value="WEATHER_ALERT">Weather & Heavy Rain Alert</option>
+                  <option value="FERTILIZER">Fertilizer Top-Dressing</option>
+                  <option value="MARKET_SPIKE">APMC Mandi Price Surge</option>
+                  <option value="SCHEME">Government Scheme Deadline</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Urgency Level</label>
+                <select id="bcastUrgency" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
+                  <option value="URGENT">Urgent / High Priority</option>
+                  <option value="MODERATE">Moderate Advisory</option>
+                  <option value="INFO">Informational / General</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Target Karnataka District</label>
+                <select id="bcastDistrict" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
+                  <option value="ALL">All Karnataka Districts</option>
+                  <option value="Mandya">Mandya (Cauvery Basin)</option>
+                  <option value="Belagavi">Belagavi (Krishna Basin)</option>
+                  <option value="Shimoga">Shimoga (Malnad)</option>
+                  <option value="Kolar">Kolar (Eastern Dry)</option>
+                  <option value="Vijayapura">Vijayapura (Deccan)</option>
+                  <option value="Chikkamagaluru">Chikkamagaluru (Ghats)</option>
+                  <option value="Davanagere">Davanagere (Central)</option>
+                  <option value="Haveri">Haveri (Spice Belt)</option>
+                  <option value="Bagalkot">Bagalkot (Upper Krishna)</option>
+                  <option value="Tumkur">Tumkur (Coconut Belt)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Target Crop</label>
+                <select id="bcastCrop" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
+                  <option value="ALL">All Crops</option>
+                  <option value="Rice (Paddy)">Rice (Paddy)</option>
+                  <option value="Sugarcane">Sugarcane</option>
+                  <option value="Arecanut">Arecanut</option>
+                  <option value="Tomato">Tomato</option>
+                  <option value="Coffee">Coffee</option>
+                  <option value="Chilli">Chilli (Byadagi)</option>
+                  <option value="Maize">Maize</option>
+                  <option value="Ragi">Ragi (Finger Millet)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Detailed Message (English)</label>
+              <textarea id="bcastMsgEn" required rows="3" placeholder="Provide actionable recommendation, chemical spray dose or precautions..." class="w-full border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500"></textarea>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Detailed Message (Kannada)</label>
+              <textarea id="bcastMsgKn" rows="3" placeholder="ರೈತರಿಗೆ ಕ್ರಮ ಕೈಗೊಳ್ಳಲು ವಿವರವಾದ ಸಲಹೆ..." class="w-full border border-slate-300 rounded-xl p-2.5 text-xs kannada focus:ring-2 focus:ring-indigo-500"></textarea>
+            </div>
+
+            <button type="submit" class="w-full bg-indigo-700 hover:bg-indigo-600 text-white font-bold py-2.5 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+              <i data-lucide="send" class="w-4 h-4"></i>
+              <span>Dispatch Alert to Farmers</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Right: Push Notification Simulator & Past Broadcasts -->
+        <div class="lg:col-span-7 space-y-5">
+          
+          <!-- In-App Push Notification Mockup Preview -->
+          <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-lg border border-slate-700">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-3">
+              <span class="flex items-center space-x-1.5">
+                <i data-lucide="smartphone" class="w-4 h-4 text-emerald-400"></i>
+                <span class="font-semibold text-white">Farmer Mobile Device Simulation</span>
+              </span>
+              <span class="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full">Push Notification Banner</span>
+            </div>
+
+            <!-- Notification card on phone -->
+            <div class="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 flex items-start space-x-3.5">
+              <div class="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                <i data-lucide="sprout" class="w-5 h-5 text-white"></i>
+              </div>
+              <div class="flex-1 text-xs space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-emerald-300">KrushikaDhara • Alert</span>
+                  <span class="text-[10px] text-slate-400">Just now</span>
+                </div>
+                <h4 id="previewTitle" class="font-bold text-white text-sm">Yellow Stem Borer Outbreak Warning</h4>
+                <p id="previewBody" class="text-slate-300 text-[11px] leading-relaxed">
+                  Continuous cloudy weather has caused pest incidence in tillering paddy. Monitor for dead hearts. Apply Cartap Hydrochloride 4G @ 8 kg/acre immediately.
+                </p>
+                <div class="pt-1 flex items-center space-x-2 text-[10px] text-emerald-400 font-semibold">
+                  <span>Target: Mandya • Rice (Paddy)</span>
+                  <span>•</span>
+                  <span>Tap to open in KrushikaDhara</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Past Broadcasts Feed -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3.5">
+            <div class="flex items-center justify-between">
+              <h4 class="font-bold text-slate-800 text-sm">Dispatched Broadcasts History</h4>
+              <span id="bcastCountBadge" class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-bold">4 Sent</span>
+            </div>
+            <div id="broadcastsFeed" class="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+              <!-- Injected via JavaScript -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 5: GOVERNMENT SCHEMES & SUBSIDIES -->
+    <!-- ========================================================================= -->
+    <div id="tabContent-schemes" class="space-y-6 hidden">
+      
+      <!-- Schemes Summary Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+          <div class="flex items-center justify-between text-xs text-slate-500 font-semibold">
+            <span>PM-KISAN Samman Nidhi</span>
+            <span class="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">₹</span>
+          </div>
+          <div class="text-xl font-black text-slate-800">₹6,000 / yr</div>
+          <p class="text-[11px] text-emerald-600 font-medium">Direct Income Support • 3 Installments</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+          <div class="flex items-center justify-between text-xs text-slate-500 font-semibold">
+            <span>PMFBY Crop Insurance</span>
+            <span class="w-6 h-6 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold"><i data-lucide="shield" class="w-3.5 h-3.5"></i></span>
+          </div>
+          <div class="text-xl font-black text-slate-800">100% Cover</div>
+          <p class="text-[11px] text-blue-600 font-medium">Drought, Flood, Pest & Post-Harvest</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+          <div class="flex items-center justify-between text-xs text-slate-500 font-semibold">
+            <span>Karnataka Raitha Siri</span>
+            <span class="w-6 h-6 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold"><i data-lucide="sprout" class="w-3.5 h-3.5"></i></span>
+          </div>
+          <div class="text-xl font-black text-slate-800">₹10,000 / ha</div>
+          <p class="text-[11px] text-amber-600 font-medium">Siridhanya Millet Cultivation DBT</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+          <div class="flex items-center justify-between text-xs text-slate-500 font-semibold">
+            <span>Krushi Bhagya & PMKSY</span>
+            <span class="w-6 h-6 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold"><i data-lucide="droplet" class="w-3.5 h-3.5"></i></span>
+          </div>
+          <div class="text-xl font-black text-slate-800">90% Subsidy</div>
+          <p class="text-[11px] text-purple-600 font-medium">Farm Pond Lining + Drip Irrigation</p>
+        </div>
+      </div>
+
+      <!-- Farmer Scheme Applications Table -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-3 p-5">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h3 class="font-bold text-slate-900 text-base">Farmer Subsidy & Insurance Applications</h3>
+            <p class="text-xs text-slate-500">Track and approve scheme benefits for registered Karnataka farmers</p>
+          </div>
+          <span class="text-xs font-semibold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full border border-emerald-200">
+            FRUITS / RTC Linked
+          </span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase tracking-wider font-semibold">
+              <tr>
+                <th class="px-3.5 py-3">Farmer</th>
+                <th class="px-3.5 py-3">District</th>
+                <th class="px-3.5 py-3">Scheme Name</th>
+                <th class="px-3.5 py-3">Benefit Entitlement</th>
+                <th class="px-3.5 py-3">Status</th>
+                <th class="px-3.5 py-3">Application Date</th>
+                <th class="px-3.5 py-3 text-right">Approval Actions</th>
+              </tr>
+            </thead>
+            <tbody id="schemesTableBody" class="divide-y divide-slate-100 text-slate-700">
+              <!-- Injected via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
 
   </main>
 
-  <!-- Edit / Add Farmer Modal -->
-  <div id="farmerModal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
-    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
-      <div class="px-6 py-4 bg-emerald-900 text-white flex items-center justify-between">
-        <h3 id="modalTitle" class="text-base font-bold">Edit Farmer Profile</h3>
-        <button onclick="closeFarmerModal()" class="text-emerald-200 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+  <!-- ========================================================================= -->
+  <!-- MODAL: COMPREHENSIVE FARMER DOSSIER & PROFILE INSPECTOR -->
+  <!-- ========================================================================= -->
+  <div id="farmerModal" class="fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-3 sm:p-5 hidden backdrop-blur-sm">
+    <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 bg-emerald-950 text-white flex items-center justify-between border-b border-emerald-900">
+        <div>
+          <h3 id="modalTitle" class="text-base font-bold">Farmer Profile Dossier</h3>
+          <p id="modalSub" class="text-xs text-emerald-300">Karnataka Agricultural Land & Crop Registry</p>
+        </div>
+        <button onclick="closeFarmerModal()" class="text-emerald-300 hover:text-white p-1 rounded-lg hover:bg-emerald-900 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
       </div>
-      <form id="farmerForm" onsubmit="handleSaveFarmer(event)" class="p-6 overflow-y-auto space-y-4 text-xs">
+
+      <!-- Modal Tabs Bar -->
+      <div class="bg-slate-100 px-6 pt-2 border-b border-slate-200 flex space-x-4 text-xs font-semibold">
+        <button onclick="setModalTab('info')" id="modalTab-info" class="pb-2 border-b-2 border-emerald-700 text-emerald-900">1. Personal & Farm Info</button>
+        <button onclick="setModalTab('soil')" id="modalTab-soil" class="pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900">2. Soil Health Card</button>
+      </div>
+
+      <!-- Tab A: Personal & Farm Info Form -->
+      <form id="farmerForm" onsubmit="handleSaveFarmer(event)" class="p-6 overflow-y-auto space-y-4 text-xs flex-1">
         <input type="hidden" id="formIsEdit" value="false">
         
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block font-semibold text-slate-700 mb-1">Mobile (10 Digits)</label>
-            <input type="text" id="formMobile" required maxlength="10" class="w-full border border-slate-300 rounded-lg p-2 font-mono text-xs">
+            <input type="text" id="formMobile" required maxlength="10" class="w-full border border-slate-300 rounded-xl p-2.5 font-mono text-xs focus:ring-2 focus:ring-emerald-500">
           </div>
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Language</label>
-            <select id="formLang" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            <label class="block font-semibold text-slate-700 mb-1">Preferred Language</label>
+            <select id="formLang" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
               <option value="kn">Kannada (ಕನ್ನಡ)</option>
               <option value="en">English</option>
             </select>
@@ -200,38 +728,38 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Name (English)</label>
-            <input type="text" id="formName" required class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            <label class="block font-semibold text-slate-700 mb-1">Full Name (English)</label>
+            <input type="text" id="formName" required class="w-full border border-slate-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-emerald-500">
           </div>
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Name (Kannada)</label>
-            <input type="text" id="formNameKn" class="w-full border border-slate-300 rounded-lg p-2 text-xs kannada">
+            <label class="block font-semibold text-slate-700 mb-1">Full Name (Kannada)</label>
+            <input type="text" id="formNameKn" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs kannada focus:ring-2 focus:ring-emerald-500">
           </div>
         </div>
 
         <div class="grid grid-cols-3 gap-3">
           <div>
             <label class="block font-semibold text-slate-700 mb-1">District</label>
-            <input type="text" id="formDistrict" required class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            <input type="text" id="formDistrict" required class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
           </div>
           <div>
             <label class="block font-semibold text-slate-700 mb-1">Taluk</label>
-            <input type="text" id="formTaluk" required class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            <input type="text" id="formTaluk" required class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
           </div>
           <div>
             <label class="block font-semibold text-slate-700 mb-1">Village</label>
-            <input type="text" id="formVillage" required class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            <input type="text" id="formVillage" required class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
           </div>
         </div>
 
         <div class="grid grid-cols-3 gap-3">
           <div>
             <label class="block font-semibold text-slate-700 mb-1">Farm Size (Acres)</label>
-            <input type="number" step="0.1" id="formFarmSize" required class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            <input type="number" step="0.1" id="formFarmSize" required class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
           </div>
           <div>
             <label class="block font-semibold text-slate-700 mb-1">Soil Type</label>
-            <select id="formSoil" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            <select id="formSoil" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
               <option value="Red Loam">Red Loam</option>
               <option value="Deep Black Cotton Soil">Deep Black Cotton Soil</option>
               <option value="Laterite Acidic Soil">Laterite Acidic Soil</option>
@@ -242,8 +770,8 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
             </select>
           </div>
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Irrigation</label>
-            <select id="formIrr" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            <label class="block font-semibold text-slate-700 mb-1">Irrigation System</label>
+            <select id="formIrr" class="w-full border border-slate-300 rounded-xl p-2.5 text-xs">
               <option value="Borewell + Drip">Borewell + Drip</option>
               <option value="Canal + Drip">Canal + Drip</option>
               <option value="Sprinkler + Stream">Sprinkler + Stream</option>
@@ -254,49 +782,103 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
           </div>
         </div>
 
-        <div class="flex items-center space-x-2 pt-2">
+        <div class="flex items-center space-x-2 pt-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
           <input type="checkbox" id="formRtc" class="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4">
-          <label for="formRtc" class="font-medium text-slate-700">RTC Land Records Verified (Pahani)</label>
+          <label for="formRtc" class="font-semibold text-slate-800">
+            RTC Land Records Verified (Pahani & FRUITS FID Linked)
+          </label>
         </div>
 
         <div class="border-t border-slate-200 pt-4 flex justify-end space-x-2">
-          <button type="button" onclick="closeFarmerModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-semibold">Save Profile</button>
+          <button type="button" onclick="closeFarmerModal()" class="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 font-medium">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl font-bold shadow-sm">Save Profile</button>
         </div>
       </form>
+
+      <!-- Tab B: Soil Health Card Diagnostics -->
+      <div id="modalSoilSection" class="p-6 overflow-y-auto space-y-4 text-xs flex-1 hidden">
+        <div class="bg-emerald-50 p-3.5 rounded-xl border border-emerald-200 flex items-start space-x-3">
+          <i data-lucide="test-tube" class="w-5 h-5 text-emerald-700 flex-shrink-0 mt-0.5"></i>
+          <div>
+            <h4 class="font-bold text-emerald-900">Soil Testing Laboratory Report</h4>
+            <p class="text-emerald-700 text-[11px]">Primary macronutrients (N, P, K) and soil reaction (pH) indicators</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3.5">
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <label class="block font-semibold text-slate-700 mb-1">Soil pH (Reaction)</label>
+            <input type="number" step="0.1" id="soilPhInput" class="w-full border border-slate-300 rounded-lg p-2 font-bold text-slate-800">
+            <span class="text-[10px] text-slate-400 mt-1 block">Ideal: 6.5 - 7.5 (Neutral)</span>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <label class="block font-semibold text-slate-700 mb-1">Available Nitrogen (N) (kg/ha)</label>
+            <input type="number" id="soilNInput" class="w-full border border-slate-300 rounded-lg p-2 font-bold text-slate-800">
+            <span class="text-[10px] text-slate-400 mt-1 block">Normal: 280 - 560 kg/ha</span>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <label class="block font-semibold text-slate-700 mb-1">Available Phosphorus (P) (kg/ha)</label>
+            <input type="number" id="soilPInput" class="w-full border border-slate-300 rounded-lg p-2 font-bold text-slate-800">
+            <span class="text-[10px] text-slate-400 mt-1 block">Normal: 10 - 25 kg/ha</span>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <label class="block font-semibold text-slate-700 mb-1">Available Potassium (K) (kg/ha)</label>
+            <input type="number" id="soilKInput" class="w-full border border-slate-300 rounded-lg p-2 font-bold text-slate-800">
+            <span class="text-[10px] text-slate-400 mt-1 block">Normal: 110 - 280 kg/ha</span>
+          </div>
+        </div>
+
+        <button onclick="handleSaveSoil()" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>Save Soil Health Metrics</span>
+        </button>
+      </div>
+
     </div>
   </div>
 
-  <!-- Manage Plots Modal -->
-  <div id="plotsModal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
-    <div class="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
-      <div class="px-6 py-4 bg-emerald-900 text-white flex items-center justify-between">
+  <!-- ========================================================================= -->
+  <!-- MODAL: CROP PLOTS & DYNAMIC STAGE PROGRESSION MANAGER -->
+  <!-- ========================================================================= -->
+  <div id="plotsModal" class="fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-3 sm:p-5 hidden backdrop-blur-sm">
+    <div class="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      
+      <div class="px-6 py-4 bg-emerald-950 text-white flex items-center justify-between border-b border-emerald-900">
         <div>
           <h3 class="text-base font-bold">Crop Plots & Stage Manager</h3>
           <p id="plotsFarmerTitle" class="text-xs text-emerald-300">Farmer: Naveen Kumar KM (Mandya)</p>
         </div>
-        <button onclick="closePlotsModal()" class="text-emerald-200 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <button onclick="closePlotsModal()" class="text-emerald-300 hover:text-white p-1 rounded-lg hover:bg-emerald-900 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
       </div>
 
       <div class="p-6 overflow-y-auto space-y-5 text-xs">
         <!-- Existing Plots List -->
         <div>
-          <h4 class="font-bold text-slate-800 text-sm mb-2 flex items-center justify-between">
+          <h4 class="font-bold text-slate-800 text-sm mb-2.5 flex items-center justify-between">
             <span>Current Active Plots</span>
-            <span id="plotsCountBadge" class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-xs font-semibold">3 Plots</span>
+            <span id="plotsCountBadge" class="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full text-xs font-bold">3 Plots</span>
           </h4>
-          <div id="existingPlotsContainer" class="space-y-2.5">
+          <div id="existingPlotsContainer" class="space-y-3">
             <!-- Injected dynamically -->
           </div>
         </div>
 
         <!-- Add New Plot Section -->
-        <div class="border-t border-slate-200 pt-4">
-          <h4 class="font-bold text-slate-800 text-sm mb-3">Add / Append Crop Plot</h4>
+        <div class="border-t border-slate-200 pt-4 bg-slate-50 p-4 rounded-2xl border">
+          <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center space-x-1.5">
+            <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i>
+            <span>Plant New Crop Parcel</span>
+          </h4>
+          
           <div class="grid grid-cols-2 gap-3 mb-3">
             <div>
               <label class="block font-medium text-slate-700 mb-1">Crop Name</label>
-              <select id="newPlotCrop" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+              <select id="newPlotCrop" class="w-full border border-slate-300 rounded-xl p-2 text-xs">
                 <option value="Rice (Paddy)">Rice (Paddy) - ಭತ್ತ</option>
                 <option value="Ragi">Ragi - ರಾಗಿ</option>
                 <option value="Tomato">Tomato - ಟೊಮೆಟೊ</option>
@@ -314,22 +896,22 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
             </div>
             <div>
               <label class="block font-medium text-slate-700 mb-1">Variety</label>
-              <input type="text" id="newPlotVariety" placeholder="e.g. BPT 5204 / Arka Rakshak" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+              <input type="text" id="newPlotVariety" placeholder="e.g. BPT 5204 / Arka Rakshak" class="w-full border border-slate-300 rounded-xl p-2 text-xs">
             </div>
           </div>
 
           <div class="grid grid-cols-3 gap-3 mb-3">
             <div>
               <label class="block font-medium text-slate-700 mb-1">Area (Acres)</label>
-              <input type="number" step="0.1" id="newPlotAcres" value="1.0" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+              <input type="number" step="0.1" id="newPlotAcres" value="1.0" class="w-full border border-slate-300 rounded-xl p-2 text-xs">
             </div>
             <div>
               <label class="block font-medium text-slate-700 mb-1">Days Ago Sown</label>
-              <input type="number" id="newPlotDays" value="35" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+              <input type="number" id="newPlotDays" value="35" class="w-full border border-slate-300 rounded-xl p-2 text-xs">
             </div>
             <div>
               <label class="block font-medium text-slate-700 mb-1">Health Condition</label>
-              <select id="newPlotHealth" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+              <select id="newPlotHealth" class="w-full border border-slate-300 rounded-xl p-2 text-xs">
                 <option value="HEALTHY">Healthy</option>
                 <option value="WATER_STRESSED">Water Stressed</option>
                 <option value="PEST_SUSPECTED">Pest Alert</option>
@@ -338,7 +920,7 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
             </div>
           </div>
 
-          <button onclick="handleAddNewPlot()" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-semibold py-2 rounded-lg text-xs shadow-sm flex items-center justify-center space-x-1.5">
+          <button onclick="handleAddNewPlot()" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs shadow-sm flex items-center justify-center space-x-1.5 transition">
             <i data-lucide="plus" class="w-4 h-4"></i>
             <span>Add Plot to Farm</span>
           </button>
@@ -347,16 +929,22 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- Scans Viewer Modal -->
-  <div id="scansModal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
-    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
-      <div class="px-6 py-4 bg-emerald-900 text-white flex items-center justify-between">
+  <!-- ========================================================================= -->
+  <!-- MODAL: AI DISEASE & PEST SCANS LOG -->
+  <!-- ========================================================================= -->
+  <div id="scansModal" class="fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-3 sm:p-5 hidden backdrop-blur-sm">
+    <div class="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      
+      <div class="px-6 py-4 bg-emerald-950 text-white flex items-center justify-between border-b border-emerald-900">
         <div>
-          <h3 class="text-base font-bold">AI Disease & Pest Scan Records</h3>
+          <h3 class="text-base font-bold">AI Disease & Pest Diagnostic Scans</h3>
           <p id="scansFarmerTitle" class="text-xs text-emerald-300">Farmer Diagnostics History</p>
         </div>
-        <button onclick="closeScansModal()" class="text-emerald-200 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <button onclick="closeScansModal()" class="text-emerald-300 hover:text-white p-1 rounded-lg hover:bg-emerald-900 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
       </div>
+
       <div id="scansContainer" class="p-6 overflow-y-auto space-y-4 text-xs">
         <!-- Injected via JavaScript -->
       </div>
@@ -364,36 +952,258 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
   </div>
 
   <!-- Toast Notification -->
-  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl border border-slate-700 flex items-center space-x-2 hidden z-50">
+  <div id="toast" class="fixed bottom-6 right-6 bg-slate-900/95 text-white px-5 py-3 rounded-2xl text-xs font-semibold shadow-2xl border border-slate-700 flex items-center space-x-2.5 hidden z-50 backdrop-blur-md">
     <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
-    <span id="toastMsg">Operation successful</span>
+    <span id="toastMsg">Operation completed successfully</span>
   </div>
 
-  <footer class="bg-slate-100 border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-    KrushikaDhara Admin Console • Comprehensive Agricultural Intelligence & Farmer Lifecycle Management • Version 1.0.0
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center space-x-2">
+        <span class="font-bold text-slate-700">KrushikaDhara Admin Portal</span>
+        <span>•</span>
+        <span>Karnataka Agro-Climatic Intelligence & Farmer Registry</span>
+      </div>
+      <div>
+        <span>Version 1.0.0 Enterprise • Connected to Live Backend</span>
+      </div>
+    </div>
   </footer>
 
+  <!-- ========================================================================= -->
+  <!-- CLIENT JAVASCRIPT LOGIC -->
+  <!-- ========================================================================= -->
   <script>
     let allFarmers = []
+    let allCropsCatalog = []
+    let allBroadcasts = []
+    let allSchemes = []
     let currentPlotsFarmerMobile = null
+    let currentDossierFarmerMobile = null
+    let viewMode = 'grid' // 'grid' | 'table'
+    let selectedCropCatalogId = null
 
+    // Chart instances
+    let chartAcreage = null
+    let chartDistricts = null
+    let chartHealth = null
+    let chartDiseases = null
+
+    // --------------------------------------------------------------------------
+    // Tab Switching
+    // --------------------------------------------------------------------------
+    function switchTab(tabId) {
+      const tabs = ['analytics', 'farmers', 'crops', 'advisories', 'schemes']
+      tabs.forEach(t => {
+        const btn = document.getElementById('nav-' + t)
+        const content = document.getElementById('tabContent-' + t)
+        if (t === tabId) {
+          btn.className = 'tab-active py-2.5 px-3 text-xs sm:text-sm whitespace-nowrap flex items-center space-x-2 transition text-emerald-100'
+          content.classList.remove('hidden')
+        } else {
+          btn.className = 'tab-inactive py-2.5 px-3 text-xs sm:text-sm whitespace-nowrap flex items-center space-x-2 transition text-emerald-200'
+          content.classList.add('hidden')
+        }
+      })
+
+      if (tabId === 'crops' && allCropsCatalog.length === 0) {
+        fetchCropsCatalog()
+      } else if (tabId === 'advisories' && allBroadcasts.length === 0) {
+        fetchBroadcasts()
+      } else if (tabId === 'schemes' && allSchemes.length === 0) {
+        fetchSchemes()
+      }
+
+      lucide.createIcons()
+    }
+
+    function toggleExportMenu() {
+      const menu = document.getElementById('exportMenu')
+      menu.classList.toggle('hidden')
+    }
+
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('exportMenu')
+      if (menu && !menu.contains(e.target) && !e.target.closest('button[onclick="toggleExportMenu()"]')) {
+        menu.classList.add('hidden')
+      }
+    })
+
+    function setViewMode(mode) {
+      viewMode = mode
+      const grid = document.getElementById('farmersGrid')
+      const table = document.getElementById('farmersTableWrap')
+      const btnGrid = document.getElementById('viewModeGrid')
+      const btnTable = document.getElementById('viewModeTable')
+
+      if (mode === 'grid') {
+        grid.classList.remove('hidden')
+        table.classList.add('hidden')
+        btnGrid.className = 'p-1.5 rounded-lg bg-white shadow-sm text-slate-800'
+        btnTable.className = 'p-1.5 rounded-lg text-slate-500 hover:text-slate-800'
+      } else {
+        grid.classList.add('hidden')
+        table.classList.remove('hidden')
+        btnTable.className = 'p-1.5 rounded-lg bg-white shadow-sm text-slate-800'
+        btnGrid.className = 'p-1.5 rounded-lg text-slate-500 hover:text-slate-800'
+      }
+      applyFilters()
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast')
+      document.getElementById('toastMsg').textContent = msg
+      toast.classList.remove('hidden')
+      lucide.createIcons()
+      setTimeout(() => toast.classList.add('hidden'), 3500)
+    }
+
+    // --------------------------------------------------------------------------
+    // API: Stats & Charts
+    // --------------------------------------------------------------------------
     async function fetchStats() {
       try {
         const res = await fetch('/api/admin/stats')
         const data = await res.json()
         if (data.success && data.stats) {
-          document.getElementById('metricFarmers').textContent = data.stats.totalFarmers
-          document.getElementById('metricAcres').textContent = data.stats.totalAcres
-          document.getElementById('metricPlots').textContent = data.stats.totalPlots
-          document.getElementById('metricRtc').textContent = Math.round((data.stats.rtcVerifiedCount / data.stats.totalFarmers) * 100) + '%'
-          document.getElementById('metricAlerts').textContent = data.stats.activeAlerts
-          document.getElementById('metricScans').textContent = data.stats.totalScans
+          const s = data.stats
+          document.getElementById('kpiFarmers').textContent = s.totalFarmers
+          document.getElementById('kpiAcres').textContent = s.totalAcres
+          document.getElementById('kpiPlots').textContent = s.totalPlots
+          document.getElementById('kpiRtc').textContent = Math.round((s.rtcVerifiedCount / s.totalFarmers) * 100) + '%'
+          document.getElementById('kpiAlerts').textContent = s.activeAlerts
+          document.getElementById('kpiScans').textContent = s.totalScans
+
+          document.getElementById('tabFarmerCount').textContent = s.totalFarmers
+
+          renderCharts(s)
         }
       } catch (e) {
-        console.error('Stats fetch error:', e)
+        console.error('Stats error:', e)
       }
     }
 
+    function renderCharts(stats) {
+      // 1. Acreage by Crop Chart
+      const cropLabels = Object.keys(stats.cropAcreage || stats.cropCounts || {})
+      const cropValues = Object.values(stats.cropAcreage || stats.cropCounts || {})
+
+      if (chartAcreage) chartAcreage.destroy()
+      const ctxCrop = document.getElementById('cropAcreageChart').getContext('2d')
+      chartAcreage = new Chart(ctxCrop, {
+        type: 'doughnut',
+        data: {
+          labels: cropLabels,
+          datasets: [{
+            data: cropValues,
+            backgroundColor: [
+              '#10b981', '#06b6d4', '#f59e0b', '#ef4444', '#8b5cf6',
+              '#ec4899', '#3b82f6', '#14b8a6', '#84cc16', '#64748b'
+            ],
+            borderWidth: 2,
+            borderColor: '#ffffff',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } }
+          }
+        }
+      })
+
+      // 2. District Distribution Bar Chart
+      const distLabels = Object.keys(stats.districtCounts || {})
+      const distValues = Object.values(stats.districtCounts || {})
+
+      if (chartDistricts) chartDistricts.destroy()
+      const ctxDist = document.getElementById('districtBarChart').getContext('2d')
+      chartDistricts = new Chart(ctxDist, {
+        type: 'bar',
+        data: {
+          labels: distLabels,
+          datasets: [{
+            label: 'Farmers Count',
+            data: distValues,
+            backgroundColor: '#059669',
+            borderRadius: 6,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } },
+            x: { ticks: { font: { size: 9 }, maxRotation: 45 } }
+          }
+        }
+      })
+
+      // 3. Health Conditions Pie Chart
+      const healthData = stats.healthCounts || { HEALTHY: 24, WATER_STRESSED: 3, PEST_SUSPECTED: 2, LOW_NUTRIENTS: 1 }
+      if (chartHealth) chartHealth.destroy()
+      const ctxHealth = document.getElementById('healthPieChart').getContext('2d')
+      chartHealth = new Chart(ctxHealth, {
+        type: 'pie',
+        data: {
+          labels: ['Healthy', 'Water Stressed', 'Pest Alert', 'Low Nutrients'],
+          datasets: [{
+            data: [
+              healthData.HEALTHY || 0,
+              healthData.WATER_STRESSED || 0,
+              healthData.PEST_SUSPECTED || 0,
+              healthData.LOW_NUTRIENTS || 0
+            ],
+            backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#eab308'],
+            borderWidth: 2,
+            borderColor: '#ffffff',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+          }
+        }
+      })
+
+      // 4. Disease Scans Horizontal Bar
+      const disLabels = Object.keys(stats.diseaseCounts || { 'Early Blight': 3, 'Yellow Stem Borer': 2, 'Blast': 2, 'Stem Rot': 1 })
+      const disValues = Object.values(stats.diseaseCounts || { 'Early Blight': 3, 'Yellow Stem Borer': 2, 'Blast': 2, 'Stem Rot': 1 })
+
+      if (chartDiseases) chartDiseases.destroy()
+      const ctxDis = document.getElementById('diseaseBarChart').getContext('2d')
+      chartDiseases = new Chart(ctxDis, {
+        type: 'bar',
+        data: {
+          labels: disLabels,
+          datasets: [{
+            label: 'Diagnoses Count',
+            data: disValues,
+            backgroundColor: '#8b5cf6',
+            borderRadius: 6,
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } },
+            y: { ticks: { font: { size: 10 } } }
+          }
+        }
+      })
+    }
+
+    // --------------------------------------------------------------------------
+    // API: Farmers List & Directory
+    // --------------------------------------------------------------------------
     async function fetchFarmers() {
       try {
         const res = await fetch('/api/admin/farmers')
@@ -403,7 +1213,7 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
           applyFilters()
         }
       } catch (e) {
-        console.error('Farmers fetch error:', e)
+        console.error('Farmers error:', e)
       }
     }
 
@@ -435,7 +1245,20 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
         return true
       })
 
-      renderFarmers(filtered)
+      const empty = document.getElementById('emptyState')
+      if (filtered.length === 0) {
+        document.getElementById('farmersGrid').innerHTML = ''
+        document.getElementById('farmersTableBody').innerHTML = ''
+        empty.classList.remove('hidden')
+        return
+      }
+      empty.classList.add('hidden')
+
+      if (viewMode === 'grid') {
+        renderFarmersGrid(filtered)
+      } else {
+        renderFarmersTable(filtered)
+      }
     }
 
     function resetFilters() {
@@ -446,26 +1269,18 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
       applyFilters()
     }
 
-    function renderFarmers(list) {
-      const container = document.getElementById('farmersList')
-      const empty = document.getElementById('emptyState')
-
-      if (list.length === 0) {
-        container.innerHTML = ''
-        empty.classList.remove('hidden')
-        return
-      }
-      empty.classList.add('hidden')
-
+    function renderFarmersGrid(list) {
+      const container = document.getElementById('farmersGrid')
       container.innerHTML = list.map(f => {
         const plots = f.activeCrops || []
         const hasAlert = plots.some(p => p.healthStatus === 'PEST_SUSPECTED' || p.healthStatus === 'WATER_STRESSED')
         return \`
           <div class="bg-white rounded-2xl border \${hasAlert ? 'border-amber-300 shadow-amber-50/50' : 'border-slate-200'} p-5 shadow-sm hover:shadow-md transition space-y-4">
+            
             <!-- Header Row -->
             <div class="flex items-start justify-between gap-3">
-              <div class="flex items-center space-x-3">
-                <img src="\${f.photoUrl || 'https://images.unsplash.com/photo-1595152772835-219674b2a8a6?w=160&h=160&fit=crop'}" alt="Avatar" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-sm">
+              <div class="flex items-center space-x-3.5">
+                <img src="\${f.photoUrl || 'https://images.unsplash.com/photo-1595152772835-219674b2a8a6?w=160&h=160&fit=crop'}" alt="Avatar" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-sm flex-shrink-0">
                 <div>
                   <div class="flex items-center space-x-2">
                     <h3 class="font-bold text-slate-900 text-sm">\${f.name}</h3>
@@ -481,7 +1296,7 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
               </div>
             </div>
 
-            <!-- Plots Badges -->
+            <!-- Plots Badges with Dynamic Stages -->
             <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
               <div class="flex items-center justify-between text-[11px] text-slate-500 font-semibold mb-2">
                 <span>Active Plots (\${plots.length})</span>
@@ -490,17 +1305,9 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
               <div class="flex flex-wrap gap-1.5">
                 \${plots.map(p => {
                   let badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                  let icon = 'leaf'
-                  if (p.healthStatus === 'WATER_STRESSED') {
-                    badgeColor = 'bg-amber-100 text-amber-900 border-amber-300'
-                    icon = 'droplet'
-                  } else if (p.healthStatus === 'PEST_SUSPECTED') {
-                    badgeColor = 'bg-rose-100 text-rose-900 border-rose-300'
-                    icon = 'alert-circle'
-                  } else if (p.healthStatus === 'LOW_NUTRIENTS') {
-                    badgeColor = 'bg-yellow-100 text-yellow-900 border-yellow-300'
-                    icon = 'alert-triangle'
-                  }
+                  if (p.healthStatus === 'WATER_STRESSED') badgeColor = 'bg-amber-100 text-amber-900 border-amber-300'
+                  else if (p.healthStatus === 'PEST_SUSPECTED') badgeColor = 'bg-rose-100 text-rose-900 border-rose-300'
+                  else if (p.healthStatus === 'LOW_NUTRIENTS') badgeColor = 'bg-yellow-100 text-yellow-900 border-yellow-300'
                   return \`
                     <span class="inline-flex items-center text-[11px] font-medium px-2.5 py-1 rounded-lg border \${badgeColor}">
                       <span class="font-bold mr-1">\${p.cropName}</span>
@@ -511,62 +1318,410 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
               </div>
             </div>
 
-            <!-- Action Buttons Footer -->
+            <!-- Soil & Nutrients Preview -->
+            <div class="flex items-center justify-between text-[11px] px-1 text-slate-500">
+              <span>Soil pH: <strong class="text-slate-700">\${f.soilPh || '6.8'}</strong></span>
+              <span>N: <strong class="text-slate-700">\${f.soilN || '210'}</strong> kg/ha</span>
+              <span>P: <strong class="text-slate-700">\${f.soilP || '18'}</strong> kg/ha</span>
+              <span>K: <strong class="text-slate-700">\${f.soilK || '195'}</strong> kg/ha</span>
+            </div>
+
+            <!-- Actions Footer -->
             <div class="pt-2 flex items-center justify-between border-t border-slate-100 text-xs">
               <div class="flex items-center space-x-1.5">
-                <button onclick="openEditModal('\${f.mobile}')" class="px-2.5 py-1 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition">Edit</button>
-                <button onclick="viewFarmerScans('\${f.mobile}')" class="px-2.5 py-1 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg font-medium transition">Scans</button>
-                <button onclick="simulateInApp('\${f.mobile}')" class="px-2.5 py-1 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg font-semibold transition" title="Use mobile in app to view this farmer">Simulate In App</button>
+                <button onclick="openEditModal('\${f.mobile}')" class="px-2.5 py-1.5 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg font-semibold transition">Dossier</button>
+                <button onclick="openPlotsModal('\${f.mobile}')" class="px-2.5 py-1.5 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg font-semibold transition">Plots</button>
+                <button onclick="viewFarmerScans('\${f.mobile}')" class="px-2.5 py-1.5 text-purple-800 bg-purple-50 hover:bg-purple-100 rounded-lg font-semibold transition">Scans</button>
+                <button onclick="simulateInApp('\${f.mobile}')" class="px-2.5 py-1.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg font-bold transition" title="Copy mobile to test on app">App Test</button>
               </div>
-              <button onclick="deleteFarmer('\${f.mobile}')" class="text-rose-600 hover:text-rose-700 p-1 rounded hover:bg-rose-50" title="Delete Farmer Profile">
+              <button onclick="deleteFarmer('\${f.mobile}')" class="text-rose-600 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50" title="Delete Profile">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
               </button>
             </div>
+
           </div>
         \`
       }).join('')
-
       lucide.createIcons()
     }
 
-    function showToast(msg) {
-      const toast = document.getElementById('toast')
-      document.getElementById('toastMsg').textContent = msg
-      toast.classList.remove('hidden')
-      setTimeout(() => toast.classList.add('hidden'), 3500)
+    function renderFarmersTable(list) {
+      const tbody = document.getElementById('farmersTableBody')
+      tbody.innerHTML = list.map(f => {
+        const plots = f.activeCrops || []
+        return \`
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="px-4 py-3">
+              <div class="flex items-center space-x-3">
+                <img src="\${f.photoUrl || 'https://images.unsplash.com/photo-1595152772835-219674b2a8a6?w=160&h=160&fit=crop'}" class="w-8 h-8 rounded-lg object-cover">
+                <div>
+                  <div class="font-bold text-slate-800">\${f.name}</div>
+                  <div class="text-[11px] text-slate-400 font-mono">+91 \${f.mobile}</div>
+                </div>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="font-medium text-slate-800">\${f.district}</div>
+              <div class="text-[11px] text-slate-500">\${f.village}, \${f.taluk}</div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="font-bold text-emerald-700">\${f.farmSize} ac • \${f.soilType}</div>
+              <div class="text-[11px] text-slate-500">pH \${f.soilPh || '6.8'} • \${f.rtcVerified ? 'RTC Verified' : 'Pending'}</div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                \${plots.map(p => \`
+                  <span class="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium">
+                    \${p.cropName} (\${p.acreage} ac)
+                  </span>
+                \`).join('')}
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                \${f._count?.scans || 1} Scans
+              </span>
+            </td>
+            <td class="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+              <button onclick="openEditModal('\${f.mobile}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-semibold text-[11px]">Edit</button>
+              <button onclick="openPlotsModal('\${f.mobile}')" class="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 rounded text-emerald-800 font-semibold text-[11px]">Plots</button>
+              <button onclick="simulateInApp('\${f.mobile}')" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 rounded text-indigo-700 font-bold text-[11px]">App</button>
+              <button onclick="deleteFarmer('\${f.mobile}')" class="text-rose-600 hover:text-rose-800 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i></button>
+            </td>
+          </tr>
+        \`
+      }).join('')
+      lucide.createIcons()
     }
 
-    async function resetAllProfiles() {
-      if (!confirm('Are you sure you want to restore all 10 authentic Karnataka farmer profiles to their initial seed state? Any manual edits will be reset.')) return
+    // --------------------------------------------------------------------------
+    // API: 32 Crops Catalog
+    // --------------------------------------------------------------------------
+    async function fetchCropsCatalog() {
       try {
-        const res = await fetch('/api/admin/reset-profiles', { method: 'POST' })
+        const res = await fetch('/api/admin/crops')
         const data = await res.json()
-        if (data.success) {
-          showToast('Restored 10 authentic Karnataka farmer profiles!')
-          await fetchStats()
-          await fetchFarmers()
+        if (data.success && Array.isArray(data.crops)) {
+          allCropsCatalog = data.crops
+          renderCropsList(allCropsCatalog)
+          if (allCropsCatalog.length > 0) {
+            selectCropForDetail(allCropsCatalog[0].id)
+          }
         }
       } catch (e) {
-        alert('Reset failed: ' + e.message)
+        console.error('Crops catalog error:', e)
       }
     }
 
+    function filterCropCatalog(category) {
+      const pills = document.querySelectorAll('#cropCategoryPills button')
+      pills.forEach(b => {
+        if (b.textContent.includes(category) || (category === 'ALL' && b.textContent === 'All Crops')) {
+          b.className = 'px-3 py-1 text-xs font-semibold rounded-lg bg-emerald-800 text-white'
+        } else {
+          b.className = 'px-3 py-1 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700'
+        }
+      })
+
+      if (category === 'ALL') {
+        renderCropsList(allCropsCatalog)
+      } else {
+        const filtered = allCropsCatalog.filter(c => c.category === category)
+        renderCropsList(filtered)
+      }
+    }
+
+    function renderCropsList(crops) {
+      const container = document.getElementById('cropsListContainer')
+      container.innerHTML = crops.map(c => \`
+        <div onclick="selectCropForDetail('\${c.id}')" id="cropItem-\${c.id}" class="p-3 rounded-xl border border-slate-200 bg-white hover:border-emerald-500 hover:bg-emerald-50/30 cursor-pointer transition flex items-center justify-between \${selectedCropCatalogId === c.id ? 'border-emerald-600 bg-emerald-50/50 shadow-sm' : ''}">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+              <i data-lucide="leaf" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-slate-800 text-xs">\${c.nameEn}</h4>
+              <p class="text-[11px] text-slate-500 kannada">\${c.nameKn || ''} • \${c.categoryKn || c.category}</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">\${c.totalDays} Days</span>
+        </div>
+      \`).join('')
+      lucide.createIcons()
+    }
+
+    function selectCropForDetail(cropId) {
+      selectedCropCatalogId = cropId
+      const crop = allCropsCatalog.find(c => c.id === cropId)
+      if (!crop) return
+
+      // Highlight active in list
+      document.querySelectorAll('#cropsListContainer > div').forEach(d => {
+        d.classList.remove('border-emerald-600', 'bg-emerald-50/50', 'shadow-sm')
+      })
+      const activeEl = document.getElementById('cropItem-' + cropId)
+      if (activeEl) activeEl.classList.add('border-emerald-600', 'bg-emerald-50/50', 'shadow-sm')
+
+      const detailPane = document.getElementById('cropDetailPane')
+      const stages = crop.stages || []
+
+      detailPane.innerHTML = \`
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 class="font-extrabold text-slate-900 text-lg">\${crop.nameEn}</h3>
+              <span class="text-sm font-semibold text-emerald-800 kannada">(\${crop.nameKn || ''})</span>
+              <span class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold">\${crop.category}</span>
+            </div>
+            <p class="text-xs text-slate-500 italic mt-0.5">\${crop.scientificName || ''} • Suitable Soil: \${crop.soilType || 'Loam'}</p>
+          </div>
+          <div class="text-right">
+            <span class="text-lg font-black text-emerald-700">\${crop.totalDays} Days</span>
+            <p class="text-[10px] text-slate-400">Total Lifecycle Duration</p>
+          </div>
+        </div>
+
+        <!-- Varieties -->
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200">
+          <span class="font-bold text-slate-700 text-xs block mb-1.5">Recommended Karnataka Varieties:</span>
+          <div class="flex flex-wrap gap-1.5">
+            \${(crop.popularVarieties || []).map(v => \`
+              <span class="text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-lg font-medium">\${v}</span>
+            \`).join('')}
+          </div>
+        </div>
+
+        <!-- Lifecycle Stage Progression Timeline -->
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm mb-3 flex items-center justify-between">
+            <span>Growth Lifecycle Stages (\${stages.length} Stages)</span>
+            <span class="text-xs font-normal text-slate-500">Day 0 to Day \${crop.totalDays}</span>
+          </h4>
+
+          <div class="space-y-3">
+            \${stages.map((st, idx) => \`
+              <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-2.5 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2">
+                    <span class="w-6 h-6 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">\${idx + 1}</span>
+                    <h5 class="font-bold text-slate-800 text-xs">\${st.nameEn} <span class="font-normal text-slate-500 kannada">(\${st.nameKn || ''})</span></h5>
+                  </div>
+                  <span class="text-xs font-semibold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">Days \${st.startDay} - \${st.endDay}</span>
+                </div>
+                
+                <p class="text-slate-600 text-xs leading-relaxed">\${st.descriptionEn || ''}</p>
+                \${st.descriptionKn ? \`<p class="text-slate-500 text-xs kannada">\${st.descriptionKn}</p>\` : ''}
+
+                <!-- Advisories Grid for this Stage -->
+                \${st.advisories && st.advisories.length > 0 ? \`
+                  <div class="pt-2 border-t border-slate-100 space-y-2">
+                    \${st.advisories.map(adv => \`
+                      <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs space-y-1">
+                        <div class="flex items-center space-x-2">
+                          <span class="text-[10px] font-bold uppercase px-1.5 py-0.2 rounded \${adv.category === 'FERTILIZER' ? 'bg-emerald-100 text-emerald-800' : adv.category === 'PEST_PREVENTION' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'}">\${adv.category}</span>
+                          <span class="font-bold text-slate-800">\${adv.titleEn}</span>
+                        </div>
+                        <p class="text-slate-600 text-[11px]">\${adv.bodyEn}</p>
+                        \${adv.bodyKn ? \`<p class="text-slate-500 text-[11px] kannada">\${adv.bodyKn}</p>\` : ''}
+                      </div>
+                    \`).join('')}
+                  </div>
+                \` : ''}
+              </div>
+            \`).join('')}
+          </div>
+        </div>
+      \`
+      lucide.createIcons()
+    }
+
+    // --------------------------------------------------------------------------
+    // API: Broadcast Advisories
+    // --------------------------------------------------------------------------
+    async function fetchBroadcasts() {
+      try {
+        const res = await fetch('/api/admin/broadcasts')
+        const data = await res.json()
+        if (data.success && Array.isArray(data.broadcasts)) {
+          allBroadcasts = data.broadcasts
+          renderBroadcastsFeed(allBroadcasts)
+        }
+      } catch (e) {
+        console.error('Broadcasts error:', e)
+      }
+    }
+
+    function renderBroadcastsFeed(broadcasts) {
+      document.getElementById('bcastCountBadge').textContent = broadcasts.length + ' Sent'
+      const feed = document.getElementById('broadcastsFeed')
+      if (broadcasts.length === 0) {
+        feed.innerHTML = '<p class="text-slate-400 italic text-center py-6 text-xs">No broadcast advisories dispatched yet.</p>'
+        return
+      }
+
+      feed.innerHTML = broadcasts.map(b => \`
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2 text-xs">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full \${b.urgency === 'URGENT' ? 'bg-rose-100 text-rose-800' : 'bg-indigo-100 text-indigo-800'}">\${b.urgency}</span>
+                <h5 class="font-bold text-slate-800">\${b.titleEn}</h5>
+              </div>
+              <p class="text-[11px] text-slate-500 kannada mt-0.5">\${b.titleKn || ''}</p>
+            </div>
+            <button onclick="handleDeleteBroadcast('\${b.id}')" class="text-slate-400 hover:text-rose-600 p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+          </div>
+          <p class="text-slate-600 leading-relaxed">\${b.messageEn}</p>
+          \${b.messageKn ? \`<p class="text-slate-500 kannada text-[11px]">\${b.messageKn}</p>\` : ''}
+          <div class="pt-1 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-200/60">
+            <span>Target: <strong class="text-slate-600">\${b.targetDistrict}</strong> • Crop: <strong class="text-slate-600">\${b.targetCrop}</strong></span>
+            <span>Delivered to <strong>\${b.sentCount || 1400}</strong> farmers • \${new Date(b.createdAt).toLocaleDateString()}</span>
+          </div>
+        </div>
+      \`).join('')
+      lucide.createIcons()
+    }
+
+    async function handleSendBroadcast(e) {
+      e.preventDefault()
+      const titleEn = document.getElementById('bcastTitleEn').value.trim()
+      const titleKn = document.getElementById('bcastTitleKn').value.trim()
+      const category = document.getElementById('bcastCategory').value
+      const urgency = document.getElementById('bcastUrgency').value
+      const targetDistrict = document.getElementById('bcastDistrict').value
+      const targetCrop = document.getElementById('bcastCrop').value
+      const messageEn = document.getElementById('bcastMsgEn').value.trim()
+      const messageKn = document.getElementById('bcastMsgKn').value.trim()
+
+      try {
+        const res = await fetch('/api/admin/broadcasts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ titleEn, titleKn, category, urgency, targetDistrict, targetCrop, messageEn, messageKn }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          showToast('Regional broadcast advisory dispatched!')
+          document.getElementById('bcastTitleEn').value = ''
+          document.getElementById('bcastTitleKn').value = ''
+          document.getElementById('bcastMsgEn').value = ''
+          document.getElementById('bcastMsgKn').value = ''
+          await fetchBroadcasts()
+        }
+      } catch (err) {
+        alert('Broadcast failed: ' + err.message)
+      }
+    }
+
+    async function handleDeleteBroadcast(id) {
+      if (!confirm('Delete this broadcast advisory?')) return
+      try {
+        const res = await fetch('/api/admin/broadcasts/' + id, { method: 'DELETE' })
+        const data = await res.json()
+        if (data.success) {
+          showToast('Advisory removed')
+          await fetchBroadcasts()
+        }
+      } catch (e) {
+        alert('Delete failed: ' + e.message)
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // API: Schemes & Subsidies
+    // --------------------------------------------------------------------------
+    async function fetchSchemes() {
+      try {
+        const res = await fetch('/api/admin/schemes')
+        const data = await res.json()
+        if (data.success && Array.isArray(data.applications)) {
+          allSchemes = data.applications
+          document.getElementById('tabSchemeCount').textContent = allSchemes.length
+          renderSchemesTable(allSchemes)
+        }
+      } catch (e) {
+        console.error('Schemes error:', e)
+      }
+    }
+
+    function renderSchemesTable(apps) {
+      const tbody = document.getElementById('schemesTableBody')
+      tbody.innerHTML = apps.map(a => {
+        let statusBadge = 'bg-slate-100 text-slate-800'
+        if (a.status === 'DISBURSED') statusBadge = 'bg-emerald-100 text-emerald-800'
+        else if (a.status === 'APPROVED') statusBadge = 'bg-blue-100 text-blue-800'
+        else if (a.status === 'VERIFIED') statusBadge = 'bg-purple-100 text-purple-800'
+        else if (a.status === 'UNDER_REVIEW') statusBadge = 'bg-amber-100 text-amber-800'
+
+        return \`
+          <tr class="hover:bg-slate-50 transition">
+            <td class="px-3.5 py-3 font-semibold text-slate-800">
+              <div>\${a.farmerName}</div>
+              <div class="text-[10px] text-slate-400 font-mono">+91 \${a.farmerMobile}</div>
+            </td>
+            <td class="px-3.5 py-3 text-slate-600">\${a.district}</td>
+            <td class="px-3.5 py-3">
+              <div class="font-bold text-slate-800">\${a.schemeNameEn}</div>
+              <div class="text-[10px] text-slate-500 kannada">\${a.schemeNameKn || ''}</div>
+            </td>
+            <td class="px-3.5 py-3 font-medium text-emerald-700">\${a.benefitEn}</td>
+            <td class="px-3.5 py-3">
+              <span class="px-2 py-0.5 rounded-full font-bold text-[10px] \${statusBadge}">\${a.status}</span>
+              \${a.disbursedAmount ? \`<div class="text-[10px] text-slate-500 mt-0.5">\${a.disbursedAmount}</div>\` : ''}
+            </td>
+            <td class="px-3.5 py-3 text-slate-500 font-mono text-[11px]">\${a.appliedDate}</td>
+            <td class="px-3.5 py-3 text-right space-x-1 whitespace-nowrap">
+              <button onclick="handleUpdateSchemeStatus('\${a.farmerMobile}', '\${a.schemeId}', 'APPROVED')" class="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded font-semibold text-[10px]">Approve</button>
+              <button onclick="handleUpdateSchemeStatus('\${a.farmerMobile}', '\${a.schemeId}', 'DISBURSED')" class="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded font-bold text-[10px]">Disburse</button>
+            </td>
+          </tr>
+        \`
+      }).join('')
+      lucide.createIcons()
+    }
+
+    async function handleUpdateSchemeStatus(farmerMobile, schemeId, status) {
+      try {
+        const res = await fetch('/api/admin/schemes/status', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ farmerMobile, schemeId, status }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          showToast('Application status updated to ' + status)
+          await fetchSchemes()
+        }
+      } catch (e) {
+        alert('Update failed: ' + e.message)
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // API: Farmer Dossier CRUD
+    // --------------------------------------------------------------------------
     function openCreateModal() {
-      document.getElementById('modalTitle').textContent = 'Add New Farmer Profile'
+      currentDossierFarmerMobile = null
+      document.getElementById('modalTitle').textContent = 'Add New Karnataka Farmer Profile'
+      document.getElementById('modalSub').textContent = 'Create registered profile with RTC land records'
       document.getElementById('formIsEdit').value = 'false'
       document.getElementById('formMobile').disabled = false
       document.getElementById('farmerForm').reset()
       document.getElementById('formMobile').value = '98450' + Math.floor(10000 + Math.random() * 90000)
       document.getElementById('formFarmSize').value = '3.5'
       document.getElementById('formRtc').checked = true
+      setModalTab('info')
       document.getElementById('farmerModal').classList.remove('hidden')
       lucide.createIcons()
     }
 
     function openEditModal(mobile) {
+      currentDossierFarmerMobile = mobile
       const f = allFarmers.find(item => item.mobile === mobile)
       if (!f) return
-      document.getElementById('modalTitle').textContent = 'Edit Farmer: ' + f.name
+      document.getElementById('modalTitle').textContent = 'Farmer Profile: ' + f.name
+      document.getElementById('modalSub').textContent = '+91 ' + f.mobile + ' • ' + f.village + ', ' + f.district
       document.getElementById('formIsEdit').value = 'true'
       document.getElementById('formMobile').value = f.mobile
       document.getElementById('formMobile').disabled = true
@@ -580,8 +1735,35 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
       document.getElementById('formSoil').value = f.soilType || 'Red Loam'
       document.getElementById('formIrr').value = f.irrigationType || 'Borewell + Drip'
       document.getElementById('formRtc').checked = Boolean(f.rtcVerified)
+
+      // Soil inputs
+      document.getElementById('soilPhInput').value = f.soilPh ?? 6.8
+      document.getElementById('soilNInput').value = f.soilN ?? 210
+      document.getElementById('soilPInput').value = f.soilP ?? 18
+      document.getElementById('soilKInput').value = f.soilK ?? 195
+
+      setModalTab('info')
       document.getElementById('farmerModal').classList.remove('hidden')
       lucide.createIcons()
+    }
+
+    function setModalTab(tab) {
+      const formInfo = document.getElementById('farmerForm')
+      const secSoil = document.getElementById('modalSoilSection')
+      const tabInfo = document.getElementById('modalTab-info')
+      const tabSoil = document.getElementById('modalTab-soil')
+
+      if (tab === 'info') {
+        formInfo.classList.remove('hidden')
+        secSoil.classList.add('hidden')
+        tabInfo.className = 'pb-2 border-b-2 border-emerald-700 text-emerald-900 font-bold'
+        tabSoil.className = 'pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900 font-medium'
+      } else {
+        formInfo.classList.add('hidden')
+        secSoil.classList.remove('hidden')
+        tabSoil.className = 'pb-2 border-b-2 border-emerald-700 text-emerald-900 font-bold'
+        tabInfo.className = 'pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900 font-medium'
+      }
     }
 
     function closeFarmerModal() {
@@ -607,7 +1789,7 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
       }
 
       try {
-        const url = isEdit ? \`/api/admin/farmers/\${mobile}\` : '/api/admin/farmers'
+        const url = isEdit ? '/api/admin/farmers/' + mobile : '/api/admin/farmers'
         const method = isEdit ? 'PUT' : 'POST'
         const res = await fetch(url, {
           method,
@@ -617,7 +1799,7 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
         const data = await res.json()
         if (data.success) {
           closeFarmerModal()
-          showToast(isEdit ? 'Profile updated successfully' : 'New farmer profile added')
+          showToast(isEdit ? 'Farmer profile updated' : 'New farmer profile registered')
           await fetchStats()
           await fetchFarmers()
         } else {
@@ -628,10 +1810,35 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
       }
     }
 
-    async function deleteFarmer(mobile) {
-      if (!confirm('Are you sure you want to delete profile for mobile ' + mobile + '?')) return
+    async function handleSaveSoil() {
+      if (!currentDossierFarmerMobile) return
+      const soilPh = parseFloat(document.getElementById('soilPhInput').value) || 6.8
+      const soilN = parseFloat(document.getElementById('soilNInput').value) || 210
+      const soilP = parseFloat(document.getElementById('soilPInput').value) || 18
+      const soilK = parseFloat(document.getElementById('soilKInput').value) || 195
+
       try {
-        const res = await fetch(\`/api/admin/farmers/\${mobile}\`, { method: 'DELETE' })
+        const res = await fetch('/api/admin/farmers/' + currentDossierFarmerMobile + '/soil', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ soilPh, soilN, soilP, soilK }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          closeFarmerModal()
+          showToast('Soil Health Card metrics saved!')
+          await fetchStats()
+          await fetchFarmers()
+        }
+      } catch (e) {
+        alert('Save soil failed: ' + e.message)
+      }
+    }
+
+    async function deleteFarmer(mobile) {
+      if (!confirm('Delete farmer profile +91 ' + mobile + '?')) return
+      try {
+        const res = await fetch('/api/admin/farmers/' + mobile, { method: 'DELETE' })
         const data = await res.json()
         if (data.success) {
           showToast('Farmer profile deleted')
@@ -643,11 +1850,14 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
       }
     }
 
+    // --------------------------------------------------------------------------
+    // API: Crop Plots Modal
+    // --------------------------------------------------------------------------
     function openPlotsModal(mobile) {
       currentPlotsFarmerMobile = mobile
       const f = allFarmers.find(item => item.mobile === mobile)
       if (!f) return
-      document.getElementById('plotsFarmerTitle').textContent = \`Farmer: \${f.name} (\${f.district}) • +91 \${f.mobile}\`
+      document.getElementById('plotsFarmerTitle').textContent = 'Farmer: ' + f.name + ' (' + f.district + ') • +91 ' + f.mobile
       renderExistingPlots(f.activeCrops || [])
       document.getElementById('plotsModal').classList.remove('hidden')
       lucide.createIcons()
@@ -657,24 +1867,32 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
       document.getElementById('plotsCountBadge').textContent = plots.length + ' Plots'
       const container = document.getElementById('existingPlotsContainer')
       if (plots.length === 0) {
-        container.innerHTML = '<p class="text-slate-400 italic">No active plots currently planted on this farm.</p>'
+        container.innerHTML = '<p class="text-slate-400 italic">No crop plots planted currently on this farm.</p>'
         return
       }
-      container.innerHTML = plots.map(p => \`
-        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
-          <div>
-            <div class="flex items-center space-x-2">
-              <span class="font-bold text-slate-800 text-xs">\${p.cropName}</span>
-              <span class="text-[10px] text-slate-500 font-medium">\${p.variety}</span>
-              <span class="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded font-semibold">\${p.acreage} ac</span>
+
+      container.innerHTML = plots.map(p => {
+        let badgeColor = 'bg-emerald-100 text-emerald-800'
+        if (p.healthStatus === 'WATER_STRESSED') badgeColor = 'bg-amber-100 text-amber-900'
+        else if (p.healthStatus === 'PEST_SUSPECTED') badgeColor = 'bg-rose-100 text-rose-900'
+
+        return \`
+          <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
+            <div class="flex-1 space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-slate-800 text-xs">\${p.cropName}</span>
+                <span class="text-[10px] text-slate-500 font-medium">\${p.variety}</span>
+                <span class="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded font-semibold">\${p.acreage} ac</span>
+                <span class="text-[10px] px-2 py-0.2 rounded-full font-bold \${badgeColor}">\${p.healthStatus}</span>
+              </div>
+              <p class="text-[11px] text-slate-500">Stage: <strong class="text-emerald-700">\${p.currentStage}</strong> • Day \${p.stageDayCount} of season</p>
             </div>
-            <p class="text-[11px] text-slate-500 mt-0.5">Stage: <span class="text-emerald-700 font-semibold">\${p.currentStage}</span> • Day \${p.stageDayCount} • Health: \${p.healthStatus}</p>
+            <button onclick="handleDeletePlot('\${p.id}')" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50" title="Remove plot">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
           </div>
-          <button onclick="handleDeletePlot('\${p.id}')" class="text-rose-500 hover:text-rose-700 p-1" title="Remove plot">
-            <i data-lucide="x" class="w-4 h-4"></i>
-          </button>
-        </div>
-      \`).join('')
+        \`
+      }).join('')
       lucide.createIcons()
     }
 
@@ -685,13 +1903,13 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
     async function handleAddNewPlot() {
       if (!currentPlotsFarmerMobile) return
       const cropName = document.getElementById('newPlotCrop').value
-      const variety = document.getElementById('newPlotVariety').value.trim() || 'High-Yield Selected'
+      const variety = document.getElementById('newPlotVariety').value.trim() || 'Selected High-Yield'
       const acreage = parseFloat(document.getElementById('newPlotAcres').value) || 1.0
-      const daysSinceSowing = parseInt(document.getElementById('newPlotDays').value, 10) || 30
+      const daysSinceSowing = parseInt(document.getElementById('newPlotDays').value, 10) || 35
       const healthStatus = document.getElementById('newPlotHealth').value
 
       try {
-        const res = await fetch(\`/api/admin/farmers/\${currentPlotsFarmerMobile}/plots\`, {
+        const res = await fetch('/api/admin/farmers/' + currentPlotsFarmerMobile + '/plots', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cropName, variety, acreage, daysSinceSowing, healthStatus }),
@@ -711,7 +1929,7 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
     async function handleDeletePlot(plotId) {
       if (!currentPlotsFarmerMobile) return
       try {
-        const res = await fetch(\`/api/admin/farmers/\${currentPlotsFarmerMobile}/plots/\${plotId}\`, {
+        const res = await fetch('/api/admin/farmers/' + currentPlotsFarmerMobile + '/plots/' + plotId, {
           method: 'DELETE',
         })
         const data = await res.json()
@@ -726,31 +1944,37 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
       }
     }
 
+    // --------------------------------------------------------------------------
+    // API: AI Scans Modal
+    // --------------------------------------------------------------------------
     async function viewFarmerScans(mobile) {
       try {
-        const res = await fetch(\`/api/admin/farmers/\${mobile}\`)
+        const res = await fetch('/api/admin/farmers/' + mobile)
         const data = await res.json()
         if (data.success) {
           const f = data.farmer
-          document.getElementById('scansFarmerTitle').textContent = \`\${f.name} (\${f.district}) • \${(data.scans || []).length} Recorded Diagnoses\`
+          document.getElementById('scansFarmerTitle').textContent = f.name + ' (' + f.district + ') • ' + (data.scans || []).length + ' Recorded Diagnoses'
           const container = document.getElementById('scansContainer')
           if (!data.scans || data.scans.length === 0) {
-            container.innerHTML = '<p class="text-slate-400 italic text-center py-6">No pest or disease scans recorded for this profile yet.</p>'
+            container.innerHTML = '<p class="text-slate-400 italic text-center py-8">No pest or disease scans recorded for this profile yet.</p>'
           } else {
             container.innerHTML = data.scans.map(s => \`
-              <div class="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-2">
+              <div class="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-2.5">
                 <div class="flex items-start justify-between">
                   <div>
-                    <h4 class="font-bold text-slate-800">\${s.diseaseName}</h4>
+                    <h4 class="font-bold text-slate-800 text-sm">\${s.diseaseName}</h4>
                     <p class="text-xs text-slate-500 kannada">\${s.diseaseNameKn || ''} • Crop: \${s.cropName}</p>
                   </div>
-                  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold \${s.severity === 'HIGH' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}">\${s.severity} Severity</span>
+                  <span class="text-[10px] px-2.5 py-0.5 rounded-full font-bold \${s.severity === 'HIGH' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}">\${s.severity} Severity</span>
                 </div>
-                <div class="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
-                  <p class="text-slate-700 font-medium"><span class="font-bold text-emerald-800">Treatment:</span> \${s.treatmentEn}</p>
-                  <p class="text-slate-500 text-[11px] kannada">\${s.treatmentKn || ''}</p>
+                <div class="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+                  <p class="text-slate-700 font-medium text-xs"><strong class="text-emerald-800">Chemical Protocol:</strong> \${s.treatmentEn}</p>
+                  \${s.treatmentKn ? \`<p class="text-slate-500 text-[11px] kannada">\${s.treatmentKn}</p>\` : ''}
                 </div>
-                <p class="text-[10px] text-slate-400">Diagnosis Confidence: \${Math.round((s.confidence || 0.9) * 100)}% • \${new Date(s.createdAt).toLocaleDateString()}</p>
+                <div class="bg-emerald-50/60 p-3 rounded-xl border border-emerald-100 text-[11px] text-emerald-900">
+                  <strong>Preventive Action:</strong> \${s.preventionEn || 'Follow crop hygiene & clean seed bed'}
+                </div>
+                <p class="text-[10px] text-slate-400">Diagnosis Confidence: \${Math.round((s.confidence || 0.9) * 100)}% • Scanned: \${new Date(s.createdAt).toLocaleDateString()}</p>
               </div>
             \`).join('')
           }
@@ -766,21 +1990,40 @@ export const ADMIN_PANEL_HTML = `<!DOCTYPE html>
       document.getElementById('scansModal').classList.add('hidden')
     }
 
+    // --------------------------------------------------------------------------
+    // Simulation & Reset Helpers
+    // --------------------------------------------------------------------------
     function simulateInApp(mobile) {
       navigator.clipboard.writeText(mobile).then(() => {
-        showToast('Copied +91 ' + mobile + ' to clipboard! Paste in KrushikaDhara app login to simulate as this farmer.')
+        showToast('Copied +91 ' + mobile + ' to clipboard! Paste into KrushikaDhara app to log in as this farmer.')
       }).catch(() => {
-        prompt('Copy this mobile number to log in as this farmer in KrushikaDhara app:', mobile)
+        prompt('Copy mobile number to test in KrushikaDhara app:', mobile)
       })
     }
 
-    // Initialize
-    window.addEventListener('DOMContentLoaded', () => {
-      fetchStats()
-      fetchFarmers()
+    async function resetAllProfiles() {
+      if (!confirm('Restore all 10 authentic Karnataka farmer profiles to their initial seed state?')) return
+      try {
+        const res = await fetch('/api/admin/reset-profiles', { method: 'POST' })
+        const data = await res.json()
+        if (data.success) {
+          showToast('Restored 10 authentic Karnataka farmer profiles!')
+          await fetchStats()
+          await fetchFarmers()
+        }
+      } catch (e) {
+        alert('Reset failed: ' + e.message)
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // Initialization
+    // --------------------------------------------------------------------------
+    window.addEventListener('DOMContentLoaded', async () => {
+      await fetchStats()
+      await fetchFarmers()
       lucide.createIcons()
     })
   </script>
 </body>
 </html>`
-

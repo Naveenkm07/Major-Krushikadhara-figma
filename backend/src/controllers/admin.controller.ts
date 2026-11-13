@@ -12,6 +12,12 @@ import {
   getFallbackScans,
   getFallbackTips,
   normalizeFallbackMobile,
+  updateFarmerSoil,
+  getAllBroadcastAdvisories,
+  addBroadcastAdvisory,
+  deleteBroadcastAdvisory,
+  getAllSchemeApplications,
+  updateSchemeApplicationStatus,
 } from "../services/farmerFallback.service.js"
 import { CROPS_CATALOG } from "../data/cropCalendarCatalog.js"
 
@@ -207,12 +213,171 @@ export async function getCropsListHandler(_req: Request, res: Response) {
         id: c.id,
         nameEn: c.nameEn,
         nameKn: c.nameKn,
+        scientificName: c.scientificName,
         category: c.category,
+        categoryKn: c.categoryKn,
+        totalDays: c.totalDays,
+        isPerennial: Boolean(c.isPerennial),
         popularVarieties: c.popularVarieties,
+        seasons: c.seasons,
+        soilType: c.soilType,
+        soilTypeKn: c.soilTypeKn,
+        iconName: c.iconName,
+        stages: c.stages,
       })),
     })
   } catch (error: any) {
     res.status(500).json({ success: false, error: error?.message || "Failed to fetch crops list" })
+  }
+}
+
+export async function updateSoilHandler(req: Request, res: Response) {
+  try {
+    const mobile = normalizeFallbackMobile(req.params.mobile)
+    const { soilN, soilP, soilK, soilPh, soilType } = req.body
+    const updated = updateFarmerSoil(mobile, { soilN, soilP, soilK, soilPh, soilType })
+    res.json({ success: true, farmer: updated })
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || "Failed to update soil diagnostics" })
+  }
+}
+
+export async function exportFarmersHandler(req: Request, res: Response) {
+  try {
+    const format = (req.query.format as string) || "csv"
+    const farmers = getAllFallbackFarmers()
+
+    if (format === "json") {
+      res.setHeader("Content-Type", "application/json")
+      res.setHeader("Content-Disposition", 'attachment; filename="krushikadhara-farmers-export.json"')
+      res.send(JSON.stringify(farmers, null, 2))
+      return
+    }
+
+    // CSV format
+    const headers = [
+      "Mobile",
+      "Name",
+      "Name_Kannada",
+      "District",
+      "Taluk",
+      "Village",
+      "FarmSize_Acres",
+      "SoilType",
+      "Soil_pH",
+      "Soil_N",
+      "Soil_P",
+      "Soil_K",
+      "Irrigation",
+      "RTC_Verified",
+      "Active_Plots_Count",
+      "Crops_Planted",
+      "Health_Alerts",
+    ]
+
+    const rows = farmers.map((f) => {
+      const plots = f.activeCrops || []
+      const cropList = plots.map((p) => `${p.cropName} (${p.acreage} ac)`).join("; ")
+      const alerts = plots
+        .filter((p) => p.healthStatus !== "HEALTHY")
+        .map((p) => `${p.cropName}: ${p.healthStatus}`)
+        .join("; ")
+
+      return [
+        `"${f.mobile}"`,
+        `"${(f.name || "").replace(/"/g, '""')}"`,
+        `"${(f.nameKn || "").replace(/"/g, '""')}"`,
+        `"${f.district || ""}"`,
+        `"${f.taluk || ""}"`,
+        `"${f.village || ""}"`,
+        f.farmSize || 0,
+        `"${f.soilType || ""}"`,
+        f.soilPh ?? "N/A",
+        f.soilN ?? "N/A",
+        f.soilP ?? "N/A",
+        f.soilK ?? "N/A",
+        `"${f.irrigationType || ""}"`,
+        f.rtcVerified ? "YES" : "NO",
+        plots.length,
+        `"${cropList.replace(/"/g, '""')}"`,
+        `"${alerts.replace(/"/g, '""')}"`,
+      ].join(",")
+    })
+
+    const csvContent = [headers.join(","), ...rows].join("\r\n")
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8")
+    res.setHeader("Content-Disposition", 'attachment; filename="krushikadhara-farmers-export.csv"')
+    res.send("\uFEFF" + csvContent) // UTF-8 BOM for Excel Kannada font support
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || "Failed to export farmers" })
+  }
+}
+
+export async function getBroadcastsHandler(_req: Request, res: Response) {
+  try {
+    const broadcasts = getAllBroadcastAdvisories()
+    res.json({ success: true, broadcasts })
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || "Failed to fetch broadcasts" })
+  }
+}
+
+export async function addBroadcastHandler(req: Request, res: Response) {
+  try {
+    const { titleEn, titleKn, category, targetDistrict, targetCrop, urgency, messageEn, messageKn } = req.body
+    if (!titleEn || !messageEn) {
+      res.status(400).json({ success: false, error: "Title and Message are required" })
+      return
+    }
+
+    const created = addBroadcastAdvisory({
+      titleEn,
+      titleKn: titleKn || titleEn,
+      category: category || "WEATHER_ALERT",
+      targetDistrict: targetDistrict || "ALL",
+      targetCrop: targetCrop || "ALL",
+      urgency: urgency || "MODERATE",
+      messageEn,
+      messageKn: messageKn || messageEn,
+    })
+
+    res.status(201).json({ success: true, broadcast: created })
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || "Failed to create broadcast advisory" })
+  }
+}
+
+export async function deleteBroadcastHandler(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const deleted = deleteBroadcastAdvisory(id)
+    res.json({ success: true, deleted, id })
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || "Failed to delete broadcast" })
+  }
+}
+
+export async function getSchemesOverviewHandler(_req: Request, res: Response) {
+  try {
+    const applications = getAllSchemeApplications()
+    res.json({ success: true, applications })
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || "Failed to fetch schemes applications" })
+  }
+}
+
+export async function updateSchemeStatusHandler(req: Request, res: Response) {
+  try {
+    const { farmerMobile, schemeId, status, disbursedAmount } = req.body
+    if (!farmerMobile || !schemeId || !status) {
+      res.status(400).json({ success: false, error: "farmerMobile, schemeId and status are required" })
+      return
+    }
+    const updated = updateSchemeApplicationStatus(farmerMobile, schemeId, status, disbursedAmount)
+    res.json({ success: true, updated })
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || "Failed to update scheme status" })
   }
 }
 
