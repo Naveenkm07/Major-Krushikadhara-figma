@@ -56,16 +56,17 @@ async function findOrCreateFarmerWithCrop(mobile: string, preferredFieldId?: str
       })
 
       if (!farmer) {
+        const fb = getOrCreateFallbackFarmer(mobile)
         farmer = await prisma.farmer.create({
           data: {
             mobile,
-            name: "Naveen Kumar KM",
-            district: "Mandya",
-            state: "Karnataka",
-            taluk: "Pandavapura",
-            village: "Channasandra",
-            farmSize: 4.2,
-            experienceYears: 6,
+            name: fb.name,
+            district: fb.district,
+            state: fb.state || "Karnataka",
+            taluk: fb.taluk,
+            village: fb.village,
+            farmSize: Number(fb.farmSize) || 4.2,
+            experienceYears: Number(fb.experienceYears) || 6,
           },
           include: {
             activeCrops: true,

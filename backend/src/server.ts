@@ -17,11 +17,13 @@ import authRoutes from "./routes/auth.routes.js"
 import insightsRoutes from "./routes/insights.routes.js"
 import equipmentRoutes from "./routes/equipment.routes.js"
 import insuranceRoutes from "./routes/insurance.routes.js"
+import adminRoutes from "./routes/admin.routes.js"
 import {
   DELETE_ACCOUNT_HTML,
   PRIVACY_POLICY_HTML,
   TERMS_OF_SERVICE_HTML,
 } from "./utils/legalPages.js"
+import { ADMIN_PANEL_HTML } from "./utils/adminPanelHtml.js"
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -72,6 +74,7 @@ app.get("/api", (_req: Request, res: Response) => {
       "/api/insights",
       "/api/equipment",
       "/api/insurance",
+      "/api/admin",
     ],
     timestamp: new Date().toISOString(),
   })
@@ -87,6 +90,10 @@ app.get("/terms", (_req: Request, res: Response) => {
 
 app.get("/delete-account", (_req: Request, res: Response) => {
   res.type("html").send(DELETE_ACCOUNT_HTML)
+})
+
+app.get("/admin", (_req: Request, res: Response) => {
+  res.type("html").send(ADMIN_PANEL_HTML)
 })
 
 app.get("/api/health", (_req: Request, res: Response) => {
@@ -110,6 +117,7 @@ app.use("/api/auth", authRoutes)
 app.use("/api/insights", insightsRoutes)
 app.use("/api/equipment", equipmentRoutes)
 app.use("/api/insurance", insuranceRoutes)
+app.use("/api/admin", adminRoutes)
 
 // Global JSON error handler (ensures multer/upload and runtime errors return JSON instead of HTML)
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -10,10 +10,11 @@ import {
   Alert,
   Share,
   ActivityIndicator,
+  Modal,
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLang, fmt } from "../i18n"
-import { useProfile } from "../profile"
+import { useProfile, DEMO_FARMERS_LIST } from "../profile"
 import { useNav } from "../nav"
 import { clearAuthToken, maskPhone } from "../auth"
 import {
@@ -49,6 +50,8 @@ import {
   CheckCircle2,
   Phone,
   BellRing,
+  Users,
+  X,
 } from "lucide-react-native"
 
 let ImagePicker: any = null
@@ -69,7 +72,7 @@ type Row = {
 
 export default function ProfileScreen({ onLogout }: { onLogout: () => void }) {
   const { t, lang } = useLang()
-  const { profile, scansCount, uploadAvatar } = useProfile()
+  const { profile, scansCount, uploadAvatar, switchFarmerProfile } = useProfile()
   const { open } = useNav()
   const insets = useSafeAreaInsets()
   const isKn = lang === "kn"
@@ -78,6 +81,28 @@ export default function ProfileScreen({ onLogout }: { onLogout: () => void }) {
   const { unreadCount } = useNotifications(profile.district, profile.crops)
   const [historyLen, setHistoryLen] = useState(() => getScanHistory().length)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [switching, setSwitching] = useState(false)
+
+  async function handleSwitchProfile(targetMobile: string) {
+    if (targetMobile === profile.mobile) {
+      setSwitcherOpen(false)
+      return
+    }
+    setSwitching(true)
+    try {
+      await switchFarmerProfile(targetMobile)
+      setSwitcherOpen(false)
+      Alert.alert(
+        isKn ? "ಪ್ರೊಫೈಲ್ ಬದಲಾಗಿದೆ" : "Profile Switched",
+        isKn
+          ? `ಈಗ ನೀವು +91 ${targetMobile} ಖಾತೆಯಲ್ಲಿದ್ದೀರಿ.`
+          : `Switched active farmer profile to +91 ${targetMobile}.`
+      )
+    } finally {
+      setSwitching(false)
+    }
+  }
 
   useEffect(() => {
     setHistoryLen(getScanHistory().length)
@@ -226,6 +251,12 @@ export default function ProfileScreen({ onLogout }: { onLogout: () => void }) {
       isToggle: true,
       toggleValue: settings.notificationsOn,
       onToggle: () => updateSettings({ notificationsOn: !settings.notificationsOn }),
+    },
+    {
+      label: isKn ? "ರೈತರ ಪ್ರೊಫೈಲ್ ಬದಲಾವಣೆ (10 ಜಿಲ್ಲೆಗಳು)" : "Switch Farmer Profile (10 Districts)",
+      icon: Users,
+      hint: profile.district,
+      onClick: () => setSwitcherOpen(true),
     },
     {
       label: t.profile.rows.saved,
@@ -485,6 +516,96 @@ export default function ProfileScreen({ onLogout }: { onLogout: () => void }) {
         {/* Version Footer */}
         <Text style={styles.versionFooter}>{t.profile.version}</Text>
       </ScrollView>
+
+      {/* 10 Karnataka Farmer Profiles Switcher Modal */}
+      <Modal
+        visible={switcherOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSwitcherOpen(false)}
+      >
+        <View style={styles.switcherModalBackdrop}>
+          <View style={[styles.switcherModalSheet, { paddingBottom: Math.max(insets.bottom + 16, 24) }]}>
+            <View style={styles.switcherModalHeader}>
+              <View>
+                <Text style={styles.switcherModalTitle}>
+                  {isKn ? "ರೈತರ ಪ್ರೊಫೈಲ್ ಆಯ್ಕೆ (10 ಜಿಲ್ಲೆಗಳು)" : "Select Demo Farmer Profile"}
+                </Text>
+                <Text style={styles.switcherModalSub}>
+                  {isKn
+                    ? "ಕರ್ನಾಟಕದ ವಿವಿಧ ಕೃಷಿ ವಲಯಗಳ ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ಪರೀಕ್ಷಿಸಿ"
+                    : "Experience live dynamic data across Karnataka agro-zones"}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setSwitcherOpen(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={styles.switcherCloseBtn}
+              >
+                <X size={20} color="#374151" />
+              </TouchableOpacity>
+            </View>
+
+            {switching ? (
+              <View style={styles.switcherLoadingBox}>
+                <ActivityIndicator size="large" color="#166534" />
+                <Text style={styles.switcherLoadingText}>
+                  {isKn ? "ಪ್ರೊಫೈಲ್ ಲೋಡ್ ಆಗುತ್ತಿದೆ..." : "Loading Farmer Profile & Plots..."}
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                style={styles.switcherList}
+                contentContainerStyle={{ paddingBottom: 12, gap: 8 }}
+              >
+                {DEMO_FARMERS_LIST.map((item) => {
+                  const isActive = item.mobile === profile.mobile
+                  return (
+                    <TouchableOpacity
+                      key={item.mobile}
+                      activeOpacity={0.7}
+                      onPress={() => handleSwitchProfile(item.mobile)}
+                      style={[
+                        styles.switcherItem,
+                        isActive && styles.switcherItemActive,
+                      ]}
+                    >
+                      <View style={styles.switcherItemLeft}>
+                        <View style={[styles.switcherDistrictBadge, isActive && styles.switcherDistrictBadgeActive]}>
+                          <Text style={[styles.switcherDistrictText, isActive && styles.switcherDistrictTextActive]}>
+                            {item.district}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.switcherFarmerName}>
+                            {isKn && item.nameKn ? item.nameKn : item.name}
+                          </Text>
+                          <Text style={styles.switcherFarmerCrops}>
+                            {item.crops}
+                          </Text>
+                          <Text style={styles.switcherFarmerMobile}>
+                            +91 {item.mobile}
+                          </Text>
+                        </View>
+                      </View>
+                      {isActive ? (
+                        <View style={styles.activePill}>
+                          <Text style={styles.activePillText}>
+                            {isKn ? "ಪ್ರಸ್ತುತ" : "Active"}
+                          </Text>
+                        </View>
+                      ) : (
+                        <ChevronRight size={18} color="#9ca3af" />
+                      )}
+                    </TouchableOpacity>
+                  )
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -737,5 +858,122 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9ca3af",
     marginTop: 20,
+  },
+  switcherModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  switcherModalSheet: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "82%",
+    paddingTop: 20,
+    paddingHorizontal: 20,
+  },
+  switcherModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    paddingBottom: 14,
+  },
+  switcherModalTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#111827",
+  },
+  switcherModalSub: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginTop: 2,
+  },
+  switcherCloseBtn: {
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: "#f3f4f6",
+  },
+  switcherLoadingBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+    gap: 12,
+  },
+  switcherLoadingText: {
+    fontSize: 13,
+    color: "#4b5563",
+    fontWeight: "600",
+  },
+  switcherList: {
+    maxHeight: 460,
+  },
+  switcherItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 16,
+    padding: 12,
+  },
+  switcherItemActive: {
+    backgroundColor: "#f0fdf4",
+    borderColor: "#16a34a",
+  },
+  switcherItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  switcherDistrictBadge: {
+    backgroundColor: "#e5e7eb",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    minWidth: 70,
+    alignItems: "center",
+  },
+  switcherDistrictBadgeActive: {
+    backgroundColor: "#dcfce7",
+  },
+  switcherDistrictText: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#374151",
+  },
+  switcherDistrictTextActive: {
+    color: "#15803d",
+  },
+  switcherFarmerName: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#111827",
+  },
+  switcherFarmerCrops: {
+    fontSize: 11,
+    color: "#4b5563",
+    marginTop: 1,
+  },
+  switcherFarmerMobile: {
+    fontSize: 10,
+    color: "#9ca3af",
+    fontFamily: "monospace",
+    marginTop: 1,
+  },
+  activePill: {
+    backgroundColor: "#166534",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  activePillText: {
+    fontSize: 10,
+    fontWeight: "bold",
+    color: "#ffffff",
   },
 })

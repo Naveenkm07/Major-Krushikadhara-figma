@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "name": "krushikadhara-admin",
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
+

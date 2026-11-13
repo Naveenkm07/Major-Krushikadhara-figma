@@ -159,62 +159,37 @@ async function ensureFarmerLoaded(mobile: string) {
   })
 
   if (!existing) {
-    const defaultSowing = new Date()
-    defaultSowing.setDate(defaultSowing.getDate() - 35)
-    const isDemo = mobile === "9591502209"
-
+    const fb = getOrCreateFallbackFarmer(mobile)
     existing = await prisma.farmer.create({
       data: {
         mobile,
-        name: isDemo ? "Naveen Kumar KM" : "Farmer",
-        nameKn: isDemo ? "ನವೀನ್ ಕುಮಾರ್ ಕೆಎಂ" : "ರೈತ",
-        email: isDemo ? "naveen.krushika@gmail.com" : null,
-        state: "Karnataka",
-        district: "Mandya",
-        taluk: "Pandavapura",
-        village: "Channasandra",
-        farmSize: 4.2,
-        experienceYears: 6,
-        photoUrl: DEFAULT_PHOTO,
-        preferredLanguage: "kn",
-        soilType: "Red Loam",
-        irrigationType: "Borewell + Drip",
-        rtcVerified: isDemo,
+        name: fb.name,
+        nameKn: fb.nameKn,
+        email: fb.email,
+        state: fb.state || "Karnataka",
+        district: fb.district,
+        taluk: fb.taluk,
+        village: fb.village,
+        farmSize: Number(fb.farmSize) || 4.2,
+        experienceYears: Number(fb.experienceYears) || 6,
+        photoUrl: fb.photoUrl || DEFAULT_PHOTO,
+        preferredLanguage: fb.preferredLanguage || "kn",
+        soilType: fb.soilType || "Red Loam",
+        irrigationType: fb.irrigationType || "Borewell + Drip",
+        rtcVerified: Boolean(fb.rtcVerified),
         notificationsOn: true,
         offlineModeOn: true,
         activeCrops: {
-          create: [
-            {
-              cropName: "Rice (Paddy)",
-              variety: "BPT 5204 (Sona Masoori)",
-              acreage: 2.0,
-              season: "Kharif",
-              sowingDate: defaultSowing,
-              currentStage: "TILLERING_VEGETATIVE",
-              stageDayCount: 35,
-              healthStatus: "HEALTHY",
-            },
-            {
-              cropName: "Ragi",
-              variety: "GPU-28 High-Yield",
-              acreage: 1.2,
-              season: "Kharif",
-              sowingDate: defaultSowing,
-              currentStage: "TILLERING_VEGETATIVE",
-              stageDayCount: 35,
-              healthStatus: "HEALTHY",
-            },
-            {
-              cropName: "Tomato",
-              variety: "Arka Rakshak",
-              acreage: 1.0,
-              season: "Kharif",
-              sowingDate: defaultSowing,
-              currentStage: "TILLERING_VEGETATIVE",
-              stageDayCount: 35,
-              healthStatus: "HEALTHY",
-            },
-          ],
+          create: (fb.activeCrops || []).map((c: any) => ({
+            cropName: c.cropName,
+            variety: c.variety,
+            acreage: Number(c.acreage) || 1.0,
+            season: c.season || "Kharif",
+            sowingDate: new Date(c.sowingDate || Date.now() - 35 * 86400000),
+            currentStage: c.currentStage || "TILLERING_VEGETATIVE",
+            stageDayCount: Number(c.stageDayCount) || 35,
+            healthStatus: c.healthStatus || "HEALTHY",
+          })),
         },
         savedTips: {
           create: STARTER_TIPS,

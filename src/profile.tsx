@@ -27,6 +27,19 @@ import {
 } from "./storage/appSettings"
 import { syncSavedTipsFromBackend } from "./storage/savedTips"
 
+export const DEMO_FARMERS_LIST = [
+  { mobile: "9591502209", name: "Naveen Kumar KM", nameKn: "ನವೀನ್ ಕುಮಾರ್ ಕೆಎಂ", district: "Mandya", crops: "Rice, Ragi, Tomato" },
+  { mobile: "9845011001", name: "Basavaraj S. Patil", nameKn: "ಬಸವರಾಜ ಎಸ್. ಪಾಟೀಲ", district: "Belagavi", crops: "Sugarcane, Maize, Soybean" },
+  { mobile: "9845011002", name: "Shivanna Gowda", nameKn: "ಶಿವಣ್ಣ ಗೌಡ", district: "Shimoga", crops: "Arecanut, Banana, Pepper" },
+  { mobile: "9845011003", name: "Manjunatha Byregowda", nameKn: "ಮಂಜುನಾಥ ಬೈರೇಗೌಡ", district: "Kolar", crops: "Tomato, Capsicum, Marigold" },
+  { mobile: "9845011004", name: "Mallikarjun Biradar", nameKn: "ಮಲ್ಲಿಕಾರ್ಜುನ ಬಿರಾದಾರ", district: "Vijayapura", crops: "Grapes, Pomegranate, Onion" },
+  { mobile: "9845011005", name: "Ramesh Nayak", nameKn: "ರಮೇಶ್ ನಾಯಕ್", district: "Chikkamagaluru", crops: "Coffee, Pepper, Ginger" },
+  { mobile: "9845011006", name: "Gangadharappa Kulkarni", nameKn: "ಗಂಗಾಧರಪ್ಪ ಕುಲಕರ್ಣಿ", district: "Davanagere", crops: "Arecanut, Maize, Moong" },
+  { mobile: "9845011007", name: "Devendrappa Pujar", nameKn: "ದೇವೇಂದ್ರಪ್ಪ ಪೂಜಾರ", district: "Haveri", crops: "Byadagi Chilli, Cotton, Groundnut" },
+  { mobile: "9845011008", name: "Siddaramaiah Shettar", nameKn: "ಸಿದ್ದರಾಮಯ್ಯ ಶೆಟ್ಟರ್", district: "Bagalkot", crops: "Sugarcane, Turmeric, Wheat" },
+  { mobile: "9845011009", name: "Chandrashekariah Swamy", nameKn: "ಚಂದ್ರಶೇಖರಯ್ಯ ಸ್ವಾಮಿ", district: "Tumkur", crops: "Coconut, Ragi, Horse Gram" },
+]
+
 export type FarmerProfile = {
   name: string
   nameKn: string
@@ -106,6 +119,7 @@ type ProfileCtx = {
   ) => Promise<boolean>
   removeCropField: (fieldId: string) => Promise<boolean>
   deleteAccountData: () => Promise<boolean>
+  switchFarmerProfile: (mobile: string) => Promise<void>
 }
 
 const ProfileContext = createContext<ProfileCtx | null>(null)
@@ -309,6 +323,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     return true
   }, [profile.mobile])
 
+  const switchFarmerProfile = useCallback(
+    async (newMobile: string): Promise<void> => {
+      setAppSettingsMobile(newMobile)
+      await refreshProfile(newMobile)
+    },
+    [refreshProfile]
+  )
+
   return (
     <ProfileContext.Provider
       value={{
@@ -324,6 +346,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         editCropField,
         removeCropField,
         deleteAccountData,
+        switchFarmerProfile,
       }}
     >
       {children}

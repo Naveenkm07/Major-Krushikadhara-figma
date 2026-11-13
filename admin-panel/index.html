@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KrushikaDhara Admin • Farm & Profile Management</title>
+  <link rel="icon" href="https://img.icons8.com/color/96/sprout.png" type="image/png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Kannada:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body { font-family: 'Inter', 'Noto Sans Kannada', sans-serif; }
+    .kannada { font-family: 'Noto Sans Kannada', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-emerald-900 text-white shadow-lg sticky top-0 z-40 border-b border-emerald-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-600/50 flex items-center justify-center border border-emerald-400/30 shadow-inner">
+          <i data-lucide="sprout" class="w-6 h-6 text-emerald-300"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-bold tracking-tight text-white">KrushikaDhara</h1>
+            <span class="text-xs bg-emerald-700/80 text-emerald-200 px-2 py-0.5 rounded-full font-medium border border-emerald-600/50">Admin Console</span>
+          </div>
+          <p class="text-xs text-emerald-300/90 kannada">ಕೃಷಿಕಧಾರ • ಕರ್ನಾಟಕ ರೈತರ ಪ್ರೊಫೈಲ್ & ಬೆಳೆ ನಿರ್ವಹಣಾ ಫಲಕ</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-800/80 text-emerald-200 border border-emerald-700">
+          <span class="w-2 h-2 mr-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+          Live API Active
+        </span>
+        <button onclick="resetAllProfiles()" class="inline-flex items-center space-x-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>Reset 10 Profiles</span>
+        </button>
+        <button onclick="openCreateModal()" class="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+          <span>Add Farmer</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+    <!-- KPI Metric Cards -->
+    <div id="statsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
+          <span>Farmers</span>
+          <i data-lucide="users" class="w-4 h-4 text-emerald-600"></i>
+        </div>
+        <div id="metricFarmers" class="text-2xl font-bold text-slate-800">10</div>
+        <div class="text-[11px] text-emerald-600 font-medium mt-1">Karnataka Seeded</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
+          <span>Total Land</span>
+          <i data-lucide="map" class="w-4 h-4 text-emerald-600"></i>
+        </div>
+        <div id="metricAcres" class="text-2xl font-bold text-slate-800">55.2</div>
+        <div class="text-[11px] text-slate-500 font-medium mt-1">Acres Monitored</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
+          <span>Active Plots</span>
+          <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i>
+        </div>
+        <div id="metricPlots" class="text-2xl font-bold text-slate-800">30</div>
+        <div class="text-[11px] text-slate-500 font-medium mt-1">Crop Parcels</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
+          <span>RTC Verified</span>
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+        </div>
+        <div id="metricRtc" class="text-2xl font-bold text-emerald-700">100%</div>
+        <div class="text-[11px] text-emerald-600 font-medium mt-1">Land Records</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
+          <span>Crop Alerts</span>
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>
+        </div>
+        <div id="metricAlerts" class="text-2xl font-bold text-amber-600">4</div>
+        <div class="text-[11px] text-amber-600 font-medium mt-1">Pest / Water stress</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
+          <span>AI Scans</span>
+          <i data-lucide="scan-line" class="w-4 h-4 text-emerald-600"></i>
+        </div>
+        <div id="metricScans" class="text-2xl font-bold text-slate-800">12</div>
+        <div class="text-[11px] text-slate-500 font-medium mt-1">Pest Diagnoses</div>
+      </div>
+    </div>
+
+    <!-- Search & Filter Bar -->
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+      <div class="relative flex-1">
+        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+        <input
+          id="searchInput"
+          type="text"
+          oninput="applyFilters()"
+          placeholder="Search by name, Kannada name, phone, village, taluk, or district..."
+          class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+        />
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <select id="districtFilter" onchange="applyFilters()" class="border border-slate-300 rounded-lg text-xs py-2 px-3 bg-white text-slate-700 focus:ring-emerald-500 focus:border-emerald-500">
+          <option value="ALL">All Districts (10)</option>
+          <option value="Mandya">Mandya (Cauvery Basin)</option>
+          <option value="Belagavi">Belagavi (Krishna Basin)</option>
+          <option value="Shimoga">Shimoga (Malnad)</option>
+          <option value="Kolar">Kolar (Eastern Dry)</option>
+          <option value="Vijayapura">Vijayapura (Deccan)</option>
+          <option value="Chikkamagaluru">Chikkamagaluru (Ghats)</option>
+          <option value="Davanagere">Davanagere (Central)</option>
+          <option value="Haveri">Haveri (Spice Belt)</option>
+          <option value="Bagalkot">Bagalkot (Upper Krishna)</option>
+          <option value="Tumkur">Tumkur (Coconut Belt)</option>
+        </select>
+
+        <select id="cropFilter" onchange="applyFilters()" class="border border-slate-300 rounded-lg text-xs py-2 px-3 bg-white text-slate-700 focus:ring-emerald-500 focus:border-emerald-500">
+          <option value="ALL">All Crops</option>
+          <option value="Rice">Rice (Paddy)</option>
+          <option value="Sugarcane">Sugarcane</option>
+          <option value="Arecanut">Arecanut</option>
+          <option value="Tomato">Tomato</option>
+          <option value="Coffee">Coffee</option>
+          <option value="Chilli">Chilli (Byadagi)</option>
+          <option value="Coconut">Coconut</option>
+          <option value="Maize">Maize</option>
+          <option value="Ragi">Ragi (Finger Millet)</option>
+        </select>
+
+        <select id="healthFilter" onchange="applyFilters()" class="border border-slate-300 rounded-lg text-xs py-2 px-3 bg-white text-slate-700 focus:ring-emerald-500 focus:border-emerald-500">
+          <option value="ALL">All Health Conditions</option>
+          <option value="HEALTHY">Healthy Only</option>
+          <option value="PEST_SUSPECTED">Pest Alert</option>
+          <option value="WATER_STRESSED">Water Stressed</option>
+          <option value="LOW_NUTRIENTS">Low Nutrients</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Farmers Cards Container -->
+    <div id="farmersList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Injected via JavaScript -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-12 bg-white rounded-xl border border-slate-200 p-8">
+      <i data-lucide="user-x" class="w-12 h-12 text-slate-300 mx-auto mb-3"></i>
+      <h3 class="text-base font-semibold text-slate-700">No farmers match this filter</h3>
+      <p class="text-xs text-slate-500 mt-1">Try clearing your search query or reset filters.</p>
+      <button onclick="resetFilters()" class="mt-4 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200">Reset Filters</button>
+    </div>
+
+  </main>
+
+  <!-- Edit / Add Farmer Modal -->
+  <div id="farmerModal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="px-6 py-4 bg-emerald-900 text-white flex items-center justify-between">
+        <h3 id="modalTitle" class="text-base font-bold">Edit Farmer Profile</h3>
+        <button onclick="closeFarmerModal()" class="text-emerald-200 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form id="farmerForm" onsubmit="handleSaveFarmer(event)" class="p-6 overflow-y-auto space-y-4 text-xs">
+        <input type="hidden" id="formIsEdit" value="false">
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Mobile (10 Digits)</label>
+            <input type="text" id="formMobile" required maxlength="10" class="w-full border border-slate-300 rounded-lg p-2 font-mono text-xs">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Language</label>
+            <select id="formLang" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+              <option value="kn">Kannada (ಕನ್ನಡ)</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Name (English)</label>
+            <input type="text" id="formName" required class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Name (Kannada)</label>
+            <input type="text" id="formNameKn" class="w-full border border-slate-300 rounded-lg p-2 text-xs kannada">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">District</label>
+            <input type="text" id="formDistrict" required class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Taluk</label>
+            <input type="text" id="formTaluk" required class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Village</label>
+            <input type="text" id="formVillage" required class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Farm Size (Acres)</label>
+            <input type="number" step="0.1" id="formFarmSize" required class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Soil Type</label>
+            <select id="formSoil" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+              <option value="Red Loam">Red Loam</option>
+              <option value="Deep Black Cotton Soil">Deep Black Cotton Soil</option>
+              <option value="Laterite Acidic Soil">Laterite Acidic Soil</option>
+              <option value="Sandy Loam">Sandy Loam</option>
+              <option value="Medium Black Soil">Medium Black Soil</option>
+              <option value="Forest Humus Laterite">Forest Humus Laterite</option>
+              <option value="Alluvial Black Soil">Alluvial Black Soil</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Irrigation</label>
+            <select id="formIrr" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+              <option value="Borewell + Drip">Borewell + Drip</option>
+              <option value="Canal + Drip">Canal + Drip</option>
+              <option value="Sprinkler + Stream">Sprinkler + Stream</option>
+              <option value="Borewell + Furrow">Borewell + Furrow</option>
+              <option value="Rainfed">Rainfed</option>
+              <option value="Lift Irrigation">Lift Irrigation</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2 pt-2">
+          <input type="checkbox" id="formRtc" class="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4">
+          <label for="formRtc" class="font-medium text-slate-700">RTC Land Records Verified (Pahani)</label>
+        </div>
+
+        <div class="border-t border-slate-200 pt-4 flex justify-end space-x-2">
+          <button type="button" onclick="closeFarmerModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-semibold">Save Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Manage Plots Modal -->
+  <div id="plotsModal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+    <div class="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="px-6 py-4 bg-emerald-900 text-white flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold">Crop Plots & Stage Manager</h3>
+          <p id="plotsFarmerTitle" class="text-xs text-emerald-300">Farmer: Naveen Kumar KM (Mandya)</p>
+        </div>
+        <button onclick="closePlotsModal()" class="text-emerald-200 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-5 text-xs">
+        <!-- Existing Plots List -->
+        <div>
+          <h4 class="font-bold text-slate-800 text-sm mb-2 flex items-center justify-between">
+            <span>Current Active Plots</span>
+            <span id="plotsCountBadge" class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-xs font-semibold">3 Plots</span>
+          </h4>
+          <div id="existingPlotsContainer" class="space-y-2.5">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+
+        <!-- Add New Plot Section -->
+        <div class="border-t border-slate-200 pt-4">
+          <h4 class="font-bold text-slate-800 text-sm mb-3">Add / Append Crop Plot</h4>
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="block font-medium text-slate-700 mb-1">Crop Name</label>
+              <select id="newPlotCrop" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+                <option value="Rice (Paddy)">Rice (Paddy) - ಭತ್ತ</option>
+                <option value="Ragi">Ragi - ರಾಗಿ</option>
+                <option value="Tomato">Tomato - ಟೊಮೆಟೊ</option>
+                <option value="Sugarcane">Sugarcane - ಕಬ್ಬು</option>
+                <option value="Arecanut">Arecanut - ಅಡಿಕೆ</option>
+                <option value="Maize">Maize - ಮೆಕ್ಕೆಜೋಳ</option>
+                <option value="Coffee">Coffee - ಕಾಫಿ</option>
+                <option value="Chilli">Chilli - ಮೆಣಸಿನಕಾಯಿ</option>
+                <option value="Coconut">Coconut - ತೆಂಗು</option>
+                <option value="Banana">Banana - ಬಾಳೆ</option>
+                <option value="Grapes">Grapes - ದ್ರಾಕ್ಷಿ</option>
+                <option value="Pomegranate">Pomegranate - ದಾಳಿಂಬೆ</option>
+                <option value="Cotton">Cotton - ಹತ್ತಿ</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-medium text-slate-700 mb-1">Variety</label>
+              <input type="text" id="newPlotVariety" placeholder="e.g. BPT 5204 / Arka Rakshak" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 mb-3">
+            <div>
+              <label class="block font-medium text-slate-700 mb-1">Area (Acres)</label>
+              <input type="number" step="0.1" id="newPlotAcres" value="1.0" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            </div>
+            <div>
+              <label class="block font-medium text-slate-700 mb-1">Days Ago Sown</label>
+              <input type="number" id="newPlotDays" value="35" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+            </div>
+            <div>
+              <label class="block font-medium text-slate-700 mb-1">Health Condition</label>
+              <select id="newPlotHealth" class="w-full border border-slate-300 rounded-lg p-2 text-xs">
+                <option value="HEALTHY">Healthy</option>
+                <option value="WATER_STRESSED">Water Stressed</option>
+                <option value="PEST_SUSPECTED">Pest Alert</option>
+                <option value="LOW_NUTRIENTS">Low Nutrients</option>
+              </select>
+            </div>
+          </div>
+
+          <button onclick="handleAddNewPlot()" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-semibold py-2 rounded-lg text-xs shadow-sm flex items-center justify-center space-x-1.5">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Add Plot to Farm</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scans Viewer Modal -->
+  <div id="scansModal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="px-6 py-4 bg-emerald-900 text-white flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold">AI Disease & Pest Scan Records</h3>
+          <p id="scansFarmerTitle" class="text-xs text-emerald-300">Farmer Diagnostics History</p>
+        </div>
+        <button onclick="closeScansModal()" class="text-emerald-200 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div id="scansContainer" class="p-6 overflow-y-auto space-y-4 text-xs">
+        <!-- Injected via JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl border border-slate-700 flex items-center space-x-2 hidden z-50">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toastMsg">Operation successful</span>
+  </div>
+
+  <footer class="bg-slate-100 border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    KrushikaDhara Admin Console • Comprehensive Agricultural Intelligence & Farmer Lifecycle Management • Version 1.0.0
+  </footer>
+
+  <script>
+    
+    const API_BASE = (window.location.origin.includes('vercel.app') || window.location.origin.includes('localhost:3000') || window.location.protocol === 'file:')
+      ? 'https://krushikadhara-api.onrender.com'
+      : window.location.origin
+    let allFarmers = []
+    let currentPlotsFarmerMobile = null
+
+    async function fetchStats() {
+      try {
+        const res = await fetch(API_BASE + '/api/admin/stats')
+        const data = await res.json()
+        if (data.success && data.stats) {
+          document.getElementById('metricFarmers').textContent = data.stats.totalFarmers
+          document.getElementById('metricAcres').textContent = data.stats.totalAcres
+          document.getElementById('metricPlots').textContent = data.stats.totalPlots
+          document.getElementById('metricRtc').textContent = Math.round((data.stats.rtcVerifiedCount / data.stats.totalFarmers) * 100) + '%'
+          document.getElementById('metricAlerts').textContent = data.stats.activeAlerts
+          document.getElementById('metricScans').textContent = data.stats.totalScans
+        }
+      } catch (e) {
+        console.error('Stats fetch error:', e)
+      }
+    }
+
+    async function fetchFarmers() {
+      try {
+        const res = await fetch(API_BASE + '/api/admin/farmers')
+        const data = await res.json()
+        if (data.success && Array.isArray(data.farmers)) {
+          allFarmers = data.farmers
+          applyFilters()
+        }
+      } catch (e) {
+        console.error('Farmers fetch error:', e)
+      }
+    }
+
+    function applyFilters() {
+      const q = (document.getElementById('searchInput').value || '').trim().toLowerCase()
+      const d = document.getElementById('districtFilter').value
+      const c = document.getElementById('cropFilter').value
+      const h = document.getElementById('healthFilter').value
+
+      const filtered = allFarmers.filter(f => {
+        if (d !== 'ALL' && f.district.toLowerCase() !== d.toLowerCase()) return false
+        if (c !== 'ALL') {
+          const hasCrop = (f.activeCrops || []).some(cp => cp.cropName.toLowerCase().includes(c.toLowerCase()))
+          if (!hasCrop) return false
+        }
+        if (h !== 'ALL') {
+          const hasHealth = (f.activeCrops || []).some(cp => cp.healthStatus === h)
+          if (!hasHealth) return false
+        }
+        if (q) {
+          const match = f.name.toLowerCase().includes(q) ||
+            (f.nameKn || '').includes(q) ||
+            f.mobile.includes(q) ||
+            f.district.toLowerCase().includes(q) ||
+            f.taluk.toLowerCase().includes(q) ||
+            f.village.toLowerCase().includes(q)
+          if (!match) return false
+        }
+        return true
+      })
+
+      renderFarmers(filtered)
+    }
+
+    function resetFilters() {
+      document.getElementById('searchInput').value = ''
+      document.getElementById('districtFilter').value = 'ALL'
+      document.getElementById('cropFilter').value = 'ALL'
+      document.getElementById('healthFilter').value = 'ALL'
+      applyFilters()
+    }
+
+    function renderFarmers(list) {
+      const container = document.getElementById('farmersList')
+      const empty = document.getElementById('emptyState')
+
+      if (list.length === 0) {
+        container.innerHTML = ''
+        empty.classList.remove('hidden')
+        return
+      }
+      empty.classList.add('hidden')
+
+      container.innerHTML = list.map(f => {
+        const plots = f.activeCrops || []
+        const hasAlert = plots.some(p => p.healthStatus === 'PEST_SUSPECTED' || p.healthStatus === 'WATER_STRESSED')
+        return \`
+          <div class="bg-white rounded-2xl border \${hasAlert ? 'border-amber-300 shadow-amber-50/50' : 'border-slate-200'} p-5 shadow-sm hover:shadow-md transition space-y-4">
+            <!-- Header Row -->
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-center space-x-3">
+                <img src="\${f.photoUrl || 'https://images.unsplash.com/photo-1595152772835-219674b2a8a6?w=160&h=160&fit=crop'}" alt="Avatar" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-sm">
+                <div>
+                  <div class="flex items-center space-x-2">
+                    <h3 class="font-bold text-slate-900 text-sm">\${f.name}</h3>
+                    \${f.rtcVerified ? '<span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">RTC Verified</span>' : ''}
+                  </div>
+                  <p class="text-xs text-slate-500 kannada">\${f.nameKn || ''} • \${f.village}, \${f.taluk}, \${f.district}</p>
+                  <p class="text-[11px] text-slate-400 font-mono mt-0.5">+91 \${f.mobile}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-base font-extrabold text-emerald-700">\${f.farmSize} ac</span>
+                <p class="text-[10px] text-slate-400">\${f.soilType}</p>
+              </div>
+            </div>
+
+            <!-- Plots Badges -->
+            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+              <div class="flex items-center justify-between text-[11px] text-slate-500 font-semibold mb-2">
+                <span>Active Plots (\${plots.length})</span>
+                <button onclick="openPlotsModal('\${f.mobile}')" class="text-emerald-700 hover:text-emerald-800 font-bold">+ Manage Plots</button>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                \${plots.map(p => {
+                  let badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                  let icon = 'leaf'
+                  if (p.healthStatus === 'WATER_STRESSED') {
+                    badgeColor = 'bg-amber-100 text-amber-900 border-amber-300'
+                    icon = 'droplet'
+                  } else if (p.healthStatus === 'PEST_SUSPECTED') {
+                    badgeColor = 'bg-rose-100 text-rose-900 border-rose-300'
+                    icon = 'alert-circle'
+                  } else if (p.healthStatus === 'LOW_NUTRIENTS') {
+                    badgeColor = 'bg-yellow-100 text-yellow-900 border-yellow-300'
+                    icon = 'alert-triangle'
+                  }
+                  return \`
+                    <span class="inline-flex items-center text-[11px] font-medium px-2.5 py-1 rounded-lg border \${badgeColor}">
+                      <span class="font-bold mr-1">\${p.cropName}</span>
+                      <span class="opacity-80">(\${p.acreage} ac • Day \${p.stageDayCount})</span>
+                    </span>
+                  \`
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- Action Buttons Footer -->
+            <div class="pt-2 flex items-center justify-between border-t border-slate-100 text-xs">
+              <div class="flex items-center space-x-1.5">
+                <button onclick="openEditModal('\${f.mobile}')" class="px-2.5 py-1 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition">Edit</button>
+                <button onclick="viewFarmerScans('\${f.mobile}')" class="px-2.5 py-1 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg font-medium transition">Scans</button>
+                <button onclick="simulateInApp('\${f.mobile}')" class="px-2.5 py-1 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg font-semibold transition" title="Use mobile in app to view this farmer">Simulate In App</button>
+              </div>
+              <button onclick="deleteFarmer('\${f.mobile}')" class="text-rose-600 hover:text-rose-700 p-1 rounded hover:bg-rose-50" title="Delete Farmer Profile">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        \`
+      }).join('')
+
+      lucide.createIcons()
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast')
+      document.getElementById('toastMsg').textContent = msg
+      toast.classList.remove('hidden')
+      setTimeout(() => toast.classList.add('hidden'), 3500)
+    }
+
+    async function resetAllProfiles() {
+      if (!confirm('Are you sure you want to restore all 10 authentic Karnataka farmer profiles to their initial seed state? Any manual edits will be reset.')) return
+      try {
+        const res = await fetch(API_BASE + '/api/admin/reset-profiles', { method: 'POST' })
+        const data = await res.json()
+        if (data.success) {
+          showToast('Restored 10 authentic Karnataka farmer profiles!')
+          await fetchStats()
+          await fetchFarmers()
+        }
+      } catch (e) {
+        alert('Reset failed: ' + e.message)
+      }
+    }
+
+    function openCreateModal() {
+      document.getElementById('modalTitle').textContent = 'Add New Farmer Profile'
+      document.getElementById('formIsEdit').value = 'false'
+      document.getElementById('formMobile').disabled = false
+      document.getElementById('farmerForm').reset()
+      document.getElementById('formMobile').value = '98450' + Math.floor(10000 + Math.random() * 90000)
+      document.getElementById('formFarmSize').value = '3.5'
+      document.getElementById('formRtc').checked = true
+      document.getElementById('farmerModal').classList.remove('hidden')
+      lucide.createIcons()
+    }
+
+    function openEditModal(mobile) {
+      const f = allFarmers.find(item => item.mobile === mobile)
+      if (!f) return
+      document.getElementById('modalTitle').textContent = 'Edit Farmer: ' + f.name
+      document.getElementById('formIsEdit').value = 'true'
+      document.getElementById('formMobile').value = f.mobile
+      document.getElementById('formMobile').disabled = true
+      document.getElementById('formLang').value = f.preferredLanguage || 'kn'
+      document.getElementById('formName').value = f.name || ''
+      document.getElementById('formNameKn').value = f.nameKn || ''
+      document.getElementById('formDistrict').value = f.district || ''
+      document.getElementById('formTaluk').value = f.taluk || ''
+      document.getElementById('formVillage').value = f.village || ''
+      document.getElementById('formFarmSize').value = f.farmSize || 3.0
+      document.getElementById('formSoil').value = f.soilType || 'Red Loam'
+      document.getElementById('formIrr').value = f.irrigationType || 'Borewell + Drip'
+      document.getElementById('formRtc').checked = Boolean(f.rtcVerified)
+      document.getElementById('farmerModal').classList.remove('hidden')
+      lucide.createIcons()
+    }
+
+    function closeFarmerModal() {
+      document.getElementById('farmerModal').classList.add('hidden')
+    }
+
+    async function handleSaveFarmer(e) {
+      e.preventDefault()
+      const isEdit = document.getElementById('formIsEdit').value === 'true'
+      const mobile = document.getElementById('formMobile').value.trim()
+      const payload = {
+        mobile,
+        preferredLanguage: document.getElementById('formLang').value,
+        name: document.getElementById('formName').value.trim(),
+        nameKn: document.getElementById('formNameKn').value.trim(),
+        district: document.getElementById('formDistrict').value.trim(),
+        taluk: document.getElementById('formTaluk').value.trim(),
+        village: document.getElementById('formVillage').value.trim(),
+        farmSize: parseFloat(document.getElementById('formFarmSize').value),
+        soilType: document.getElementById('formSoil').value,
+        irrigationType: document.getElementById('formIrr').value,
+        rtcVerified: document.getElementById('formRtc').checked,
+      }
+
+      try {
+        const url = isEdit ? \`/api/admin/farmers/\${mobile}\` : '/api/admin/farmers'
+        const method = isEdit ? 'PUT' : 'POST'
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const data = await res.json()
+        if (data.success) {
+          closeFarmerModal()
+          showToast(isEdit ? 'Profile updated successfully' : 'New farmer profile added')
+          await fetchStats()
+          await fetchFarmers()
+        } else {
+          alert('Error: ' + data.error)
+        }
+      } catch (err) {
+        alert('Save failed: ' + err.message)
+      }
+    }
+
+    async function deleteFarmer(mobile) {
+      if (!confirm('Are you sure you want to delete profile for mobile ' + mobile + '?')) return
+      try {
+        const res = await fetch(\`/api/admin/farmers/\${mobile}\`, { method: 'DELETE' })
+        const data = await res.json()
+        if (data.success) {
+          showToast('Farmer profile deleted')
+          await fetchStats()
+          await fetchFarmers()
+        }
+      } catch (e) {
+        alert('Delete failed: ' + e.message)
+      }
+    }
+
+    function openPlotsModal(mobile) {
+      currentPlotsFarmerMobile = mobile
+      const f = allFarmers.find(item => item.mobile === mobile)
+      if (!f) return
+      document.getElementById('plotsFarmerTitle').textContent = \`Farmer: \${f.name} (\${f.district}) • +91 \${f.mobile}\`
+      renderExistingPlots(f.activeCrops || [])
+      document.getElementById('plotsModal').classList.remove('hidden')
+      lucide.createIcons()
+    }
+
+    function renderExistingPlots(plots) {
+      document.getElementById('plotsCountBadge').textContent = plots.length + ' Plots'
+      const container = document.getElementById('existingPlotsContainer')
+      if (plots.length === 0) {
+        container.innerHTML = '<p class="text-slate-400 italic">No active plots currently planted on this farm.</p>'
+        return
+      }
+      container.innerHTML = plots.map(p => \`
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-slate-800 text-xs">\${p.cropName}</span>
+              <span class="text-[10px] text-slate-500 font-medium">\${p.variety}</span>
+              <span class="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded font-semibold">\${p.acreage} ac</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">Stage: <span class="text-emerald-700 font-semibold">\${p.currentStage}</span> • Day \${p.stageDayCount} • Health: \${p.healthStatus}</p>
+          </div>
+          <button onclick="handleDeletePlot('\${p.id}')" class="text-rose-500 hover:text-rose-700 p-1" title="Remove plot">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      \`).join('')
+      lucide.createIcons()
+    }
+
+    function closePlotsModal() {
+      document.getElementById('plotsModal').classList.add('hidden')
+    }
+
+    async function handleAddNewPlot() {
+      if (!currentPlotsFarmerMobile) return
+      const cropName = document.getElementById('newPlotCrop').value
+      const variety = document.getElementById('newPlotVariety').value.trim() || 'High-Yield Selected'
+      const acreage = parseFloat(document.getElementById('newPlotAcres').value) || 1.0
+      const daysSinceSowing = parseInt(document.getElementById('newPlotDays').value, 10) || 30
+      const healthStatus = document.getElementById('newPlotHealth').value
+
+      try {
+        const res = await fetch(\`/api/admin/farmers/\${currentPlotsFarmerMobile}/plots\`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cropName, variety, acreage, daysSinceSowing, healthStatus }),
+        })
+        const data = await res.json()
+        if (data.success && data.farmer) {
+          showToast('Added plot for ' + cropName)
+          renderExistingPlots(data.farmer.activeCrops || [])
+          await fetchStats()
+          await fetchFarmers()
+        }
+      } catch (e) {
+        alert('Failed to add plot: ' + e.message)
+      }
+    }
+
+    async function handleDeletePlot(plotId) {
+      if (!currentPlotsFarmerMobile) return
+      try {
+        const res = await fetch(\`/api/admin/farmers/\${currentPlotsFarmerMobile}/plots/\${plotId}\`, {
+          method: 'DELETE',
+        })
+        const data = await res.json()
+        if (data.success && data.farmer) {
+          showToast('Plot removed')
+          renderExistingPlots(data.farmer.activeCrops || [])
+          await fetchStats()
+          await fetchFarmers()
+        }
+      } catch (e) {
+        alert('Failed to delete plot: ' + e.message)
+      }
+    }
+
+    async function viewFarmerScans(mobile) {
+      try {
+        const res = await fetch(\`/api/admin/farmers/\${mobile}\`)
+        const data = await res.json()
+        if (data.success) {
+          const f = data.farmer
+          document.getElementById('scansFarmerTitle').textContent = \`\${f.name} (\${f.district}) • \${(data.scans || []).length} Recorded Diagnoses\`
+          const container = document.getElementById('scansContainer')
+          if (!data.scans || data.scans.length === 0) {
+            container.innerHTML = '<p class="text-slate-400 italic text-center py-6">No pest or disease scans recorded for this profile yet.</p>'
+          } else {
+            container.innerHTML = data.scans.map(s => \`
+              <div class="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-2">
+                <div class="flex items-start justify-between">
+                  <div>
+                    <h4 class="font-bold text-slate-800">\${s.diseaseName}</h4>
+                    <p class="text-xs text-slate-500 kannada">\${s.diseaseNameKn || ''} • Crop: \${s.cropName}</p>
+                  </div>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold \${s.severity === 'HIGH' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}">\${s.severity} Severity</span>
+                </div>
+                <div class="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
+                  <p class="text-slate-700 font-medium"><span class="font-bold text-emerald-800">Treatment:</span> \${s.treatmentEn}</p>
+                  <p class="text-slate-500 text-[11px] kannada">\${s.treatmentKn || ''}</p>
+                </div>
+                <p class="text-[10px] text-slate-400">Diagnosis Confidence: \${Math.round((s.confidence || 0.9) * 100)}% • \${new Date(s.createdAt).toLocaleDateString()}</p>
+              </div>
+            \`).join('')
+          }
+          document.getElementById('scansModal').classList.remove('hidden')
+          lucide.createIcons()
+        }
+      } catch (e) {
+        alert('Failed to load scans: ' + e.message)
+      }
+    }
+
+    function closeScansModal() {
+      document.getElementById('scansModal').classList.add('hidden')
+    }
+
+    function simulateInApp(mobile) {
+      navigator.clipboard.writeText(mobile).then(() => {
+        showToast('Copied +91 ' + mobile + ' to clipboard! Paste in KrushikaDhara app login to simulate as this farmer.')
+      }).catch(() => {
+        prompt('Copy this mobile number to log in as this farmer in KrushikaDhara app:', mobile)
+      })
+    }
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchStats()
+      fetchFarmers()
+      lucide.createIcons()
+    })
+  </script>
+</body>
+</html>

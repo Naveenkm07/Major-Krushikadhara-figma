@@ -8,6 +8,12 @@
 import fs from "node:fs"
 import path from "node:path"
 import { calculateHaversineKm, isValidCoordinate } from "../utils/geo.js"
+import {
+  INITIAL_10_FARMERS,
+  INITIAL_FARMER_SCANS,
+  type ActiveCropPlot,
+  type FarmerProfileData,
+} from "../data/mockFarmersData.js"
 
 const CACHE_DIR = path.resolve(process.cwd(), ".local-cache")
 const STORE_FILE = path.join(CACHE_DIR, "krushikadhara-store.json")
@@ -650,15 +656,32 @@ function seedDefaultEquipmentData() {
   ])
 }
 
+function seedInitial10FarmersIfNeeded() {
+  for (const f of INITIAL_10_FARMERS) {
+    if (!fallbackFarmers.has(f.mobile)) {
+      fallbackFarmers.set(f.mobile, JSON.parse(JSON.stringify(f)))
+    }
+  }
+  for (const [m, scans] of Object.entries(INITIAL_FARMER_SCANS)) {
+    if (!fallbackScans.has(m) || (fallbackScans.get(m) || []).length === 0) {
+      fallbackScans.set(m, JSON.parse(JSON.stringify(scans)))
+    }
+  }
+}
+
 function loadStoreFromDisk() {
   try {
     if (!fs.existsSync(STORE_FILE)) {
       seedDefaultEquipmentData()
+      seedInitial10FarmersIfNeeded()
+      saveStoreToDisk()
       return
     }
     const raw = fs.readFileSync(STORE_FILE, "utf8")
     if (!raw.trim()) {
       seedDefaultEquipmentData()
+      seedInitial10FarmersIfNeeded()
+      saveStoreToDisk()
       return
     }
     const parsed = JSON.parse(raw) as Partial<PersistedStoreShape>
@@ -715,9 +738,11 @@ function loadStoreFromDisk() {
         }
       }
     }
+    seedInitial10FarmersIfNeeded()
   } catch (err: any) {
     console.warn("⚠️ [LocalStore Load Warning]:", err?.message || err)
     if (fallbackEquipment.length === 0) seedDefaultEquipmentData()
+    seedInitial10FarmersIfNeeded()
   }
 }
 
@@ -767,6 +792,18 @@ export function getOrCreateFallbackFarmer(rawMobile: string): any {
       savedTips: getFallbackTips(mobile).length,
     }
     return existing
+  }
+
+  const seeded = INITIAL_10_FARMERS.find((f) => f.mobile === mobile)
+  if (seeded) {
+    const clone = JSON.parse(JSON.stringify(seeded))
+    clone._count = {
+      scans: (fallbackScans.get(mobile) || []).length || (INITIAL_FARMER_SCANS[mobile] || []).length,
+      savedTips: getFallbackTips(mobile).length,
+    }
+    fallbackFarmers.set(mobile, clone)
+    saveStoreToDisk()
+    return clone
   }
 
   const isDemo = mobile === "9591502209"
@@ -2217,3 +2254,132 @@ export function deleteFallbackFarmerAccount(rawMobile: string): { deleted: boole
   saveStoreToDisk()
   return { deleted: true }
 }
+
+// ==============================================================================
+// Admin Management API Functions
+// ==============================================================================
+
+export function getAllFallbackFarmers(): FarmerProfileData[] {
+  seedInitial10FarmersIfNeeded()
+  const list: FarmerProfileData[] = []
+  for (const [m, f] of fallbackFarmers.entries()) {
+    const scansCount = (fallbackScans.get(m) || []).length
+    const tipsCount = (fallbackTips.get(m) || []).length
+    list.push({
+      ...f,
+      _count: { scans: scansCount, savedTips: tipsCount },
+    })
+  }
+  return list
+}
+
+export function resetAllFallbackFarmersToSeed(): FarmerProfileData[] {
+  fallbackFarmers.clear()
+  fallbackScans.clear()
+  for (const f of INITIAL_10_FARMERS) {
+    fallbackFarmers.set(f.mobile, JSON.parse(JSON.stringify(f)))
+  }
+  for (const [m, scans] of Object.entries(INITIAL_FARMER_SCANS)) {
+    fallbackScans.set(m, JSON.parse(JSON.stringify(scans)))
+  }
+  saveStoreToDisk()
+  return getAllFallbackFarmers()
+}
+
+export function updateFallbackFarmerFields(mobile: string, updates: Partial<FarmerProfileData>): any {
+  const norm = normalizeFallbackMobile(mobile)
+  const f = getOrCreateFallbackFarmer(norm)
+  Object.assign(f, updates)
+  f.mobile = norm
+  saveStoreToDisk()
+  return f
+}
+
+export function deleteFallbackFarmerByMobile(mobile: string): boolean {
+  const norm = normalizeFallbackMobile(mobile)
+  const existed = fallbackFarmers.delete(norm)
+  fallbackScans.delete(norm)
+  fallbackTips.delete(norm)
+  saveStoreToDisk()
+  return existed
+}
+
+export function addPlotToFallbackFarmer(mobile: string, plot: ActiveCropPlot): any {
+  const f = getOrCreateFallbackFarmer(mobile)
+  if (!Array.isArray(f.activeCrops)) f.activeCrops = []
+  f.activeCrops.push(plot)
+  saveStoreToDisk()
+  return f
+}
+
+export function updatePlotInFallbackFarmer(
+  mobile: string,
+  plotId: string,
+  updates: Partial<ActiveCropPlot>
+): any {
+  const f = getOrCreateFallbackFarmer(mobile)
+  if (Array.isArray(f.activeCrops)) {
+    const idx = f.activeCrops.findIndex((p: any) => p.id === plotId)
+    if (idx !== -1) {
+      f.activeCrops[idx] = { ...f.activeCrops[idx], ...updates }
+    }
+  }
+  saveStoreToDisk()
+  return f
+}
+
+export function deletePlotFromFallbackFarmer(mobile: string, plotId: string): any {
+  const f = getOrCreateFallbackFarmer(mobile)
+  if (Array.isArray(f.activeCrops)) {
+    f.activeCrops = f.activeCrops.filter((p: any) => p.id !== plotId)
+  }
+  saveStoreToDisk()
+  return f
+}
+
+export function getAdminAggregateStats() {
+  const farmers = getAllFallbackFarmers()
+  let totalAcres = 0
+  const cropCounts: Record<string, number> = {}
+  const districtCounts: Record<string, number> = {}
+  let activeAlerts = 0
+  let totalPlots = 0
+  let rtcVerifiedCount = 0
+
+  for (const f of farmers) {
+    totalAcres += Number(f.farmSize) || 0
+    if (f.rtcVerified) rtcVerifiedCount++
+    districtCounts[f.district] = (districtCounts[f.district] || 0) + 1
+    if (Array.isArray(f.activeCrops)) {
+      totalPlots += f.activeCrops.length
+      for (const p of f.activeCrops) {
+        cropCounts[p.cropName] = (cropCounts[p.cropName] || 0) + 1
+        if (
+          p.healthStatus === "PEST_SUSPECTED" ||
+          p.healthStatus === "WATER_STRESSED" ||
+          p.healthStatus === "LOW_NUTRIENTS"
+        ) {
+          activeAlerts++
+        }
+      }
+    }
+  }
+
+  let totalScans = 0
+  for (const scans of fallbackScans.values()) {
+    totalScans += scans.length
+  }
+
+  return {
+    totalFarmers: farmers.length,
+    totalAcres: Math.round(totalAcres * 10) / 10,
+    totalPlots,
+    rtcVerifiedCount,
+    activeAlerts,
+    totalScans,
+    cropCounts,
+    districtCounts,
+    lastUpdated: new Date().toISOString(),
+  }
+}
+
