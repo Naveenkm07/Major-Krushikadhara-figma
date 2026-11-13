@@ -20,3 +20,4 @@ for i, slide in enumerate(prs.slides):
         elif s.shape_type == 13: # picture
             bottom = (s.top + s.height) / 914400.0
             print(f"  Picture: left={s.left/914400:.2f}\", top={s.top/914400:.2f}\", w={s.width/914400:.2f}\", h={s.height/914400:.2f}\", bottom={bottom:.2f}\"")
+

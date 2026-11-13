@@ -10,15 +10,13 @@ template_path = r'Z:\figma-major-12-11-2026\Major-Krushikadhara-figma\Project Ph
 output_path = r'Z:\figma-major-12-11-2026\Major-Krushikadhara-figma\Project Phase-II_Review 2_ PPT Template.pptx'
 assets_dir = r'Z:\figma-major-12-11-2026\Major-Krushikadhara-figma\ppt_assets'
 
-logo_path = os.path.join(assets_dir, 'nhce_logo.png')
+# High-Res Logos & Diagrams
+logo_path = os.path.join(assets_dir, 'nhce_crest_clean.png')
 arch_diag = os.path.join(assets_dir, 'arch_diagram.png')
 pipe_diag = os.path.join(assets_dir, 'pipeline_diagram.png')
 voice_diag = os.path.join(assets_dir, 'voice_diagram.png')
 life_diag = os.path.join(assets_dir, 'lifecycle_diagram.png')
-
-ss_home = os.path.join(assets_dir, '01-home-dashboard.png')
-ss_scan = os.path.join(assets_dir, '02-pest-scan.png')
-ss_mandi = os.path.join(assets_dir, '03-mandi-market.png')
+showcase_img = os.path.join(assets_dir, 'live_showcase.png')
 
 # Colors
 MAROON = RGBColor(0xC0, 0x00, 0x00)
@@ -117,6 +115,16 @@ for g in guides:
     p.font.size = Pt(12)
     p.font.color.rgb = DARK_TEXT
 
+# Replace low-res Shape 3 logo on Slide 1 with crisp high-res crest
+if len(s1.shapes) > 3:
+    for sh in list(s1.shapes):
+        if sh.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE:
+            sp = sh._element
+            sp.getparent().remove(sp)
+
+if os.path.exists(logo_path):
+    s1.shapes.add_picture(logo_path, Inches(5.66), Inches(0.08), Inches(2.0), Inches(1.84))
+
 
 # ==========================================
 # SLIDE 2: Outline of Presentation - Slide Index 1
@@ -129,7 +137,7 @@ for shape in list(s2.shapes):
 if os.path.exists(logo_path):
     s2.shapes.add_picture(logo_path, Inches(12.0), Inches(0.12), Inches(1.0), Inches(0.98))
 
-tbox = s2.shapes.add_textbox(Inches(0.8), Inches(0.35), Inches(10.8), Inches(0.8))
+tbox = s2.shapes.add_textbox(Inches(0.8), Inches(0.35), Inches(10.8), Inches(0.75))
 tf = tbox.text_frame
 tf.word_wrap = True
 p = tf.paragraphs[0]
@@ -215,6 +223,7 @@ def setup_slide(slide, title_text):
         sp = shape._element
         sp.getparent().remove(sp)
     
+    # Crisp high-res crest in top right
     if os.path.exists(logo_path):
         slide.shapes.add_picture(logo_path, Inches(12.0), Inches(0.12), Inches(1.0), Inches(0.98))
     
@@ -230,7 +239,6 @@ def setup_slide(slide, title_text):
     p = tf.paragraphs[0]
     p.text = title_text
     p.font.name = "Times New Roman"
-    # Strict font size to prevent wrapping
     if len(title_text) > 50:
         p.font.size = Pt(20)
     elif len(title_text) > 35:
@@ -291,68 +299,17 @@ def create_bullet_slide(slide, title_text, bullets):
 
 
 # ==========================================
-# HELPER: Split Slide (Bullets Left, Diagram Right)
+# HELPER: Full-Slide Ultra-HD Visual Canvas Slide
 # ==========================================
-def create_split_slide(slide, title_text, bullets, diagram_path, takeaway_title, takeaway_text):
+def create_visual_canvas_slide(slide, title_text, image_path):
     setup_slide(slide, title_text)
     
-    # Left Content Box
-    cbox = slide.shapes.add_textbox(Inches(0.8), Inches(1.40), Inches(5.6), Inches(5.20))
-    tf = cbox.text_frame
-    tf.word_wrap = True
-    tf.margin_top = 0
-    tf.margin_bottom = 0
-    tf.margin_left = 0
-    tf.margin_right = 0
-    
-    for i, (heading, body) in enumerate(bullets):
-        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-        p.space_after = Pt(7)
-        
-        run_h = p.add_run()
-        run_h.text = f"•  {heading}: "
-        run_h.font.name = "Times New Roman"
-        run_h.font.size = Pt(12)
-        run_h.font.bold = True
-        run_h.font.color.rgb = NAVY
-        
-        run_b = p.add_run()
-        run_b.text = body
-        run_b.font.name = "Times New Roman"
-        run_b.font.size = Pt(11)
-        run_b.font.color.rgb = DARK_TEXT
-    
-    # Right Diagram Image (2:1 aspect ratio -> 5.85" x 2.925")
-    if os.path.exists(diagram_path):
-        slide.shapes.add_picture(diagram_path, Inches(6.65), Inches(1.40), Inches(5.85), Inches(2.925))
-    
-    # Right Callout Card below diagram
-    callout_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(6.65), Inches(4.50), Inches(5.85), Inches(2.00))
-    callout_box.fill.solid()
-    callout_box.fill.fore_color.rgb = LIGHT_BG
-    callout_box.line.color.rgb = BORDER_COLOR
-    callout_box.line.width = Pt(1.5)
-    
-    ctf = callout_box.text_frame
-    ctf.word_wrap = True
-    ctf.margin_top = Inches(0.12)
-    ctf.margin_bottom = Inches(0.12)
-    ctf.margin_left = Inches(0.15)
-    ctf.margin_right = Inches(0.15)
-    
-    cp1 = ctf.paragraphs[0]
-    cp1.text = f"Key Architectural Highlight: {takeaway_title}"
-    cp1.font.name = "Times New Roman"
-    cp1.font.size = Pt(11.5)
-    cp1.font.bold = True
-    cp1.font.color.rgb = NAVY
-    cp1.space_after = Pt(4)
-    
-    cp2 = ctf.add_paragraph()
-    cp2.text = takeaway_text
-    cp2.font.name = "Times New Roman"
-    cp2.font.size = Pt(10.5)
-    cp2.font.color.rgb = DARK_TEXT
+    # Display Ultra-HD Retina Canvas at full slide width (11.40" x 5.45")
+    # Aspect ratio of 4800x2300 is 2.087
+    if os.path.exists(image_path):
+        slide.shapes.add_picture(image_path, Inches(0.95), Inches(1.25), Inches(11.40), Inches(5.45))
+    else:
+        print(f"⚠️ Warning: {image_path} not found!")
 
 
 # ==========================================
@@ -464,83 +421,42 @@ create_bullet_slide(prs.slides[4], "2. INTRODUCTION - PROBLEM STATEMENT & OBJECT
 
 
 # ==========================================
-# SLIDE 6: Proposed System Architecture (Index 5)
+# SLIDE 6: Proposed System Architecture (Index 5) - FULL-SLIDE ULTRA-HD CANVAS
 # ==========================================
-s6_bullets = [
-    ("5-Tier Full-Stack Architecture", "Engineered with modular high-availability separation between edge client execution and cloud AI services."),
-    ("Tier 1: Client Application", "React Native 0.88, Expo SDK 58, Offline Cache, Camera & Audio stream with zero-literacy vernacular UI."),
-    ("Tier 2: Edge AI Intelligence", "Quantized YOLO11s INT8 TFLite neural network running locally in 340ms on ARM64 NNAPI hardware."),
-    ("Tier 3: Cloud REST Gateway", "Dockerized Node.js 22 LTS / Express microservice hosted on Render Cloud with automated horizontal autoscaling."),
-    ("Tier 4: Multimodal & Voice AI", "Google Gemini 2.5 Flash for foliar pathology reasoning + Sarvam AI saaras:v2 for Kannada STT/TTS."),
-    ("Tier 5: Data & Telemetry", "Neon Serverless PostgreSQL 16 with Prisma ORM + live Agmarknet APMC mandi daily synchronization.")
-]
-create_split_slide(
+create_visual_canvas_slide(
     prs.slides[5], 
     "3. PROPOSED SYSTEM - ARCHITECTURAL OVERVIEW", 
-    s6_bullets, 
-    arch_diag, 
-    "5-Tier High-Availability Pipeline",
-    "Separates compute-heavy edge neural execution from cloud multimodal reasoning, ensuring zero downtime even during rural network blackouts."
+    arch_diag
 )
 
 
 # ==========================================
-# SLIDE 7: Edge Vision & Multimodal Diagnostics (Index 6)
+# SLIDE 7: Edge Vision & Multimodal Diagnostics (Index 6) - FULL-SLIDE ULTRA-HD CANVAS
 # ==========================================
-s7_bullets = [
-    ("Two-Stage Hybrid Diagnostic Logic", "Combines low-latency edge computer vision with cloud multimodal leaf pathology reasoning."),
-    ("Stage 1: Edge YOLO11s TFLite", "640×640 letterboxed input image with INT8 quantization; executes in 340ms across 102 agricultural pest and disease classes."),
-    ("Decision Gate (85% Confidence)", "High-confidence detections produce instant on-device treatment cards; ambiguous foliar blights escalate to Stage 2."),
-    ("Stage 2: Gemini Multimodal Vision", "Analyzes intricate leaf chlorosis, fungal lesions, and N/P/K nutritional deficiencies with UAS Bengaluru treatment dosages."),
-    ("Offline-First Resiliency", "Built-in embedded rule-based database guarantees 100% operational uptime when cellular coverage drops.")
-]
-create_split_slide(
+create_visual_canvas_slide(
     prs.slides[6], 
     "3. PROPOSED SYSTEM - EDGE VISION & MULTIMODAL DIAGNOSTICS", 
-    s7_bullets, 
-    pipe_diag, 
-    "Dual-Stage Precision Vision",
-    "Edge model delivers 340ms immediate pest localization, while Cloud Gemini handles complex multi-pathogen foliar necrosis with expert dosages."
+    pipe_diag
 )
 
 
 # ==========================================
-# SLIDE 8: Bilingual Voice Agronomist (Index 7)
+# SLIDE 8: Bilingual Voice Agronomist (Index 7) - FULL-SLIDE ULTRA-HD CANVAS
 # ==========================================
-s8_bullets = [
-    ("Conversational Vernacular AI", "Completely eliminates typing and literacy barriers by allowing farmers to communicate in colloquial Kannada speech."),
-    ("Bilingual Speech Pipeline", "Captures 16kHz PCM audio via Expo Audio; streams to Sarvam AI saaras:v2 engine for dialect-resilient Kannada transcription."),
-    ("Stage-Aware Prompt Injection", "Dynamically injects registered farmer profile, active crop, sowing age (Day 35), and physiological stage into Gemini 2.5 prompts."),
-    ("Multimodal Dialogue Output", "Plays natural synthesized Kannada audio via Sarvam TTS while simultaneously rendering structured visual advisory cards."),
-    ("Voice Feedback & Waveform", "Real-time 60fps audio waveform bars reassure the farmer during speech capture and token processing.")
-]
-create_split_slide(
+create_visual_canvas_slide(
     prs.slides[7], 
     "3. PROPOSED SYSTEM - BILINGUAL VOICE AGRONOMIST", 
-    s8_bullets, 
-    voice_diag, 
-    "Stage-Aware Vernacular Loop",
-    "Injects the crop's precise chronological age into each query, ensuring recommendations match current vegetative and reproductive realities."
+    voice_diag
 )
 
 
 # ==========================================
-# SLIDE 9: Crop Lifecycle & Mandi Intelligence (Index 8)
+# SLIDE 9: Crop Lifecycle & Mandi Intelligence (Index 8) - FULL-SLIDE ULTRA-HD CANVAS
 # ==========================================
-s9_bullets = [
-    ("Dynamic 32+ Crop Lifecycle Engine", "Interactive calendar tracking 32+ regional crops across Karnataka (Paddy, Ragi, Tomato, Sugarcane, Maize, Cotton, etc.)."),
-    ("5 Growth Stages", "Models Land Prep (0-15d), Tillering/Vegetative (16-45d), Panicle/Flowering (46-75d), Grain Filling/Ripening (76-105d), and Harvest (106-120d)."),
-    ("Proactive Day-by-Day Advisory", "Calculates growing degree days (GDD), soil moisture thresholds, and exact split-dose fertilizer timings (Urea/MOP)."),
-    ("Statewide APMC Mandi Telemetry", "Synchronizes with Agmarknet across 150+ market yards in all 31 districts of Karnataka daily."),
-    ("Market Exploitation Elimination", "Informs smallholders of minimum, maximum, and modal wholesale rates, empowering them to bypass predatory commission agents.")
-]
-create_split_slide(
+create_visual_canvas_slide(
     prs.slides[8], 
     "3. PROPOSED SYSTEM - CROP LIFECYCLE & MANDI INTELLIGENCE", 
-    s9_bullets, 
-    life_diag, 
-    "Lifecycle & Market Synchronization",
-    "Unifies biological crop growth monitoring with economic market price discovery, maximizing smallholder yield and financial profit."
+    life_diag
 )
 
 
@@ -616,70 +532,13 @@ create_bullet_slide(prs.slides[12], "6. RESULTS AND DISCUSSIONS - DIAGNOSTIC ACC
 
 
 # ==========================================
-# SLIDE 14: Results & Discussions - Live Screenshots (Index 13) - OVERHAULED & FLAWLESS!
+# SLIDE 14: Results & Discussions - Live Screenshots (Index 13) - FULL-SLIDE ULTRA-HD CANVAS
 # ==========================================
-s14 = prs.slides[13]
-setup_slide(s14, "6. RESULTS AND DISCUSSIONS - LIVE SYSTEM IMPLEMENTATION")
-
-# 3 Screenshots with exact borders & alignment
-ss_info = [
-    (ss_home, Inches(0.80), "Fig 6.1: Microclimate & Stage Home"),
-    (ss_scan, Inches(3.10), "Fig 6.2: Edge Pest Vision Scan"),
-    (ss_mandi, Inches(5.40), "Fig 6.3: Statewide APMC Mandi")
-]
-for img_path, left_pos, caption in ss_info:
-    if os.path.exists(img_path):
-        s14.shapes.add_picture(img_path, left_pos, Inches(1.40), Inches(2.10), Inches(4.25))
-    
-    c_box = s14.shapes.add_textbox(left_pos, Inches(5.72), Inches(2.10), Inches(0.35))
-    ctf = c_box.text_frame
-    ctf.word_wrap = True
-    ctf.margin_top = 0
-    cp = ctf.paragraphs[0]
-    cp.text = caption
-    cp.font.name = "Times New Roman"
-    cp.font.size = Pt(10)
-    cp.font.bold = True
-    cp.font.color.rgb = NAVY
-    cp.alignment = PP_ALIGN.CENTER
-
-# Right Technical Analysis Card
-right_card = s14.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(7.70), Inches(1.40), Inches(4.80), Inches(4.70))
-right_card.fill.solid()
-right_card.fill.fore_color.rgb = LIGHT_BG
-right_card.line.color.rgb = BORDER_COLOR
-right_card.line.width = Pt(1.5)
-
-rtf = right_card.text_frame
-rtf.word_wrap = True
-rtf.margin_top = Inches(0.12)
-rtf.margin_bottom = Inches(0.12)
-rtf.margin_left = Inches(0.15)
-rtf.margin_right = Inches(0.15)
-
-bullets_s14 = [
-    ("Physical Device Validation", "Tested on Motorola Edge 50 Fusion (Snapdragon 7s Gen 2, 8GB RAM, Android 14) with zero crashes."),
-    ("Live Mandya Microclimate", "Real-time weather (30.8°C, 57% humidity) + thermal GDD calculation for harvest timeline estimation."),
-    ("On-Device Edge Vision", "Zero-server YOLO11s pest detection in 340ms with camera viewfinder guidance."),
-    ("Statewide APMC Mandi Telemetry", "Live arrivals, minimum, maximum, and modal wholesale rates across all 31 Karnataka districts."),
-    ("Admin Studio Web Console", "Vercel-hosted management portal with 60fps real-time crop stage progression slider.")
-]
-for i, (head, body) in enumerate(bullets_s14):
-    p = rtf.paragraphs[0] if i == 0 else rtf.add_paragraph()
-    p.space_after = Pt(6)
-    
-    run_h = p.add_run()
-    run_h.text = f"• {head}: "
-    run_h.font.name = "Times New Roman"
-    run_h.font.size = Pt(10.5)
-    run_h.font.bold = True
-    run_h.font.color.rgb = NAVY
-    
-    run_b = p.add_run()
-    run_b.text = body
-    run_b.font.name = "Times New Roman"
-    run_b.font.size = Pt(9.5)
-    run_b.font.color.rgb = DARK_TEXT
+create_visual_canvas_slide(
+    prs.slides[13], 
+    "6. RESULTS AND DISCUSSIONS - LIVE SYSTEM IMPLEMENTATION", 
+    showcase_img
+)
 
 
 # ==========================================

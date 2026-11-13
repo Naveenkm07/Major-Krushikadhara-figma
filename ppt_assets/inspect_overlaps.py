@@ -26,3 +26,4 @@ for i, slide in enumerate(prs.slides):
         
         fs_str = f"fonts={set(font_sizes)}" if font_sizes else ""
         print(f"  Shape {s_idx} ({shape.name}): left={left:.2f}\", top={top:.2f}\", w={width:.2f}\", h={height:.2f}\" | {fs_str} | '{text_preview}'")
+
